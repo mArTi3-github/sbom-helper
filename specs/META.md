@@ -1,6 +1,6 @@
-# PURL Resolver — Specification System
+# sbom-helper — Specification System
 
-This directory contains structured specifications for the PURL Resolver project. Specs are optimized for both human developers and AI agents — they provide deterministic context about intended behavior, interfaces, and architectural decisions.
+This directory contains structured specifications for the sbom-helper project. Specs are optimized for both human developers and AI agents — they provide deterministic context about intended behavior, interfaces, and architectural decisions.
 
 ## File Organization
 

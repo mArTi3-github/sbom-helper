@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from .config import settings
 from .router import router
 
-app = FastAPI(title="PURL Resolver")
+app = FastAPI(title="sbom-helper")
 app.include_router(router)
 
 

@@ -1,5 +1,5 @@
 [project]
-name = "purl-resolver"
+name = "sbom-helper"
 version = "0.1.0"
 description = "Resolve Package URLs (PURLs) to source code repository URLs"
 requires-python = ">=3.11"

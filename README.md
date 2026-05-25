@@ -1,4 +1,4 @@
-# PURL Resolver
+# sbom-helper
 
 Resolve Package URLs (PURLs) to source code repository URLs with confidence scoring and evidence.
 

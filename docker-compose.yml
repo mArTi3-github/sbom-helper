@@ -3,8 +3,8 @@ services:
     build:
       context: .
       target: ${BUILD_TARGET:-prod}
-    image: purl-resolver:latest
-    container_name: purl-resolver
+    image: sbom-helper:latest
+    container_name: sbom-helper
     ports:
       - "${PORT:-8000}:8000"
     environment:

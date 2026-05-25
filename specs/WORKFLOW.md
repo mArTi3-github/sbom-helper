@@ -1,6 +1,6 @@
 # Spec Workflow
 
-This document defines how AI agents and human developers use and maintain the specification system for the PURL Resolver project. The project's development workflow is defined in `/WORKFLOW.md` at the repository root — this file covers spec-specific processes.
+This document defines how AI agents and human developers use and maintain the specification system for the sbom-helper project. The project's development workflow is defined in `/WORKFLOW.md` at the repository root — this file covers spec-specific processes.
 
 ## When to Read Specs
 

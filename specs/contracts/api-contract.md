@@ -2,7 +2,7 @@
 
 ## Participants
 
-- **Provider**: PURL Resolver service (FastAPI)
+- **Provider**: sbom-helper service (FastAPI)
 - **Consumer**: Any HTTP client (browser, curl, scripts, future frontend)
 
 ## Base URL
