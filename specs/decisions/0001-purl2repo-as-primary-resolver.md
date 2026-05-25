@@ -1,0 +1,3 @@
+# purl2repo as primary resolver
+
+purl2repo resolves PURLs to repository URLs with confidence, evidence, and repository kind. The original plan proposed purl2src, but purl2src returns download URLs (tarballs), not repository URLs. purl2repo returns exactly what the application needs — VCS repository URLs — which eliminates the need for an intermediate mapping layer. purl2src is reserved as a potential future fallback resolver.

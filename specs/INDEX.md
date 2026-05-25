@@ -1,0 +1,52 @@
+# Specs INDEX
+
+## Task → Spec Mapping
+
+| Task | Spec to Read |
+|---|---|
+| Add a new API endpoint | `contracts/api-contract.md`, `architecture/layers.md` |
+| Change the resolution logic | `domains/purl-resolution.md` |
+| Modify the web UI | `domains/web-ui.md` |
+| Change error handling strategy | `domains/purl-resolution.md`, `contracts/api-contract.md` |
+| Add configuration parameter | `domains/purl-resolution.md` |
+| Change how purl2repo is called | `architecture/layers.md`, `domains/purl-resolution.md` |
+| Add a new layer or module | `architecture/layers.md`, `META.md` |
+| Make a breaking API change | `contracts/api-contract.md` (Breaking Change Checklist) |
+| Understand the full system | `architecture/layers.md` first, then domain specs |
+| Add a fallback resolver | `architecture/layers.md`, `decisions/` |
+
+## Dependency Graph
+
+```
+contracts/api-contract.md
+        |
+        v
+domains/purl-resolution.md  ──>  domains/web-ui.md
+        |
+        v
+architecture/layers.md
+        |
+        v
+decisions/0001-purl2repo-as-primary-resolver.md
+```
+
+The API contract depends on the purl-resolution domain definition. The web UI depends on the API contract. Architecture layers provide the structural constraints for all domains. Decisions document the rationale behind architectural choices.
+
+## Directory Listing
+
+```
+specs/
+├── META.md                          — Rules, templates, glossary
+├── INDEX.md                         — This file
+├── WORKFLOW.md                      — Agent workflows
+├── architecture/
+│   └── layers.md                    — Layer hierarchy and import rules
+├── domains/
+│   ├── purl-resolution.md           — Core resolution capability
+│   └── web-ui.md                    — Browser interface
+├── contracts/
+│   └── api-contract.md              — HTTP API contract
+└── decisions/
+    ├── _template.md                 — ADR template
+    └── 0001-purl2repo-as-primary-resolver.md
+```

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "codebase-memory-mcp": {
+      "type": "local",
+      "command": ["/home/administrator/.local/bin/codebase-memory-mcp"],
+      "enabled": true
+    }
+  }
+}

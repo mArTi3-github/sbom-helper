@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "vibespec-check": {
+      "source": "v0lka/skills",
+      "sourceType": "github",
+      "skillPath": "sdd/vibespec-check/SKILL.md",
+      "computedHash": "74e9c49da8ddc116a019eb8d25e2914f71059c815a8c23d3dc9b1cd856aa6530"
+    },
+    "vibespec-consult": {
+      "source": "v0lka/skills",
+      "sourceType": "github",
+      "skillPath": "sdd/vibespec-consult/SKILL.md",
+      "computedHash": "73bf167b7eaef0a537e9fc20b47fd64f5b41a54fa3ff774bb5fe5d8d9571029c"
+    },
+    "vibespec-create": {
+      "source": "v0lka/skills",
+      "sourceType": "github",
+      "skillPath": "sdd/vibespec-create/SKILL.md",
+      "computedHash": "991063ee9355b1bd70bd82ef441d19725f455bfc4d5bc627a6af9a339b8fb230"
+    },
+    "vibespec-init": {
+      "source": "v0lka/skills",
+      "sourceType": "github",
+      "skillPath": "sdd/vibespec-init/SKILL.md",
+      "computedHash": "50a0cea6c93b32904416c87a11f33483cd222fb173523f440924c465e8341bac"
+    },
+    "vibespec-update": {
+      "source": "v0lka/skills",
+      "sourceType": "github",
+      "skillPath": "sdd/vibespec-update/SKILL.md",
+      "computedHash": "2591fad553108d048d67b75325582a3cf9e590ecefbde5d65565fef5557c9b18"
+    }
+  }
+}
