@@ -66,3 +66,4 @@ Client                    API Layer                    purl2repo
 | `PURL2REPO_USE_CACHE` | `true` | Enable purl2repo file-based caching |
 | `PURL2REPO_STRICT` | `false` | Strict mode — purl2repo raises instead of returning warnings |
 | `PURL2REPO_NO_NETWORK` | `false` | Disable network access for purl2repo |
+| `PURL2REPO_CACHE_DIR` | `None` | Custom cache directory path for purl2repo |

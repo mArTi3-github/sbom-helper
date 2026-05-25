@@ -10,6 +10,7 @@ from purl2repo.errors import (
     UnsupportedEcosystemError,
 )
 
+from .config import settings
 from .schemas import ErrorResponse, ResolveRequest, ResolveResponse
 
 router = APIRouter()
@@ -19,7 +20,14 @@ templates = Jinja2Templates(directory="src/purl_resolver/templates")
 @router.post("/api/v1/resolve")
 async def resolve_endpoint(body: ResolveRequest) -> JSONResponse:
     try:
-        result = resolve(body.purl)
+        result = resolve(
+            body.purl,
+            timeout=settings.timeout,
+            use_cache=settings.use_cache,
+            strict=settings.strict,
+            no_network=settings.no_network,
+            cache_dir=settings.cache_dir,
+        )
     except (InvalidPurlError, UnsupportedEcosystemError) as e:
         return JSONResponse(
             status_code=400,
