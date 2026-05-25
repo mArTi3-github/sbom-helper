@@ -2,15 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from purl2repo import resolve as purl2repo_resolve
-from purl2repo.errors import (
-    InvalidPurlError,
-    MetadataFetchError,
-    ResolutionError,
-    UnsupportedEcosystemError,
-)
-
-from .config import Settings
+from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
 from .schemas import ResolveResponse, ResolveResult
 from .storage.interface import Storage
 
@@ -20,7 +12,7 @@ logger = logging.getLogger(__name__)
 async def resolve_purl(
     purl: str,
     storage: Storage,
-    settings: Settings,
+    resolvers: list[Resolver],
 ) -> ResolveResult:
     try:
         cached = await storage.lookup(purl)
@@ -34,45 +26,39 @@ async def resolve_purl(
             exc_info=True,
         )
 
-    try:
-        result = purl2repo_resolve(
-            purl,
-            timeout=settings.timeout,
-            use_cache=settings.use_cache,
-            strict=settings.strict,
-            no_network=settings.no_network,
-            cache_dir=settings.cache_dir,
-        )
-    except (InvalidPurlError, UnsupportedEcosystemError) as e:
-        return ResolveResult.err(400, "invalid_purl", str(e))
-    except (ResolutionError, MetadataFetchError) as e:
-        return ResolveResult.err(502, "upstream_error", str(e))
+    for resolver in resolvers:
+        try:
+            resolution = resolver.resolve(purl)
+        except InvalidPurlError as e:
+            return ResolveResult.err(400, "invalid_purl", str(e))
+        except UpstreamError as e:
+            return ResolveResult.err(502, "upstream_error", str(e))
 
-    if result.repository_url is None:
-        return ResolveResult.ok(
-            ResolveResponse(
-                purl=purl,
-                warnings=list(result.warnings),
-            )
+        if resolution.repository_url is None:
+            continue
+
+        response = ResolveResponse(
+            purl=resolution.purl,
+            repository_url=resolution.repository_url,
+            repository_type=resolution.repository_type,
+            repository_kind=resolution.repository_kind,
+            confidence=resolution.confidence,
+            evidence=list(resolution.evidence),
+            warnings=list(resolution.warnings),
+            version_reference=resolution.version_reference,
         )
 
-    response = ResolveResponse(
-        purl=purl,
-        repository_url=result.repository_url,
-        repository_type=result.repository_type,
-        repository_kind=result.repository_kind,
-        confidence=result.confidence,
-        evidence=list(result.evidence),
-        warnings=list(result.warnings),
-        version_reference=result.version_reference.url
-        if result.version_reference
-        else None,
+        try:
+            await storage.store(response)
+            logger.info("Stored result for %s", purl)
+        except Exception:
+            logger.warning("Failed to store result for %s", purl, exc_info=True)
+
+        return ResolveResult.ok(response)
+
+    return ResolveResult.ok(
+        ResolveResponse(
+            purl=purl,
+            warnings=["No resolver found a repository URL"],
+        )
     )
-
-    try:
-        await storage.store(response)
-        logger.info("Stored result for %s", purl)
-    except Exception:
-        logger.warning("Failed to store result for %s", purl, exc_info=True)
-
-    return ResolveResult.ok(response)

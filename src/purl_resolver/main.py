@@ -7,7 +7,8 @@ import asyncpg
 import uvicorn
 from fastapi import FastAPI
 
-from .config import storage_settings
+from .config import settings, storage_settings
+from .resolver.purl2repo import Purl2RepoResolver
 from .router import router
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
@@ -27,6 +28,16 @@ async def lifespan(app: FastAPI):
             "PostgreSQL unavailable, falling back to in-memory cache", exc_info=True
         )
         app.state.storage = InMemoryCache()
+    app.state.resolvers = [
+        Purl2RepoResolver(
+            timeout=settings.timeout,
+            use_cache=settings.use_cache,
+            strict=settings.strict,
+            no_network=settings.no_network,
+            cache_dir=settings.cache_dir,
+        ),
+    ]
+    logger.info("Configured %d resolver(s)", len(app.state.resolvers))
     yield
     if pool is not None:
         await pool.close()

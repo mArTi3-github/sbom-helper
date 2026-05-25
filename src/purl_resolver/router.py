@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from .config import settings
 from .schemas import ResolveRequest
 from .service import resolve_purl
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-templates = Jinja2Templates(directory="src/purl_resolver/templates")
+_templates_dir = (pathlib.Path(__file__).parent / "templates").resolve()
+templates = Jinja2Templates(directory=str(_templates_dir))
 
 
 @router.post("/api/v1/resolve")
@@ -21,7 +22,7 @@ async def resolve_endpoint(body: ResolveRequest, request: Request) -> JSONRespon
     result = await resolve_purl(
         purl=body.purl,
         storage=request.app.state.storage,
-        settings=settings,
+        resolvers=request.app.state.resolvers,
     )
 
     if result.error_status is not None:
