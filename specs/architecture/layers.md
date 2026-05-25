@@ -3,47 +3,50 @@
 ## Layer Diagram
 
 ```
-+---------------------------+
-|     HTTP Client           |
-|  (Browser, curl, scripts) |
-+------------+--------------+
-             |
-             | HTTP JSON
-             v
-+---------------------------+
-|     API Layer             |
-|  src/purl_resolver/router |
-|                           |
-|  POST /api/v1/resolve     |
-|  GET /health              |
-|  GET / (HTML page)        |
-+------------+--------------+
-             |
-             | Python call
-             v
-+---------------------------+
-|     Domain Layer          |
-|  purl2repo library        |
-|                           |
-|  resolve(purl_str)        |
-+---------------------------+
-
-+---------------------------+
-|     Config Layer          |
-|  src/purl_resolver/config |
-|                           |
-|  Pydantic Settings        |
-|  env vars + .env          |
-+---------------------------+
-
-+---------------------------+
-|     Web UI Layer          |
-|  src/purl_resolver/       |
-|  templates/index.html     |
-|                           |
-|  Jinja2 template          |
-|  Vanilla JS + fetch()     |
-+---------------------------+
++-----------------------------------------------+
+|  Docker Container                              |
+|  +---------------------------+                 |
+|  |     HTTP Client           |                 |
+|  |  (Browser, curl, scripts) |                 |
+|  +------------+--------------+                 |
+|               |                                |
+|               | HTTP JSON                      |
+|               v                                |
+|  +---------------------------+                 |
+|  |     API Layer             |                 |
+|  |  src/purl_resolver/router |                 |
+|  |                           |                 |
+|  |  POST /api/v1/resolve     |                 |
+|  |  GET /health              |                 |
+|  |  GET / (HTML page)        |                 |
+|  +------------+--------------+                 |
+|               |                                |
+|               | Python call                    |
+|               v                                |
+|  +---------------------------+                 |
+|  |     Domain Layer          |                 |
+|  |  purl2repo library        |                 |
+|  |                           |                 |
+|  |  resolve(purl_str)        |                 |
+|  +---------------------------+                 |
+|                                                |
+|  +---------------------------+                 |
+|  |     Config Layer          |                 |
+|  |  src/purl_resolver/config |                 |
+|  |                           |                 |
+|  |  Pydantic Settings        |                 |
+|  |  env vars from container  |                 |
+|  +---------------------------+                 |
+|                                                |
+|  +---------------------------+                 |
+|  |     Web UI Layer          |                 |
+|  |  src/purl_resolver/       |                 |
+|  |  templates/index.html     |                 |
+|  |                           |                 |
+|  |  Jinja2 template          |                 |
+|  |  Vanilla JS + fetch()     |                 |
+|  +---------------------------+                 |
++-----------------------------------------------+
 ```
 
 ## Import Rules
@@ -71,7 +74,7 @@
 
 ### Config Layer (`config.py`)
 - Provide typed access to all runtime configuration
-- Load from environment variables with `.env` file fallback
+- Load from environment variables (set via docker-compose.yml in production, or `.env` in development)
 - All env vars use the `PURL2REPO_` prefix
 
 ### Web UI Layer (`templates/index.html`)
@@ -85,3 +88,4 @@
 - Bypassing the API Layer — direct calls to purl2repo from the test client (tests use HTTP through TestClient)
 - Storing state in the API Layer (the service is stateless by design)
 - Changing the canonical response format without updating contracts/api-contract.md
+- Running outside Docker for production deployment (development-only bare uvicorn)

@@ -5,15 +5,19 @@ Resolve Package URLs (PURLs) to source code repository URLs with confidence scor
 ## Quick Start
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn purl_resolver.main:app --reload
+docker compose up -d
 ```
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/resolve \
   -H "Content-Type: application/json" \
   -d '{"purl":"pkg:pypi/requests@2.31.0"}'
+```
+
+For development with hot-reload:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up
 ```
 
 ## API
@@ -28,6 +32,7 @@ curl -X POST http://localhost:8000/api/v1/resolve \
 
 **Backend:** FastAPI, Pydantic, purl2repo  
 **UI:** Jinja2, vanilla JS  
+**Infrastructure:** Docker, Docker Compose  
 **Python:** 3.11+
 
 ## Status

@@ -62,32 +62,35 @@
 ## 5. Архитектура MVP
 
 ```
-+-------------------+
-|   Browser (UI)    |
-|   HTML + JS       |
-+---------+---------+
-          |
-          v
-+------------------------+
-|   FastAPI (один сервис)|
-|                        |
-|   POST /api/v1/resolve |
-|   GET /health          |
-|   GET / (HTML page)    |
-+------------------------+
-          |
-          v
-+------------------------+
-|   purl2repo            |
-|   (Python library)     |
-+------------------------+
++-----------------------------------------------+
+|  Docker Container                              |
+|  +---------------------------+                 |
+|  |     HTTP Client           |                 |
+|  |  (Browser, curl, scripts) |                 |
+|  +------------+--------------+                 |
+|               |                                |
+|               v                                |
+|  +------------------------+                    |
+|  |   FastAPI (один сервис)|                    |
+|  |                        |                    |
+|  |   POST /api/v1/resolve |                    |
+|  |   GET /health          |                    |
+|  |   GET / (HTML page)    |                    |
+|  +------------------------+                    |
+|               |                                |
+|               v                                |
+|  +------------------------+                    |
+|  |   purl2repo            |                    |
+|  |   (Python library)     |                    |
+|  +------------------------+                    |
++-----------------------------------------------+
 ```
 
 В MVP нет:
 - Отдельного API Gateway / BFF — FastAPI выполняет обе роли.
 - PostgreSQL — результаты не сохраняются.
 - Redis — кэширование через файловый кэш purl2repo.
-- Docker — разработка и запуск через `uvicorn` напрямую.
+- Docker Compose используется для оркестрации одного сервиса (без БД, Redis, reverse proxy).
 
 ---
 
@@ -163,17 +166,23 @@ GET /
 
 ```
 purl-resolver/
+├── Dockerfile                 # Multi-stage build (dev + prod)
+├── docker-compose.yml         # Orchestration (prod default + future services)
+├── docker-compose.override.yml# Dev overrides (volume mount, hot-reload)
+├── .dockerignore              # Minimal build context
 ├── src/
 │   └── purl_resolver/
 │       ├── __init__.py
-│       ├── main.py          # FastAPI app, endpoints
-│       ├── config.py        # Pydantic Settings
-│       ├── schemas.py       # Pydantic models for request/response
-│       ├── router.py        # API routes
+│       ├── main.py            # FastAPI app, endpoints
+│       ├── config.py          # Pydantic Settings
+│       ├── schemas.py         # Pydantic models for request/response
+│       ├── router.py          # API routes
 │       └── templates/
-│           └── index.html   # Single HTML page
+│           └── index.html     # Single HTML page
 ├── tests/
-│   └── test_api.py          # Integration tests
+│   └── test_api.py            # Integration tests
+├── specs/
+│   ...
 ├── docs/
 │   └── adr/
 │       └── 0001-purl2repo-as-primary-resolver.md
@@ -221,6 +230,8 @@ purl-resolver/
 - Интеграция purl2repo
 - Интеграционные тесты
 - File-based cache purl2repo
+- Docker multi-stage Dockerfile (dev + prod)
+- Docker Compose для единого сервиса с health check и hot-reload dev режимом
 
 ### Phase 2
 - PostgreSQL для хранения результатов (lookup до purl2repo)

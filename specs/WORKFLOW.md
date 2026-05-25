@@ -10,6 +10,8 @@ Read the relevant spec before making structural changes:
 - Before modifying the web UI → read `domains/web-ui.md`
 - Before restructuring modules → read `architecture/layers.md`
 - Before changing the API contract → read `contracts/api-contract.md` (Breaking Change Checklist)
+- Before changing Docker/deployment configuration → read `architecture/layers.md` (container boundary)
+- Before adding a new service to docker-compose → read `architecture/layers.md`
 
 ## When to Update Specs
 
@@ -18,6 +20,7 @@ Update specs **after** implementation when behaviour has changed:
 - **New configuration parameter** → update the relevant domain spec's Configuration section
 - **New layer or changed import rules** → update `architecture/layers.md`
 - **New domain** → create `specs/domains/<name>.md`, add to `INDEX.md` and `META.md`
+- **Dockerfile or docker-compose changes** → update `architecture/layers.md` (container boundary)
 
 ## Workflow for Typical Tasks
 

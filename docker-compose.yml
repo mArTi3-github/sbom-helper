@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-prod}
+    image: purl-resolver:latest
+    container_name: purl-resolver
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - PURL2REPO_TIMEOUT=${PURL2REPO_TIMEOUT:-15.0}
+      - PURL2REPO_USE_CACHE=${PURL2REPO_USE_CACHE:-true}
+      - PURL2REPO_STRICT=false
+      - PURL2REPO_NO_NETWORK=false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # db:      (Phase 2 — PostgreSQL)
+  # redis:   (Phase 2 — caching)
+  # proxy:   (Phase 2+ — reverse proxy for multi-service routing)

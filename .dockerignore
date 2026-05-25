@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+.env
+.pytest_cache
+.ruff_cache
+.DS_Store
+plans/
+openspec/
+docs/
+AGENTS.md
+CONTEXT.md
+project_plan.md
+WORKFLOW.md

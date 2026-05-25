@@ -3,7 +3,7 @@
 ## Task → Spec Mapping
 
 | Task | Spec to Read |
-|---|---|
+|---|---|---|
 | Add a new API endpoint | `contracts/api-contract.md`, `architecture/layers.md` |
 | Change the resolution logic | `domains/purl-resolution.md` |
 | Modify the web UI | `domains/web-ui.md` |
@@ -14,6 +14,8 @@
 | Make a breaking API change | `contracts/api-contract.md` (Breaking Change Checklist) |
 | Understand the full system | `architecture/layers.md` first, then domain specs |
 | Add a fallback resolver | `architecture/layers.md`, `decisions/` |
+| Change Dockerfile or docker-compose | `architecture/layers.md` |
+| Add a new container to docker-compose | `architecture/layers.md` |
 
 ## Dependency Graph
 
