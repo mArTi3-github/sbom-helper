@@ -15,4 +15,17 @@ class Settings(BaseSettings):
     cache_dir: str | None = None
 
 
+class StorageSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="DB_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
+
+    url: str = "postgresql://sbom:sbom@localhost:5432/sbom"
+    pool_min_size: int = 2
+    pool_max_size: int = 10
+
+
 settings = Settings()
+storage_settings = StorageSettings()

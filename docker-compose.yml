@@ -1,3 +1,6 @@
+volumes:
+  pgdata:
+
 services:
   app:
     build:
@@ -5,6 +8,9 @@ services:
       target: ${BUILD_TARGET:-prod}
     image: sbom-helper:latest
     container_name: sbom-helper
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${PORT:-8000}:8000"
     environment:
@@ -12,6 +18,7 @@ services:
       - PURL2REPO_USE_CACHE=${PURL2REPO_USE_CACHE:-true}
       - PURL2REPO_STRICT=false
       - PURL2REPO_NO_NETWORK=false
+      - DB_URL=postgresql://sbom:${DB_PASSWORD:-sbom}@db:5432/sbom
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -20,6 +27,18 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # db:      (Phase 2 — PostgreSQL)
-  # redis:   (Phase 2 — caching)
-  # proxy:   (Phase 2+ — reverse proxy for multi-service routing)
+  db:
+    image: postgres:16-alpine
+    container_name: sbom-db
+    environment:
+      POSTGRES_USER: sbom
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sbom}
+      POSTGRES_DB: sbom
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sbom"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped

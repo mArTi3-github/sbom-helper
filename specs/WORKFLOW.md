@@ -12,6 +12,8 @@ Read the relevant spec before making structural changes:
 - Before changing the API contract → read `contracts/api-contract.md` (Breaking Change Checklist)
 - Before changing Docker/deployment configuration → read `architecture/layers.md` (container boundary)
 - Before adding a new service to docker-compose → read `architecture/layers.md`
+- **Before modifying storage/database layer** → read `architecture/layers.md` (Storage Layer)
+- **Before adding a new resolver** → read `architecture/layers.md` (Service Layer), `domains/purl-resolution.md`
 
 ## When to Update Specs
 
@@ -21,6 +23,7 @@ Update specs **after** implementation when behaviour has changed:
 - **New layer or changed import rules** → update `architecture/layers.md`
 - **New domain** → create `specs/domains/<name>.md`, add to `INDEX.md` and `META.md`
 - **Dockerfile or docker-compose changes** → update `architecture/layers.md` (container boundary)
+- **New storage backend or changed persistence logic** → update `architecture/layers.md` (Storage Layer), `domains/purl-resolution.md` (invariants, config)
 
 ## Workflow for Typical Tasks
 
@@ -35,12 +38,20 @@ Update specs **after** implementation when behaviour has changed:
 
 ### Changing the resolver strategy
 
-1. Read `architecture/layers.md` to understand the resolver boundary
-2. Read `domains/purl-resolution.md` for current resolution flow
+1. Read `architecture/layers.md` to understand the resolver boundary and Service Layer
+2. Read `domains/purl-resolution.md` for current resolution flow and invariants
 3. Read `decisions/0001-purl2repo-as-primary-resolver.md` for original rationale
 4. Implement the change
 5. Update `architecture/layers.md` if the layer diagram changes
 6. Create a new ADR in `decisions/` if the choice is hard to reverse or surprising
+
+### Adding a database or storage backend
+
+1. Read `architecture/layers.md` to understand the Storage Layer interface
+2. Read `domains/purl-resolution.md` for current invariants and configuration
+3. Implement the new storage backend implementing the `Storage` protocol from `storage/interface.py`
+4. Update `architecture/layers.md` if the layer diagram changes
+5. Update `domains/purl-resolution.md` configuration table with new settings
 
 ## Spec Review Checklist
 

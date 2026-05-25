@@ -13,9 +13,11 @@
 | Add a new layer or module | `architecture/layers.md`, `META.md` |
 | Make a breaking API change | `contracts/api-contract.md` (Breaking Change Checklist) |
 | Understand the full system | `architecture/layers.md` first, then domain specs |
-| Add a fallback resolver | `architecture/layers.md`, `decisions/` |
+| Add a fallback resolver | `architecture/layers.md`, `decisions/`, `domains/purl-resolution.md` |
 | Change Dockerfile or docker-compose | `architecture/layers.md` |
 | Add a new container to docker-compose | `architecture/layers.md` |
+| Add or change database integration | `architecture/layers.md`, `domains/purl-resolution.md` |
+| Add or modify storage layer | `architecture/layers.md` |
 
 ## Dependency Graph
 
@@ -30,6 +32,7 @@ architecture/layers.md
         |
         v
 decisions/0001-purl2repo-as-primary-resolver.md
+decisions/0002-postgres-for-resolution-storage.md (docs/adr/)
 ```
 
 The API contract depends on the purl-resolution domain definition. The web UI depends on the API contract. Architecture layers provide the structural constraints for all domains. Decisions document the rationale behind architectural choices.
@@ -51,4 +54,7 @@ specs/
 └── decisions/
     ├── _template.md                 — ADR template
     └── 0001-purl2repo-as-primary-resolver.md
+
+Related decisions outside specs/:
+docs/adr/0002-postgres-for-resolution-storage.md
 ```
