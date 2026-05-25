@@ -7,10 +7,9 @@ __pycache__
 .pytest_cache
 .ruff_cache
 .DS_Store
-plans/
+.misc/
 openspec/
 docs/
+*.egg-info
 AGENTS.md
 CONTEXT.md
-project_plan.md
-WORKFLOW.md
