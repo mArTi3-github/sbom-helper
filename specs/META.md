@@ -16,9 +16,13 @@ specs/
 │   └── web-ui.md                    # Browser-based web interface
 ├── contracts/
 │   └── api-contract.md              # HTTP API contract between client and service
-└── decisions/
-    ├── _template.md                 # ADR template
-    └── 0001-purl2repo-as-primary-resolver.md
+├── decisions/
+│   ├── _template.md                 # ADR template
+│   └── 0001-purl2repo-as-primary-resolver.md
+
+Related decisions outside specs/:
+docs/adr/0002-postgres-for-resolution-storage.md
+docs/adr/0003-purl-validation-and-normalization.md
 ```
 
 ## How to Use

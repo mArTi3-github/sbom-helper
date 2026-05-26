@@ -1,5 +1,4 @@
 *.egg-info
-.misc/
 .venv/
 __pycache__/
 *.pyc

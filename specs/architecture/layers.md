@@ -28,6 +28,8 @@
 |  |  src/purl_resolver/service  |                   |
 |  |                             |                   |
 |  |  Orchestrates:              |                   |
+|  |  purl_utils.validate() →    |                   |
+|  |  purl_utils.normalize() →   |                   |
 |  |  storage.lookup() →         |                   |
 |  |  resolver.resolve() →       |                   |
 |  |  storage.store()            |                   |
@@ -36,15 +38,21 @@
 |       | Python call        | Python call           |
 |       v                    v                       |
 |  +----------+     +------------------+             |
-|  | Storage  |     |  Domain Layer    |             |
-|  | Layer    |     |  purl2repo       |             |
-|  |          |     |                  |             |
-|  | lookup() |     |  resolve(        |             |
-|  | store()  |     |   purl_str)      |             |
-|  +----+-----+     +------------------+             |
-|       |                                            |
-|       | asyncpg                                    |
-|       v                                            |
+|  | PURL     |     |  Storage Layer   |             |
+|  | Utils    |     |  storage/        |             |
+|  | Layer    |     |                  |             |
+|  |          |     |  lookup()        |             |
+|  | validate |     |  store()         |             |
+|  | normalize|     +----+-------------+             |
+|  +----------+          |                           |
+|       |                | asyncpg                   |
+|       v                v                           |
+|  +-----------------------------+                   |
+|  |     Domain Layer            |                   |
+|  |  (purl2repo, future LLM)    |                   |
+|  |  resolve(original_purl)     |                   |
+|  +-----------------------------+                   |
+|                                                    |
 |  +----------+                                      |
 |  |PostgreSQL|                                      |
 |  +----------+                                      |
@@ -73,13 +81,15 @@
 
 - **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
 - **API Layer** imports **Config Layer** (settings)
-- **Service Layer** imports **Storage Layer** (`storage/interface.py`) and **Domain Layer** (`purl2repo`)
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Domain Layer** (purl2repo)
+- **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`
 - **Service Layer** imports **Config Layer** (settings)
-- **Domain Layer** is the external purl2repo library — our code does not modify it
+- **Domain Layer** is the external resolver library (purl2repo) — our code does not modify it
+- **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
 - **Web UI Layer** is served by the API Layer and communicates via HTTP (fetch → API Layer)
-- Tests (`tests/`) import `main:app` and FastAPI TestClient; unit tests for storage/service import them directly
+- Tests (`tests/`) import `main:app` and FastAPI TestClient; unit tests for storage/service/purl_utils import them directly
 
 ## Layer Responsibilities
 
@@ -91,10 +101,17 @@
 - Serve Jinja2 template for the web UI
 
 ### Service Layer (`service.py`)
-- Orchestrate resolution flow: storage lookup → resolver call → storage store
+- Orchestrate resolution flow: validate PURL → normalize cache key → storage lookup → resolver call → storage store
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
+
+### PURL Utils Layer (`purl_utils/`)
+- **`__init__.py`** — `validate(purl) → PurlComponents`, `normalize(components) → str`
+- Validate PURL format using the official `packageurl-python` library
+- Normalize PURL to `scheme:type/namespace/name` form (namespace only if present)
+- `PurlValidationError` — resolver-agnostic exception for invalid PURLs
+- Has zero dependency on any resolver implementation
 
 ### Storage Layer (`storage/`)
 - **interface.py** — Abstract `Storage` protocol with `lookup(purl) → ResolveResponse | None` and `store(result) → None`

@@ -23,13 +23,13 @@ Resolve a single PURL to its repository URL.
 }
 ```
 
-- `purl`: required, non-empty string
+- `purl`: required, non-empty string. The response `purl` field contains the normalized form (`scheme:type/namespace/name`), not the original input PURL.
 
 #### Success Response (200) — resolved
 
 ```json
 {
-  "purl": "pkg:pypi/requests@2.31.0",
+  "purl": "pkg:pypi/requests",
   "repository_url": "https://github.com/psf/requests",
   "repository_type": "github",
   "repository_kind": "source_code",
@@ -40,11 +40,13 @@ Resolve a single PURL to its repository URL.
 }
 ```
 
+Note: `purl` field contains the normalized form (version, qualifiers, subpath stripped). The original PURL is only used internally for resolver processing.
+
 #### Success Response (200) — unresolved
 
 ```json
 {
-  "purl": "pkg:pypi/obscure-package@0.0.1",
+  "purl": "pkg:pypi/obscure-package",
   "repository_url": null,
   "repository_type": null,
   "repository_kind": null,
@@ -101,8 +103,8 @@ Content-Type: `text/html`. Returns the Jinja2-rendered index page.
 
 | Condition | HTTP Status | Error Code |
 |---|---|---|
-| Invalid PURL format | 400 | `invalid_purl` |
-| Unsupported ecosystem | 400 | `invalid_purl` |
+| Invalid PURL format (application-level validation) | 400 | `invalid_purl` |
+| Unsupported ecosystem (resolver-level validation) | 400 | `invalid_purl` |
 | Valid PURL, no repository found | 200 | — (`repository_url: null`) |
 | purl2repo network/timeout error | 502 | `upstream_error` |
 | Empty purl string | 422 | (Pydantic validation) |

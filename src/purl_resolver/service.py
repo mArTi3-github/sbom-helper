@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from .purl_utils import normalize, validate
 from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
 from .schemas import ResolveResponse, ResolveResult
 from .storage.interface import Storage
@@ -15,14 +16,21 @@ async def resolve_purl(
     resolvers: list[Resolver],
 ) -> ResolveResult:
     try:
-        cached = await storage.lookup(purl)
+        components = validate(purl)
+    except Exception as e:
+        return ResolveResult.err(400, "invalid_purl", str(e))
+
+    purl_key = normalize(components)
+
+    try:
+        cached = await storage.lookup(purl_key)
         if cached is not None:
-            logger.info("Cache hit for %s", purl)
+            logger.info("Cache hit for %s", purl_key)
             return ResolveResult.ok(cached)
     except Exception:
         logger.warning(
             "Cache lookup failed for %s, falling through to resolver",
-            purl,
+            purl_key,
             exc_info=True,
         )
 
@@ -38,7 +46,7 @@ async def resolve_purl(
             continue
 
         response = ResolveResponse(
-            purl=resolution.purl,
+            purl=purl_key,
             repository_url=resolution.repository_url,
             repository_type=resolution.repository_type,
             repository_kind=resolution.repository_kind,
@@ -50,15 +58,15 @@ async def resolve_purl(
 
         try:
             await storage.store(response)
-            logger.info("Stored result for %s", purl)
+            logger.info("Stored result for %s", purl_key)
         except Exception:
-            logger.warning("Failed to store result for %s", purl, exc_info=True)
+            logger.warning("Failed to store result for %s", purl_key, exc_info=True)
 
         return ResolveResult.ok(response)
 
     return ResolveResult.ok(
         ResolveResponse(
-            purl=purl,
+            purl=purl_key,
             warnings=["No resolver found a repository URL"],
         )
     )

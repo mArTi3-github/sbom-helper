@@ -18,6 +18,7 @@
 | Add a new container to docker-compose | `architecture/layers.md` |
 | Add or change database integration | `architecture/layers.md`, `domains/purl-resolution.md` |
 | Add or modify storage layer | `architecture/layers.md` |
+| Add PURL validation or normalization | `domains/purl-resolution.md`, `architecture/layers.md` |
 
 ## Dependency Graph
 
@@ -57,4 +58,5 @@ specs/
 
 Related decisions outside specs/:
 docs/adr/0002-postgres-for-resolution-storage.md
+docs/adr/0003-purl-validation-and-normalization.md
 ```

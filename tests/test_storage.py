@@ -2,28 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from purl_resolver.resolver.interface import InvalidPurlError, Resolution, Resolver
+from purl_resolver.resolver.interface import InvalidPurlError, Resolution
 from purl_resolver.schemas import ResolveResponse
 from purl_resolver.service import resolve_purl
 from purl_resolver.storage.inmemory import InMemoryCache
 
-
-class _FakeResolver(Resolver):
-
-    def __init__(
-        self, resolution: Resolution | None = None, error: Exception | None = None
-    ) -> None:
-        self._resolution = resolution
-        self._error = error
-        self.call_count = 0
-
-    def resolve(self, purl: str) -> Resolution:
-        self.call_count += 1
-        if self._error:
-            raise self._error
-        if self._resolution:
-            return self._resolution
-        return Resolution(purl=purl)
+from tests.helpers import FakeResolver
 
 
 @pytest.fixture
@@ -39,53 +23,53 @@ class TestInMemoryCache:
 
     async def test_store_and_lookup(self, storage: InMemoryCache) -> None:
         response = ResolveResponse(
-            purl="pkg:pypi/requests@2.31.0",
+            purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
             repository_type="github",
             repository_kind="source_code",
             confidence="high",
         )
         await storage.store(response)
-        cached = await storage.lookup("pkg:pypi/requests@2.31.0")
+        cached = await storage.lookup("pkg:pypi/requests")
         assert cached is not None
         assert cached.repository_url == "https://github.com/psf/requests"
 
     async def test_store_overwrites_existing(self, storage: InMemoryCache) -> None:
         response_old = ResolveResponse(
-            purl="pkg:pypi/example@1.0",
+            purl="pkg:pypi/example",
             repository_url="https://github.com/old/example",
         )
         response_new = ResolveResponse(
-            purl="pkg:pypi/example@1.0",
+            purl="pkg:pypi/example",
             repository_url="https://github.com/new/example",
         )
         await storage.store(response_old)
         await storage.store(response_new)
-        cached = await storage.lookup("pkg:pypi/example@1.0")
+        cached = await storage.lookup("pkg:pypi/example")
         assert cached is not None
         assert cached.repository_url == "https://github.com/new/example"
 
     async def test_clear_removes_all(self, storage: InMemoryCache) -> None:
         response = ResolveResponse(
-            purl="pkg:pypi/requests@2.31.0",
+            purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
         )
         await storage.store(response)
         storage.clear()
-        assert await storage.lookup("pkg:pypi/requests@2.31.0") is None
+        assert await storage.lookup("pkg:pypi/requests") is None
 
 
 class TestResolvePurl:
 
     async def test_cache_hit_returns_cached_result(self, storage: InMemoryCache) -> None:
         cached_response = ResolveResponse(
-            purl="pkg:pypi/requests@2.31.0",
+            purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
             confidence="high",
         )
         await storage.store(cached_response)
 
-        resolver = _FakeResolver()
+        resolver = FakeResolver()
         result = await resolve_purl(
             "pkg:pypi/requests@2.31.0", storage, [resolver]
         )
@@ -94,9 +78,28 @@ class TestResolvePurl:
         assert result.error_status is None
         assert result.response is not None
         assert result.response.repository_url == "https://github.com/psf/requests"
+        assert result.response.purl == "pkg:pypi/requests"
+
+    async def test_cache_hit_with_different_version(self, storage: InMemoryCache) -> None:
+        cached_response = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            confidence="high",
+        )
+        await storage.store(cached_response)
+
+        resolver = FakeResolver()
+        result = await resolve_purl(
+            "pkg:pypi/requests@3.0.0", storage, [resolver]
+        )
+
+        assert resolver.call_count == 0
+        assert result.error_status is None
+        assert result.response is not None
+        assert result.response.repository_url == "https://github.com/psf/requests"
 
     async def test_cache_miss_calls_resolver_and_stores(self, storage: InMemoryCache) -> None:
-        resolver = _FakeResolver(
+        resolver = FakeResolver(
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
@@ -115,8 +118,9 @@ class TestResolvePurl:
         assert result.error_status is None
         assert result.response is not None
         assert result.response.repository_url == "https://github.com/psf/requests"
+        assert result.response.purl == "pkg:pypi/requests"
 
-        cached = await storage.lookup("pkg:pypi/requests@2.31.0")
+        cached = await storage.lookup("pkg:pypi/requests")
         assert cached is not None
         assert cached.repository_url == "https://github.com/psf/requests"
 
@@ -129,7 +133,7 @@ class TestResolvePurl:
 
         broken_storage.lookup = failing_lookup
 
-        resolver = _FakeResolver(
+        resolver = FakeResolver(
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
@@ -156,7 +160,7 @@ class TestResolvePurl:
 
         broken_storage.store = failing_store
 
-        resolver = _FakeResolver(
+        resolver = FakeResolver(
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
@@ -175,7 +179,7 @@ class TestResolvePurl:
         assert result.response.repository_url == "https://github.com/psf/requests"
 
     async def test_unresolved_purl_not_stored(self, storage: InMemoryCache) -> None:
-        resolver = _FakeResolver(
+        resolver = FakeResolver(
             resolution=Resolution(
                 purl="pkg:pypi/unknown@0.1",
                 warnings=["No repository URL found"],
@@ -193,21 +197,33 @@ class TestResolvePurl:
         cached = await storage.lookup("pkg:pypi/unknown@0.1")
         assert cached is None
 
-    async def test_invalid_purl_returns_error(self, storage: InMemoryCache) -> None:
-        resolver = _FakeResolver(error=InvalidPurlError("not a PURL"))
-
+    async def test_invalid_purl_returns_error_from_validation(self, storage: InMemoryCache) -> None:
+        resolver = FakeResolver()
         result = await resolve_purl(
             "not-a-purl", storage, [resolver]
         )
 
+        assert resolver.call_count == 0
         assert result.error_status == 400
-        assert result.error_body == {"error": "invalid_purl", "message": "not a PURL"}
+        assert result.error_body is not None
+        assert result.error_body["error"] == "invalid_purl"
+        assert isinstance(result.error_body["message"], str)
+
+    async def test_invalid_purl_from_resolver_still_works(self, storage: InMemoryCache) -> None:
+        resolver = FakeResolver(error=InvalidPurlError("unsupported ecosystem"))
+        result = await resolve_purl(
+            "pkg:pypi/somepackage@1.0", storage, [resolver]
+        )
+
+        assert resolver.call_count == 1
+        assert result.error_status == 400
+        assert result.error_body == {"error": "invalid_purl", "message": "unsupported ecosystem"}
 
     async def test_all_resolvers_fail_returns_unresolved(self, storage: InMemoryCache) -> None:
-        resolver_a = _FakeResolver(
+        resolver_a = FakeResolver(
             resolution=Resolution(purl="pkg:pypi/missing@1.0")
         )
-        resolver_b = _FakeResolver(
+        resolver_b = FakeResolver(
             resolution=Resolution(purl="pkg:pypi/missing@1.0")
         )
 
@@ -222,10 +238,10 @@ class TestResolvePurl:
     async def test_second_resolver_used_when_first_returns_null(
         self, storage: InMemoryCache
     ) -> None:
-        resolver_a = _FakeResolver(
+        resolver_a = FakeResolver(
             resolution=Resolution(purl="pkg:pypi/pkg@1.0")
         )
-        resolver_b = _FakeResolver(
+        resolver_b = FakeResolver(
             resolution=Resolution(
                 purl="pkg:pypi/pkg@1.0",
                 repository_url="https://github.com/second/pkg",
