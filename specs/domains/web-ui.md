@@ -37,4 +37,4 @@ User                   Browser                    API Layer
 - All states (loading, success, unresolved, error, network failure) have distinct visual representations
 - `version_reference` in details is rendered as a clickable link
 - Evidence items are listed as an unordered list in the details section
-- Warnings are shown in yellow, errors in red
+- Warnings within the resolved result card are shown in red; the unresolved fallback message is shown in yellow; errors in red

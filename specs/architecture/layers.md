@@ -48,6 +48,20 @@
 |       |                | asyncpg                   |
 |       v                v                           |
 |  +-----------------------------+                   |
+|  |   Resolver Layer            |                   |
+|  |  resolver/                  |                   |
+|  |                             |                   |
+|  |  Resolver (ABC)             |                   |
+|  |  Resolution dataclass       |                   |
+|  |  InvalidPurlError           |                   |
+|  |  UpstreamError              |                   |
+|  |  Purl2RepoResolver          |                   |
+|  |  (future: LLM, purl2src)   |                   |
+|  +----+------------------------+                   |
+|       |                                            |
+|       | Python call                                |
+|       v                                            |
+|  +-----------------------------+                   |
 |  |     Domain Layer            |                   |
 |  |  (purl2repo, future LLM)    |                   |
 |  |  resolve(original_purl)     |                   |
@@ -81,11 +95,11 @@
 
 - **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
 - **API Layer** imports **Config Layer** (settings)
-- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Domain Layer** (purl2repo)
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`)
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`
-- **Service Layer** imports **Config Layer** (settings)
-- **Domain Layer** is the external resolver library (purl2repo) — our code does not modify it
+- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC, `Resolution` dataclass, and resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`). `Purl2RepoResolver` wraps the purl2repo library.
+- **Resolver Layer** imports purl2repo; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
 - **Web UI Layer** is served by the API Layer and communicates via HTTP (fetch → API Layer)
@@ -107,21 +121,26 @@
 - Log errors from storage without breaking the response
 
 ### PURL Utils Layer (`purl_utils/`)
-- **`__init__.py`** — `validate(purl) → PurlComponents`, `normalize(components) → str`
+- **`__init__.py`** — `validate(purl) → PurlComponents` (raises `PurlValidationError`), `normalize(components) → str`
 - Validate PURL format using the official `packageurl-python` library
 - Normalize PURL to `scheme:type/namespace/name` form (namespace only if present)
 - `PurlValidationError` — resolver-agnostic exception for invalid PURLs
 - Has zero dependency on any resolver implementation
 
 ### Storage Layer (`storage/`)
-- **interface.py** — Abstract `Storage` protocol with `lookup(purl) → ResolveResponse | None` and `store(result) → None`
+- **interface.py** — Abstract `Storage` ABC with `lookup(purl) → ResolveResponse | None` and `store(result) → None`
 - **postgres.py** — `PostgresCache` implementation via asyncpg; handles JSONB encoding/decoding; creates table on startup
 - **inmemory.py** — `InMemoryCache` implementation (dict-based) for tests and fallback when PostgreSQL is unavailable
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence
 - Manage internal file-based caching (independent of the Storage Layer)
-- The canonical response format is independent of purl2repo's internal structure
+- Our code does not import or modify purl2repo directly
+
+### Resolver Layer (`resolver/`)
+- **interface.py** — `Resolver(ABC)` with `resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `repository_type`, `repository_kind`, `confidence`, `evidence`, `warnings`, `version_reference`
+- **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; maps `InvalidPurlError`/`UnsupportedEcosystemError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
+- Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 
 ### Config Layer (`config.py`)
 - Provide typed access to all runtime configuration

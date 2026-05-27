@@ -9,6 +9,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/router.py` — API endpoint handler that calls the Service Layer
 - `src/purl_resolver/service.py` — Orchestration: validation → normalization → storage lookup → resolver → storage store
 - `src/purl_resolver/purl_utils/` — PURL validation and normalization layer
+- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions) and purl2repo wrapper
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
 - `tests/test_api.py` — Integration tests for resolution workflow
