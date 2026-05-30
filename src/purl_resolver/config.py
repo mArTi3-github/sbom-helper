@@ -29,3 +29,16 @@ class StorageSettings(BaseSettings):
 
 settings = Settings()
 storage_settings = StorageSettings()
+
+
+class SbomSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="SBOM_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
+
+    max_file_size: int = 200 * 1024 * 1024  # 200 MB
+
+
+sbom_settings = SbomSettings()

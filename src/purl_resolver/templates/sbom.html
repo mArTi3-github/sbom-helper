@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBOM-updater — sbom-helper</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5; color: #1a1a1a; line-height: 1.6;
+            min-height: 100vh; display: flex; flex-direction: column;
+        }
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; flex: 1; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+        .subtitle { color: #666; margin-bottom: 1.5rem; }
+        .back-link { display: inline-block; margin-bottom: 1rem; color: #2563eb; text-decoration: none; font-size: 0.9rem; }
+        .back-link:hover { text-decoration: underline; }
+        .upload-area {
+            background: #fff; border: 2px dashed #ccc; border-radius: 8px;
+            padding: 2rem; text-align: center; cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .upload-area:hover, .upload-area.dragover { border-color: #2563eb; }
+        .upload-area input[type="file"] { display: none; }
+        .upload-label { font-size: 1rem; color: #555; cursor: pointer; }
+        .upload-label strong { color: #2563eb; }
+        .upload-hint { font-size: 0.8rem; color: #999; margin-top: 0.5rem; }
+        button {
+            padding: 0.75rem 1.5rem; background: #2563eb; color: #fff;
+            border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #93c5fd; cursor: not-allowed; }
+        .toolbar { margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; }
+        .summary {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            padding: 1rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .summary-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .summary-item { text-align: center; }
+        .summary-value { font-size: 1.5rem; font-weight: 700; }
+        .summary-label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
+        .summary-value.found { color: #166534; }
+        .summary-value.not-found { color: #991b1b; }
+        .summary-value.skipped { color: #854d0e; }
+        table {
+            width: 100%; border-collapse: collapse; margin-top: 1rem;
+            background: #fff; border-radius: 8px; overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f9fafb; font-size: 0.8rem; text-transform: uppercase; color: #888; }
+        .status-found { color: #166534; font-weight: 500; }
+        .status-not-found { color: #991b1b; font-weight: 500; }
+        .repo-url-cell { word-break: break-all; }
+        .repo-url-cell a { color: #2563eb; text-decoration: none; }
+        .repo-url-cell a:hover { text-decoration: underline; }
+        .spinner {
+            display: inline-block; width: 1.25rem; height: 1.25rem;
+            border: 2px solid #e5e7eb; border-top-color: #2563eb;
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading { display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; color: #666; }
+        .error-msg {
+            background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px;
+            padding: 1rem; color: #991b1b; margin-top: 1rem;
+        }
+        .file-name { font-size: 0.9rem; color: #555; margin-top: 0.5rem; }
+        footer { text-align: center; padding: 1rem; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">&larr; Back to PURL resolver</a>
+        <h1>SBOM-updater</h1>
+        <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы обогатить компоненты ссылками на репозитории исходных текстов</p>
+
+        <div id="upload-area" class="upload-area">
+            <input type="file" id="file-input" accept=".json">
+            <label for="file-input" class="upload-label">
+                <strong>Выберите файл</strong> или перетащите его сюда
+            </label>
+            <div class="upload-hint">CycloneDX JSON, до 200 МБ</div>
+            <div id="file-name" class="file-name"></div>
+        </div>
+
+        <div class="toolbar">
+            <button id="process-btn" disabled>Обработать</button>
+        </div>
+
+        <div id="loading" class="loading" style="display:none;">
+            <span class="spinner"></span> Обработка SBOM...
+        </div>
+
+        <div id="error" class="error-msg" style="display:none;"></div>
+
+        <div id="results" style="display:none;">
+            <div class="summary" id="summary-box"></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>PURL</th>
+                        <th>Статус</th>
+                        <th>Repository URL</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body"></tbody>
+            </table>
+            <div class="toolbar">
+                <button id="download-btn">Скачать обогащённый SBOM</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>Powered by purl2repo</footer>
+
+    <script>
+        const uploadArea = document.getElementById("upload-area");
+        const fileInput = document.getElementById("file-input");
+        const fileNameDisplay = document.getElementById("file-name");
+        const processBtn = document.getElementById("process-btn");
+        const loading = document.getElementById("loading");
+        const errorDiv = document.getElementById("error");
+        const resultsDiv = document.getElementById("results");
+        const summaryBox = document.getElementById("summary-box");
+        const resultsBody = document.getElementById("results-body");
+        const downloadBtn = document.getElementById("download-btn");
+
+        let enrichedSbom = null;
+        let currentFileName = "";
+
+        ["dragenter", "dragover", "dragleave", "drop"].forEach(event => {
+            uploadArea.addEventListener(event, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        ["dragenter", "dragover"].forEach(event => {
+            uploadArea.addEventListener(event, () => uploadArea.classList.add("dragover"));
+        });
+        ["dragleave", "drop"].forEach(event => {
+            uploadArea.addEventListener(event, () => uploadArea.classList.remove("dragover"));
+        });
+        uploadArea.addEventListener("drop", e => {
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+        uploadArea.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            currentFileName = file.name;
+            fileNameDisplay.textContent = "File: " + file.name + " (" + formatSize(file.size) + ")";
+            processBtn.disabled = false;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+            return (bytes / 1048576).toFixed(1) + " MB";
+        }
+
+        processBtn.addEventListener("click", async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            errorDiv.style.display = "none";
+            resultsDiv.style.display = "none";
+            loading.style.display = "flex";
+            processBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch("/api/v1/resolve/sbom", {
+                    method: "POST",
+                    body: formData,
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showError(data.message || data.detail?.message || "Unknown error");
+                    return;
+                }
+
+                enrichedSbom = data.enriched_sbom;
+                renderResults(data);
+            } catch {
+                showError("Network error: could not reach the server.");
+            } finally {
+                loading.style.display = "none";
+                processBtn.disabled = false;
+            }
+        });
+
+        function showError(msg) {
+            errorDiv.textContent = msg;
+            errorDiv.style.display = "block";
+        }
+
+        function renderResults(data) {
+            const s = data.summary;
+            summaryBox.innerHTML = `
+                <h3 style="margin-bottom:0.5rem;">Результаты</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-value">${s.total_purls}</div>
+                        <div class="summary-label">Всего PURL</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value found">${s.found}</div>
+                        <div class="summary-label">Найдено</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value not-found">${s.not_found}</div>
+                        <div class="summary-label">Не найдено</div>
+                    </div>
+                    ${s.skipped > 0 ? `<div class="summary-item"><div class="summary-value skipped">${s.skipped}</div><div class="summary-label">Пропущено</div></div>` : ""}
+                </div>
+            `;
+
+            resultsBody.innerHTML = data.results.map(r => {
+                const statusClass = r.status === "found" ? "status-found" : "status-not-found";
+                const statusText = r.status === "found" ? "Found" : "Not found";
+                const urlHtml = r.repository_url
+                    ? `<a href="${escapeHtml(r.repository_url)}" target="_blank">${escapeHtml(r.repository_url)}</a>`
+                    : "&mdash;";
+                return `<tr>
+                    <td><code>${escapeHtml(r.purl)}</code></td>
+                    <td class="${statusClass}">${statusText}</td>
+                    <td class="repo-url-cell">${urlHtml}</td>
+                </tr>`;
+            }).join("");
+
+            resultsDiv.style.display = "block";
+        }
+
+        downloadBtn.addEventListener("click", () => {
+            if (!enrichedSbom) return;
+            const blob = new Blob([JSON.stringify(enrichedSbom, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = currentFileName.replace(/\.json$/, "") + "_enriched.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        function escapeHtml(str) {
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

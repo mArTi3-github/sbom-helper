@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import json
 import logging
 import pathlib
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
+from .config import sbom_settings
 from .schemas import ResolveRequest
 from .service import resolve_purl
+from .sbom.collector import collect_components
+from .sbom.enricher import enrich_sbom
+from .sbom.parser import CycloneDXParser, SbomParseError
+from .sbom.reporter import build_report
+from .purl_utils import normalize, validate
 
 logger = logging.getLogger(__name__)
 
@@ -41,3 +48,72 @@ async def health() -> JSONResponse:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="index.html")
+
+
+@router.get("/sbom-updater", response_class=HTMLResponse)
+async def sbom_updater_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="sbom.html")
+
+
+@router.post("/api/v1/resolve/sbom")
+async def resolve_sbom_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+) -> JSONResponse:
+    raw = await file.read()
+    if len(raw) > sbom_settings.max_file_size:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={
+                "error": "file_too_large",
+                "message": f"File size exceeds maximum of {sbom_settings.max_file_size // (1024*1024)} MB",
+            },
+        )
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_json", "message": f"Invalid JSON: {e}"},
+        )
+
+    try:
+        CycloneDXParser.parse(data)
+    except SbomParseError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_sbom", "message": str(e)},
+        )
+
+    components = collect_components(data)
+    purls_to_resolve = [c for c in components if c.needs_enrichment]
+
+    seen: set[str] = set()
+    unique_purls: list[tuple[str, str]] = []
+    skipped = 0
+    for comp in purls_to_resolve:
+        try:
+            n = normalize(validate(comp.purl))
+        except Exception:
+            skipped += 1
+            continue
+        if n not in seen:
+            seen.add(n)
+            unique_purls.append((comp.purl, n))
+
+    resolved: dict[str, str] = {}
+    storage = request.app.state.storage
+    resolvers = request.app.state.resolvers
+    for original, normalized in unique_purls:
+        result = await resolve_purl(original, storage, resolvers)
+        if result.response and result.response.repository_url:
+            resolved[normalized] = result.response.repository_url
+
+    enrich_sbom(data, components, resolved)
+    report = build_report(components, resolved, skipped=skipped)
+
+    return JSONResponse(
+        status_code=200,
+        content={**report, "enriched_sbom": data},
+    )
