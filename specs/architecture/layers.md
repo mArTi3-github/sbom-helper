@@ -21,6 +21,12 @@
 |  |  GET /health               |                   |
 |  |  GET / (HTML page)         |                   |
 |  |  GET /sbom-updater         |                   |
+|  |  GET /db-admin             |                   |
+|  |  GET /api/v1/db/purls      |                   |
+|  |  PATCH /api/v1/db/purls/   |                   |
+|  |  DELETE /api/v1/db/purls   |                   |
+|  |  POST /api/v1/db/import    |                   |
+|  |  GET /api/v1/db/export     |                   |
 |  +-------------+---------------+                   |
 |                |                                   |
 |                | Python call                       |
@@ -123,6 +129,7 @@
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
 - Delegate SBOM enrichment to Service Layer (`service.resolve_batch()` + `service.process_sbom()`)
+- Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
 - Handle error responses from Service Layer
 - Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`)
 
@@ -160,9 +167,7 @@
 ### Web UI Layer (`templates/`)
 - `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater page
 - `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download
-- **interface.py** — Abstract `Storage` ABC with `lookup(purl) → ResolveResponse | None` and `store(result) → None`
-- **postgres.py** — `PostgresCache` implementation via asyncpg; handles JSONB encoding/decoding; creates table on startup
-- **inmemory.py** — `InMemoryCache` implementation (dict-based) for tests and fallback when PostgreSQL is unavailable
+- `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export, bulk delete; column visibility controls; consistent navigation bar
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence

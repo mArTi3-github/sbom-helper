@@ -189,6 +189,56 @@ Standard FastAPI/Pydantic 422 response.
 
 ---
 
+### `GET /api/v1/db/purls`
+
+List PURLs with pagination, filtering, and sorting.
+
+Query parameters: `page`, `page_size`, `search`, `resolver`, `confidence`, `date_from`, `date_to`, `sort_by`, `sort_order`.
+
+Response (200):
+```json
+{
+  "rows": [{ "purl": "...", "repository_url": "...", ... }],
+  "total": 1234,
+  "page": 1,
+  "page_size": 50
+}
+```
+
+### `PATCH /api/v1/db/purls/{purl:path}`
+
+Edit a PURL row. Body: `{ "purl": "...", "repository_url": "..." }` (both optional).
+
+Response (200): `{ "ok": true }`
+Response (404): `{ "error": "not_found", "message": "PURL not found" }`
+
+### `DELETE /api/v1/db/purls`
+
+Bulk delete. Body: `{ "purls": ["...", "..."] }`.
+
+Response (200): `{ "deleted": N }`
+
+### `POST /api/v1/db/import`
+
+Import CSV. Multipart: `file` (CSV) + `strategy` (`"upsert"` or `"skip_existing"`).
+
+Response (200): `{ "imported": N, "skipped": N, "errors": [...] }`
+Response (400): `{ "error": "invalid_csv", "message": "..." }` (missing columns, wrong format)
+
+### `GET /api/v1/db/export`
+
+Export CSV. Same filter/sort params as `GET /api/v1/db/purls` (no pagination).
+
+Response: `Content-Type: text/csv`, `Content-Disposition: attachment; filename="resolved_purls_export.csv"`
+
+### `GET /db-admin`
+
+Serve the database admin page HTML.
+
+Response (200): `Content-Type: text/html`. Jinja2-rendered `db-admin.html`.
+
+---
+
 ## Enrichment Algorithm
 
 1. Recursively walk all `components[]` arrays (including nested `components` inside components)
@@ -207,6 +257,9 @@ Standard FastAPI/Pydantic 422 response.
 | Valid PURL, no repository found | 200 | — (`repository_url: null`) |
 | purl2repo network/timeout error | 502 | `upstream_error` |
 | Empty purl string | 422 | (Pydantic validation) |
+| PURL not found on PATCH | 404 | `not_found` |
+| Invalid CSV (missing columns, wrong format) | 400 | `invalid_csv` |
+| CSV too large | 413 | `file_too_large` |
 
 ## Breaking Change Checklist
 

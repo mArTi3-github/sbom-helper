@@ -22,6 +22,7 @@
 | Enrich CycloneDX SBOM files | `contracts/api-contract.md`, `architecture/layers.md`, `domains/purl-resolution.md`, `domains/web-ui.md` |
 | Add batch PURL resolution | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
+| Manage database (view, edit, filter, import, export) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 
 ## Dependency Graph
 
@@ -52,9 +53,9 @@ specs/
 │   └── layers.md                    — Layer hierarchy and import rules
 ├── domains/
 │   ├── purl-resolution.md           — Core resolution capability
-│   └── web-ui.md                    — Browser interface
+│   └── web-ui.md                    — Browser interface (three pages)
 ├── contracts/
-│   └── api-contract.md              — HTTP API contract
+│   └── api-contract.md              — HTTP API contract (including db-admin endpoints)
 └── decisions/
     ├── _template.md                 — ADR template
     └── 0001-purl2repo-as-primary-resolver.md
