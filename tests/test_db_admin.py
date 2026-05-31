@@ -259,7 +259,7 @@ class TestAdminDeletePurls:
 
 class TestAdminImport:
     def test_import_upsert_new_rows(self, storage, admin_client):
-        csv_content = "purl,repository_url\npkg:pypi/newpkg,https://github.com/new/pkg\n"
+        csv_content = "purl;repository_url\npkg:pypi/newpkg;https://github.com/new/pkg\n"
         response = admin_client.post(
             "/api/v1/db/import",
             files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
@@ -273,7 +273,7 @@ class TestAdminImport:
         assert "pkg:pypi/newpkg" in storage._store
 
     def test_import_upsert_overwrite_existing(self, populated_storage, admin_client):
-        csv_content = "purl,repository_url\npkg:pypi/requests,https://github.com/psf/requests-v4\n"
+        csv_content = "purl;repository_url\npkg:pypi/requests;https://github.com/psf/requests-v4\n"
         response = admin_client.post(
             "/api/v1/db/import",
             files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
@@ -285,9 +285,9 @@ class TestAdminImport:
 
     def test_import_skip_existing(self, populated_storage, admin_client):
         csv_content = (
-            "purl,repository_url\n"
-            "pkg:pypi/requests,https://github.com/NEW/requests\n"
-            "pkg:pypi/totallynew,https://github.com/new/totallynew\n"
+            "purl;repository_url\n"
+            "pkg:pypi/requests;https://github.com/NEW/requests\n"
+            "pkg:pypi/totallynew;https://github.com/new/totallynew\n"
         )
         response = admin_client.post(
             "/api/v1/db/import",
@@ -304,14 +304,14 @@ class TestAdminImport:
         csv_content = "purl\npkg:pypi/requests\n"
         response = admin_client.post(
             "/api/v1/db/import",
-            files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
+            files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8-sig")), "text/csv")},
             data={"strategy": "upsert"},
         )
         assert response.status_code == 400
         assert response.json()["error"] == "invalid_csv"
 
     def test_import_empty_purl_errors(self, storage, admin_client):
-        csv_content = "purl,repository_url\n,https://example.com\npkg:pypi/valid,https://example.com\n"
+        csv_content = "purl;repository_url\n;https://example.com\npkg:pypi/valid;https://example.com\n"
         response = admin_client.post(
             "/api/v1/db/import",
             files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
@@ -324,8 +324,8 @@ class TestAdminImport:
 
     def test_import_optional_columns(self, storage, admin_client):
         csv_content = (
-            "purl,repository_url,confidence,resolver\n"
-            "pkg:pypi/pkg1,https://github.com/owner/pkg1,high,custom-resolver\n"
+            "purl;repository_url;confidence;resolver\n"
+            "pkg:pypi/pkg1;https://github.com/owner/pkg1;high;custom-resolver\n"
         )
         response = admin_client.post(
             "/api/v1/db/import",
@@ -343,7 +343,7 @@ class TestAdminExport:
         assert response.status_code == 200
         assert "attachment" in response.headers.get("content-disposition", "")
         content = response.content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(content))
+        reader = csv.DictReader(io.StringIO(content), delimiter=";")
         assert "purl" in (reader.fieldnames or [])
         assert "repository_url" in (reader.fieldnames or [])
 
@@ -351,7 +351,7 @@ class TestAdminExport:
         response = admin_client.get("/api/v1/db/export?search=requests")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(content))
+        reader = csv.DictReader(io.StringIO(content), delimiter=";")
         rows = list(reader)
         assert len(rows) == 1
         assert rows[0]["purl"] == "pkg:pypi/requests"
@@ -360,6 +360,47 @@ class TestAdminExport:
         response = admin_client.get("/api/v1/db/export")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(content))
+        reader = csv.DictReader(io.StringIO(content), delimiter=";")
         rows = list(reader)
         assert len(rows) == 3
+
+    def test_export_uses_semicolon_delimiter(self, populated_storage, admin_client):
+        response = admin_client.get("/api/v1/db/export")
+        content = response.content.decode("utf-8")
+        first_line = content.split("\n")[0]
+        assert ";" in first_line
+        assert "," not in first_line.split(";")[0]
+
+
+class TestAdminImportBom:
+    def test_import_with_bom(self, storage, admin_client):
+        csv_content = "\ufeffpurl;repository_url\npkg:pypi/bomtest;https://github.com/bom/test\n"
+        response = admin_client.post(
+            "/api/v1/db/import",
+            files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
+            data={"strategy": "upsert"},
+        )
+        assert response.status_code == 200
+        assert response.json()["imported"] == 1
+        assert "pkg:pypi/bomtest" in storage._store
+
+    def test_import_with_trailing_newline(self, storage, admin_client):
+        csv_content = "purl;repository_url\npkg:pypi/trailing;https://github.com/trailing/test\n\n\n"
+        response = admin_client.post(
+            "/api/v1/db/import",
+            files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
+            data={"strategy": "upsert"},
+        )
+        assert response.status_code == 200
+        assert response.json()["imported"] == 1
+        assert "pkg:pypi/trailing" in storage._store
+
+    def test_import_semicolons_in_values(self, storage, admin_client):
+        csv_content = 'purl;repository_url;evidence;warnings\npkg:pypi/semi;https://github.com/semi/test;["value;with;semicolons"];["warn;1"]\n'
+        response = admin_client.post(
+            "/api/v1/db/import",
+            files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
+            data={"strategy": "upsert"},
+        )
+        assert response.status_code == 200
+        assert response.json()["imported"] == 1

@@ -212,14 +212,14 @@ async def import_csv_endpoint(
 ):
     raw = await file.read()
     try:
-        text = raw.decode("utf-8")
+        text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
         return JSONResponse(
             status_code=400,
             content={"error": "invalid_csv", "message": "File must be UTF-8 encoded"},
         )
 
-    reader = csv.DictReader(io.StringIO(text))
+    reader = csv.DictReader(io.StringIO(text), delimiter=";")
     if reader.fieldnames is None or not reader.fieldnames:
         return JSONResponse(
             status_code=400,
@@ -324,7 +324,7 @@ async def export_csv_endpoint(
     )
 
     output = io.StringIO()
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter=";")
     writer.writerow([
         "purl", "repository_url", "repository_type", "repository_kind",
         "confidence", "evidence", "warnings", "version_reference",
