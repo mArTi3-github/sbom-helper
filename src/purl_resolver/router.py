@@ -10,12 +10,10 @@ from fastapi.templating import Jinja2Templates
 
 from .config import sbom_settings
 from .schemas import ResolveRequest
-from .service import resolve_purl
+from .service import resolve_purl, resolve_batch, process_sbom
 from .sbom.collector import collect_components
-from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser, SbomParseError
-from .sbom.reporter import build_report
-from .purl_utils import normalize, validate
+from .purl_utils import safe_normalize
 
 logger = logging.getLogger(__name__)
 
@@ -90,28 +88,21 @@ async def resolve_sbom_endpoint(
     purls_to_resolve = [c for c in components if c.needs_enrichment]
 
     seen: set[str] = set()
-    unique_purls: list[tuple[str, str]] = []
+    unique_purls: list[str] = []
     skipped = 0
     for comp in purls_to_resolve:
-        try:
-            n = normalize(validate(comp.purl))
-        except Exception:
+        n = safe_normalize(comp.purl)
+        if n == comp.purl:
             skipped += 1
             continue
         if n not in seen:
             seen.add(n)
-            unique_purls.append((comp.purl, n))
+            unique_purls.append(comp.purl)
 
-    resolved: dict[str, str] = {}
     storage = request.app.state.storage
     resolvers = request.app.state.resolvers
-    for original, normalized in unique_purls:
-        result = await resolve_purl(original, storage, resolvers)
-        if result.response and result.response.repository_url:
-            resolved[normalized] = result.response.repository_url
-
-    enrich_sbom(data, components, resolved)
-    report = build_report(components, resolved, skipped=skipped)
+    resolved = await resolve_batch(unique_purls, storage, resolvers)
+    report = process_sbom(data, components, resolved, skipped=skipped)
 
     return JSONResponse(
         status_code=200,

@@ -40,3 +40,10 @@ def normalize(components: PurlComponents) -> str:
     if components.namespace:
         return f"{components.scheme}:{components.type}/{components.namespace}/{components.name}"
     return f"{components.scheme}:{components.type}/{components.name}"
+
+
+def safe_normalize(purl: str) -> str:
+    try:
+        return normalize(validate(purl))
+    except Exception:
+        return purl

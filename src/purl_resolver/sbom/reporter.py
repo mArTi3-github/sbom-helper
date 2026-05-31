@@ -1,15 +1,7 @@
 from __future__ import annotations
 
 from .collector import SbomComponent
-
-
-def _normalize_purl(purl: str) -> str:
-    from ..purl_utils import validate, normalize
-
-    try:
-        return normalize(validate(purl))
-    except Exception:
-        return purl
+from ..purl_utils import safe_normalize
 
 
 def build_report(
@@ -25,7 +17,7 @@ def build_report(
     for comp in components:
         if not comp.needs_enrichment:
             continue
-        key = _normalize_purl(comp.purl)
+        key = safe_normalize(comp.purl)
         if key in seen:
             continue
         seen.add(key)

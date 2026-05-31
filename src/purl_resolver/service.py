@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
-from .purl_utils import normalize, validate
+from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
 from .schemas import ResolveResponse, ResolveResult
 from .storage.interface import Storage
 
+from .sbom.collector import collect_components
+from .sbom.enricher import enrich_sbom
+from .sbom.parser import CycloneDXParser, SbomParseError
+from .sbom.reporter import build_report
+
 logger = logging.getLogger(__name__)
+
+_BATCH_SEMAPHORE_LIMIT = 10
 
 
 async def resolve_purl(
@@ -70,3 +78,33 @@ async def resolve_purl(
             warnings=["No resolver found a repository URL"],
         )
     )
+
+
+async def resolve_batch(
+    purls: list[str],
+    storage: Storage,
+    resolvers: list[Resolver],
+) -> dict[str, str]:
+    semaphore = asyncio.Semaphore(_BATCH_SEMAPHORE_LIMIT)
+
+    async def _resolve_one(original: str) -> tuple[str, str | None]:
+        async with semaphore:
+            result = await resolve_purl(original, storage, resolvers)
+            key = safe_normalize(original)
+            if result.response and result.response.repository_url:
+                return (key, result.response.repository_url)
+            return (key, None)
+
+    tasks = [_resolve_one(p) for p in purls]
+    results = await asyncio.gather(*tasks)
+    return {k: v for k, v in results if v is not None}
+
+
+def process_sbom(
+    sbom: dict,
+    components: list,
+    resolved: dict[str, str],
+    skipped: int = 0,
+) -> dict:
+    enrich_sbom(sbom, components, resolved)
+    return build_report(components, resolved, skipped=skipped)
