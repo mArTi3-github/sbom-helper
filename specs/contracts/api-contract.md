@@ -36,7 +36,9 @@ Resolve a single PURL to its repository URL.
   "confidence": "high",
   "evidence": ["homepage from PyPI metadata"],
   "warnings": [],
-  "version_reference": "https://github.com/psf/requests/tree/v2.31.0"
+  "version_reference": "https://github.com/psf/requests/tree/v2.31.0",
+  "resolver": "purl2repo",
+  "resolved_at": "2026-05-31T12:00:00Z"
 }
 ```
 

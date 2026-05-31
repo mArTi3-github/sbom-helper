@@ -23,6 +23,7 @@
 | Add batch PURL resolution | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
 | Manage database (view, edit, filter, import, export) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
+| Refactor CSV import/export or storage interface | `architecture/layers.md`, `contracts/api-contract.md` |
 
 ## Dependency Graph
 

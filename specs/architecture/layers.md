@@ -111,11 +111,12 @@
 ## Import Rules
 
 - **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
+- **API Layer** imports **csv_io** module for CSV parsing/rendering
 - **API Layer** imports **Config Layer** (settings)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
-- **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`
+- **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
 - **Resolver Layer** (`resolver/`) defines the `Resolver` ABC, `Resolution` dataclass, and resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`). `Purl2RepoResolver` wraps the purl2repo library.
 - **Resolver Layer** imports purl2repo; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
@@ -130,9 +131,10 @@
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
 - Delegate SBOM enrichment to Service Layer (`service.resolve_batch()` + `service.process_sbom()`)
+- Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
 - Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
 - Handle error responses from Service Layer
-- Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`)
+- Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`, `db-admin.html`)
 
 ### Service Layer (`service.py`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → resolver call → storage store
@@ -142,6 +144,13 @@
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
+
+### CSV I/O Module (`csv_io.py`)
+- Pure functions for CSV parsing and rendering, no HTTP or Storage dependencies
+- `detect_delimiter(text) → str` — detects semicolon or comma delimiter from header line
+- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, semicolon delimiter, required column validation
+- `render_csv_export(rows: list[PurlRow]) → str` — renders PurlRow objects as semicolon-delimited CSV string
+- Dependencies: only `csv`, `io`, `json` from stdlib
 
 ### PURL Utils Layer (`purl_utils/`)
 - **`__init__.py`** — `validate(purl) → PurlComponents` (raises `PurlValidationError`), `normalize(components) → str`, `safe_normalize(purl) → str`
