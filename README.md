@@ -25,8 +25,10 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 | Endpoint | Description |
 |---|---|
 | `POST /api/v1/resolve` | Resolve a PURL to its repository URL |
+| `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references |
 | `GET /health` | Health check |
 | `GET /` | Web UI |
+| `GET /sbom-updater` | SBOM enrichment web interface |
 
 ## Stack
 
@@ -37,7 +39,7 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 
 ## Status
 
-MVP — single PURL resolution with file-based caching.  
+SBOM enrichment capabilities added — resolve Package URLs (PURLs) to source code repository URLs with confidence scoring and evidence, plus enrich CycloneDX SBOMs with VCS references.
 See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
 
 ## Specs

@@ -13,8 +13,8 @@
 # High-Level Workflow
 
 idea
-→ grill-with-docs
-→ OpenSpec proposal/tasks
+→ grill-with-docs or superpowers skills
+→ OpenSpec proposal/tasks or superpowers skills
 → tests
 → implementation
 → ADR/docs update
@@ -47,6 +47,43 @@ Dependencies are managed in `.venv/` (Python virtual environment). Always instal
 ```
 
 Do NOT use `pip install --break-system-packages` or install outside `.venv`.
+
+---
+
+# Superpowers Skills (MCP Server)
+
+An alternative or supplement to OpenSpec. The `superpowers` MCP server provides 14 skills accessible as tools/prompts:
+
+| Skill | Purpose |
+|-------|---------|
+| brainstorming | Creative work, design exploration, requirements clarification |
+| writing-plans | Small implementation plans with file paths and TDD steps |
+| executing-plans | Batch execution with review checkpoints |
+| subagent-driven-development | One subagent per task + two-stage code review |
+| dispatching-parallel-agents | Distribute independent tasks to concurrent agents |
+| test-driven-development | RED-GREEN-REFACTOR cycle |
+| systematic-debugging | 4-phase root cause analysis |
+| verification-before-completion | Run verification before claiming completion |
+| requesting-code-review | Dispatch code review with severity-categorized feedback |
+| receiving-code-review | Technical rigor when processing feedback |
+| using-git-worktrees | Isolated worktrees for parallel features |
+| finishing-a-development-branch | Merge, PR, or cleanup guidance |
+| writing-skills | Create/test/deploy new skills |
+| using-superpowers | Skill system overview and invocation guide |
+
+Typical workflow with superpowers:
+
+```text
+idea
+→ brainstorming (explore design)
+→ writing-plans (create implementation plan)
+→ test-driven-development or subagent-driven-development
+→ verification-before-completion
+→ requesting-code-review
+→ finishing-a-development-branch
+```
+
+Use `list_skills` to discover available skills, `recommend_skills` to pick skills for a task, `compose_workflow` to build an ordered workflow from a goal description.
 
 ---
 
@@ -262,13 +299,16 @@ Human SHOULD:
 # Recommended Daily Workflow
 
 feature idea
-→ grill-with-docs
+→ grill-with-docs or superpowers brainstorming
 → discussion summary → persist to `.misc/plans/`
-→ OpenSpec proposal/tasks
-→ implementation
+→ OpenSpec proposal/tasks or superpowers writing-plans
+→ implementation (TDD or superpowers TDD skill)
 → tests
+→ verification-before-completion
 → ADR/docs update
-→ archive OpenSpec change
+→ archive OpenSpec change or superpowers finishing-a-development-branch
+
+For alternative workflows, use `compose_workflow` from superpowers to generate a tailored sequence.
 
 ---
 

@@ -5,6 +5,14 @@
       "type": "local",
       "command": ["/home/administrator/.local/bin/codebase-memory-mcp"],
       "enabled": true
+    },
+    "superpowers": {
+      "type": "local",
+      "command": ["node", "/home/administrator/.superpowers-mcp/server/build/index.js"],
+      "environment": {
+        "SUPERPOWERS_SKILLS_DIR": "/home/administrator/.superpowers-mcp/skills/skills"
+      },
+      "enabled": true
     }
   }
 }
