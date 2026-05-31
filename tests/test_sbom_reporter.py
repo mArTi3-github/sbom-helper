@@ -58,3 +58,15 @@ class TestBuildReport:
         resolved = {"pkg:pypi/a": "https://example.com/a"}
         report = build_report(components, resolved, skipped=0)
         assert len(report["results"]) == 1
+
+    def test_skips_components_without_enrichment_needed(self) -> None:
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=False),
+            SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
+        ]
+        resolved = {"pkg:pypi/b": "https://example.com/b"}
+        report = build_report(components, resolved, skipped=0)
+        assert report["summary"]["total_purls"] == 1
+        assert report["summary"]["found"] == 1
+        assert len(report["results"]) == 1
+        assert report["results"][0]["purl"] == "pkg:pypi/b"

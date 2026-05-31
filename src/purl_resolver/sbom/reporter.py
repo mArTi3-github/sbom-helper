@@ -23,6 +23,8 @@ def build_report(
     not_found_count = 0
 
     for comp in components:
+        if not comp.needs_enrichment:
+            continue
         key = _normalize_purl(comp.purl)
         if key in seen:
             continue
