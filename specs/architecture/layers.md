@@ -32,12 +32,13 @@
 |                | Python call                       |
 |                v                                   |
 |  +-----------------------------+                   |
-|  |     Service Layer           |                   |
+|  |  Service Layer           |                   |
 |  |  src/purl_resolver/service  |                   |
 |  |                             |                   |
 |  |  resolve_purl()             |                   |
 |  |  resolve_batch()            |                   |
 |  |  process_sbom()             |                   |
+|  |  store_preexisting_references() |               |
 |  +----+--------------------+---+                   |
 |       |                    |                       |
 |       | Python call        | Python call           |
@@ -111,7 +112,7 @@
 
 - **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
 - **API Layer** imports **Config Layer** (settings)
-- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), and **SBOM Module** (`sbom/`)
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`
@@ -137,6 +138,7 @@
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → resolver call → storage store
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions
 - SBOM enrichment flow (`process_sbom`): accept parsed SBOM dict + components + resolved map → call `enricher.enrich_sbom()` → call `reporter.build_report()` → return combined report
+- Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `storage.store()`
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
@@ -165,9 +167,9 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Web UI Layer (`templates/`)
-- `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater page
-- `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download
-- `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export, bulk delete; column visibility controls; consistent navigation bar
+- `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater and DB-admin pages
+- `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download; navigation link to PURL resolver and DB-admin pages
+- `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export (semicolon delimiter, BOM handling), bulk delete; column visibility controls; consistent navigation bar across all pages
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence
@@ -178,17 +180,6 @@
 - **interface.py** — `Resolver(ABC)` with `resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `repository_type`, `repository_kind`, `confidence`, `evidence`, `warnings`, `version_reference`
 - **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; maps `InvalidPurlError`/`UnsupportedEcosystemError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
-
-### Config Layer (`config.py`)
-- Provide typed access to all runtime configuration
-- Load from environment variables (set via docker-compose.yml in production, or `.env` in development)
-- `Settings` class uses the `PURL2REPO_` prefix for resolver settings
-- `StorageSettings` class uses the `DB_` prefix for database connection settings (`DB_URL`, etc.)
-
-### Web UI Layer (`templates/index.html`)
-- Provide form-based PURL input
-- Fetch resolution results via `POST /api/v1/resolve`
-- Display results in a readable card format with expandable details
 
 ## Anti-Patterns
 

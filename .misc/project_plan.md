@@ -38,86 +38,7 @@
 
 ---
 
-## 3. Пакетная обработка PURL
-
-### Описание
-
-Эндпоинт для обработки списка PURL за один запрос. Позволяет клиентам отправлять до N PURL за раз и получать массив результатов.
-
-### API-дизайн (предварительно)
-
-```
-POST /api/v1/resolve/batch
-```
-
-```json
-{
-  "purls": ["pkg:pypi/requests@2.31.0", "pkg:npm/express@4.17.1"]
-}
-```
-
-Ответ:
-```json
-{
-  "results": [
-    { "purl": "pkg:pypi/requests", "repository_url": "..." },
-    { "purl": "pkg:npm/express", "repository_url": null, "warnings": ["..."] }
-  ]
-}
-```
-
-### Ключевые вопросы
-
-- Максимальный размер batch?
-- Обрабатывать последовательно или параллельно (asyncio.gather)?
-- Должен ли сбой одного PURL ломать весь batch (fail-fast) или возвращать частичные результаты?
-- Нужно ли логирование прогресса для больших batch?
-
-### Зависимости
-
-- Переиспользует `service.resolve_purl()` для каждого PURL
-- Новая схема запроса/ответа в `schemas.py`
-
----
-
-## 4. Обогащение SBOM-файлов
-
-### Описание
-
-Приём SBOM-файла (CycloneDX или SPDX), извлечение всех PURL компонентов, резолвинг каждого, добавление repository_url в результат.
-
-### Формат
-
-- **CycloneDX JSON** — PURL находятся в `metadata.component.purl` и `components[].purl`
-- **SPDX JSON** — PURL находятся в `packages[].externalRefs[].referenceLocator` (где `referenceType = "purl"`)
-
-### Архитектура (предварительно)
-
-```
-POST /api/v1/resolve/sbom
-→ парсинг SBOM (определение формата CycloneDX/SPDX)
-→ извлечение PURL-списка
-→ batch-резолвинг (см. раздел 3)
-→ возврат enriched SBOM (repository_url добавлен к каждому компоненту)
-```
-
-### Ключевые вопросы
-
-- Какой формат ответа — enriched SBOM (исходный + repository_url) или плоский список результатов?
-- Какой максимальный размер SBOM-файла?
-- Нужна ли поддержка SPDX и CycloneDX одновременно?
-- Нужна ли поддержка форматов, отличных от JSON (XML, tag-value)?
-- Хранить ли enriched SBOM для повторных запросов?
-
-### Зависимости
-
-- Библиотека для парсинга SBOM (или ручной парсинг CycloneDX/SPDX)
-- Batch-резолвинг из раздела 3
-- Новый эндпоинт в `router.py`
-
----
-
-## 5. Этапы разработки
+## 3. Этапы разработки
 
 ### Выполнено
 
@@ -137,17 +58,20 @@ POST /api/v1/resolve/sbom
 - Normalized cache keys (`scheme:type/namespace/name`)
 - FakeResolver для hermetic тестов
 - ADRs: purl2repo, PostgreSQL, purl validation
+- **Пакетная обработка PURL** — `resolve_batch()` в service layer (параллельный резолвинг с semaphore)
+- **Обогащение SBOM** — приём CycloneDX JSON, резолвинг компонентов, вставка VCS-ссылок
+- **Кэширование результатов обогащения** — PURL из обогащённых SBOM автоматически сохраняются в БД (включая компоненты с уже заполненными externalReferences)
+- **Database Admin** — веб-интерфейс `/db-admin` для просмотра, редактирования, фильтрации, импорта/экспорта (CSV с `;`-разделителем) и массового удаления записей `resolved_purls`
 
 ### Очередные задачи
 
 - **LLM-резолвер** — интеграция LLM как дополнительного резолвера
-- **Пакетная обработка** — эндпоинт `POST /api/v1/resolve/batch`
-- **Обогащение SBOM** — приём SBOM-файла, резолвинг компонентов
+- **Миграция фронтенда на React** — перевод с Vanilla JS на React для масштабируемости UI (админ-панель, дашборды)
+- **Динамический прогресс обогащения SBOM** — отображение в реальном времени прогресса обработки компонентов (WebSocket или SSE)
 
 ### Будущие возможности
 
 - Redis для distributed caching
 - Rate limiting
 - Метрики (Prometheus + Grafana)
-- Admin dashboard
 - Валидация сопоставления PURL и repository URL

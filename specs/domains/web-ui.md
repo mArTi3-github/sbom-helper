@@ -87,6 +87,8 @@ User                   Browser                    API Layer
 - Column visibility is user-configurable via checkboxes (default: PURL, repository_url, resolver)
 - All states (loading, empty, error, success) have distinct visual representations
 - Edits update via PATCH and re-fetch the current page
-- Export respects current filter settings
+- Export uses semicolon (`;`) delimiter and respects current filter settings
+- Import expects semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically); first row must contain headers; required columns: `purl`, `repository_url`
+- Import modal includes a collapsible CSV format reference section
 - Import modal supports drag-and-drop for CSV files
 - All three pages use a consistent navigation bar
