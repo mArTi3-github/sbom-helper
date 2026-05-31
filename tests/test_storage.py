@@ -17,10 +17,12 @@ def storage() -> InMemoryCache:
 
 class TestInMemoryCache:
 
+    @pytest.mark.asyncio
     async def test_lookup_returns_none_for_missing(self, storage: InMemoryCache) -> None:
         result = await storage.lookup("pkg:pypi/unknown@1.0")
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_store_and_lookup(self, storage: InMemoryCache) -> None:
         response = ResolveResponse(
             purl="pkg:pypi/requests",
@@ -34,6 +36,7 @@ class TestInMemoryCache:
         assert cached is not None
         assert cached.repository_url == "https://github.com/psf/requests"
 
+    @pytest.mark.asyncio
     async def test_store_overwrites_existing(self, storage: InMemoryCache) -> None:
         response_old = ResolveResponse(
             purl="pkg:pypi/example",
@@ -49,6 +52,7 @@ class TestInMemoryCache:
         assert cached is not None
         assert cached.repository_url == "https://github.com/new/example"
 
+    @pytest.mark.asyncio
     async def test_clear_removes_all(self, storage: InMemoryCache) -> None:
         response = ResolveResponse(
             purl="pkg:pypi/requests",
@@ -61,6 +65,7 @@ class TestInMemoryCache:
 
 class TestResolvePurl:
 
+    @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_result(self, storage: InMemoryCache) -> None:
         cached_response = ResolveResponse(
             purl="pkg:pypi/requests",
@@ -80,6 +85,7 @@ class TestResolvePurl:
         assert result.response.repository_url == "https://github.com/psf/requests"
         assert result.response.purl == "pkg:pypi/requests"
 
+    @pytest.mark.asyncio
     async def test_cache_hit_with_different_version(self, storage: InMemoryCache) -> None:
         cached_response = ResolveResponse(
             purl="pkg:pypi/requests",
@@ -98,6 +104,7 @@ class TestResolvePurl:
         assert result.response is not None
         assert result.response.repository_url == "https://github.com/psf/requests"
 
+    @pytest.mark.asyncio
     async def test_cache_miss_calls_resolver_and_stores(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver(
             resolution=Resolution(
@@ -124,6 +131,7 @@ class TestResolvePurl:
         assert cached is not None
         assert cached.repository_url == "https://github.com/psf/requests"
 
+    @pytest.mark.asyncio
     async def test_lookup_failure_falls_through(self, storage: InMemoryCache) -> None:
         broken_storage = InMemoryCache()
 
@@ -151,6 +159,7 @@ class TestResolvePurl:
         assert result.response is not None
         assert result.response.repository_url == "https://github.com/psf/requests"
 
+    @pytest.mark.asyncio
     async def test_store_failure_does_not_break_response(self, storage: InMemoryCache) -> None:
         broken_storage = InMemoryCache()
 
@@ -178,6 +187,7 @@ class TestResolvePurl:
         assert result.response is not None
         assert result.response.repository_url == "https://github.com/psf/requests"
 
+    @pytest.mark.asyncio
     async def test_unresolved_purl_not_stored(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver(
             resolution=Resolution(
@@ -197,6 +207,7 @@ class TestResolvePurl:
         cached = await storage.lookup("pkg:pypi/unknown@0.1")
         assert cached is None
 
+    @pytest.mark.asyncio
     async def test_invalid_purl_returns_error_from_validation(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver()
         result = await resolve_purl(
@@ -209,6 +220,7 @@ class TestResolvePurl:
         assert result.error_body["error"] == "invalid_purl"
         assert isinstance(result.error_body["message"], str)
 
+    @pytest.mark.asyncio
     async def test_invalid_purl_from_resolver_still_works(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver(error=InvalidPurlError("unsupported ecosystem"))
         result = await resolve_purl(
@@ -219,6 +231,7 @@ class TestResolvePurl:
         assert result.error_status == 400
         assert result.error_body == {"error": "invalid_purl", "message": "unsupported ecosystem"}
 
+    @pytest.mark.asyncio
     async def test_all_resolvers_fail_returns_unresolved(self, storage: InMemoryCache) -> None:
         resolver_a = FakeResolver(
             resolution=Resolution(purl="pkg:pypi/missing@1.0")
@@ -235,6 +248,7 @@ class TestResolvePurl:
         assert result.response is not None
         assert result.response.repository_url is None
 
+    @pytest.mark.asyncio
     async def test_second_resolver_used_when_first_returns_null(
         self, storage: InMemoryCache
     ) -> None:

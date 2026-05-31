@@ -6,6 +6,7 @@ import asyncpg
 import pytest
 
 from purl_resolver.schemas import ResolveResponse
+from purl_resolver.storage.interface import PurlFilters, UpsertRow
 from purl_resolver.storage.postgres import PostgresCache, _load_schema
 
 pytestmark = pytest.mark.skipif(
@@ -131,3 +132,204 @@ class TestE2EPostgresStoreAndLookup:
         assert result.evidence == []
         assert result.warnings == []
         assert result.version_reference is None
+
+
+async def _seed_data(cache: PostgresCache) -> None:
+    entries = [
+        ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            repository_type="github",
+            repository_kind="source_code",
+            confidence="high",
+            evidence=["homepage from PyPI"],
+            warnings=[],
+        ),
+        ResolveResponse(
+            purl="pkg:npm/express",
+            repository_url="https://github.com/expressjs/express",
+            repository_type="github",
+            repository_kind="source_code",
+            confidence="low",
+            evidence=[],
+            warnings=["registry mismatch"],
+        ),
+        ResolveResponse(
+            purl="pkg:pypi/flask",
+            repository_url="https://github.com/pallets/flask",
+            repository_type="github",
+            repository_kind="source_code",
+            confidence="high",
+            evidence=["homepage from PyPI"],
+            warnings=[],
+        ),
+    ]
+    for e in entries:
+        await cache.store(e)
+
+
+class TestE2EPostgresListPurls:
+
+    @pytest.mark.asyncio
+    async def test_list_all(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = await cache.list_purls(0, 50, PurlFilters())
+        assert len(rows) == 3
+        purls = {r.purl for r in rows}
+        assert purls == {"pkg:pypi/requests", "pkg:npm/express", "pkg:pypi/flask"}
+
+    @pytest.mark.asyncio
+    async def test_list_with_limit(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = await cache.list_purls(0, 2, PurlFilters())
+        assert len(rows) == 2
+
+    @pytest.mark.asyncio
+    async def test_list_with_offset(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = await cache.list_purls(2, 10, PurlFilters())
+        assert len(rows) == 1
+
+    @pytest.mark.asyncio
+    async def test_list_with_search(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = await cache.list_purls(0, 50, PurlFilters(search="flask"))
+        assert len(rows) == 1
+        assert rows[0].purl == "pkg:pypi/flask"
+
+    @pytest.mark.asyncio
+    async def test_list_with_confidence_filter(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = await cache.list_purls(0, 50, PurlFilters(confidence="high"))
+        assert len(rows) == 2
+
+    @pytest.mark.asyncio
+    async def test_list_sort_by_purl_asc(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = await cache.list_purls(0, 50, PurlFilters(), sort_by="purl", sort_order="asc")
+        purls = [r.purl for r in rows]
+        assert purls == ["pkg:npm/express", "pkg:pypi/flask", "pkg:pypi/requests"]
+
+
+class TestE2EPostgresCountPurls:
+
+    @pytest.mark.asyncio
+    async def test_count_all(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        count = await cache.count_purls(PurlFilters())
+        assert count == 3
+
+    @pytest.mark.asyncio
+    async def test_count_with_search(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        count = await cache.count_purls(PurlFilters(search="pypi"))
+        assert count == 2
+
+    @pytest.mark.asyncio
+    async def test_count_with_confidence_filter(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        count = await cache.count_purls(PurlFilters(confidence="low"))
+        assert count == 1
+
+
+class TestE2EPostgresUpdatePurl:
+
+    @pytest.mark.asyncio
+    async def test_update_repository_url(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        ok = await cache.update_purl(
+            "pkg:pypi/requests", "pkg:pypi/requests", "https://github.com/psf/requests-v3"
+        )
+        assert ok is True
+        row = await cache.lookup("pkg:pypi/requests")
+        assert row is not None
+        assert row.repository_url == "https://github.com/psf/requests-v3"
+
+    @pytest.mark.asyncio
+    async def test_update_rekey_purl(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        ok = await cache.update_purl(
+            "pkg:pypi/requests", "pkg:pypi/requests3", "https://github.com/psf/requests3"
+        )
+        assert ok is True
+        old = await cache.lookup("pkg:pypi/requests")
+        assert old is None
+        new = await cache.lookup("pkg:pypi/requests3")
+        assert new is not None
+        assert new.repository_url == "https://github.com/psf/requests3"
+
+    @pytest.mark.asyncio
+    async def test_update_not_found(self, cache: PostgresCache) -> None:
+        ok = await cache.update_purl(
+            "pkg:pypi/nonexistent", "pkg:pypi/nonexistent", "https://example.com"
+        )
+        assert ok is False
+
+
+class TestE2EPostgresDeletePurls:
+
+    @pytest.mark.asyncio
+    async def test_delete_single(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        deleted = await cache.delete_purls(["pkg:pypi/requests"])
+        assert deleted == 1
+        assert await cache.lookup("pkg:pypi/requests") is None
+
+    @pytest.mark.asyncio
+    async def test_delete_multiple(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        deleted = await cache.delete_purls(["pkg:pypi/requests", "pkg:npm/express"])
+        assert deleted == 2
+        assert await cache.lookup("pkg:pypi/requests") is None
+        assert await cache.lookup("pkg:npm/express") is None
+
+    @pytest.mark.asyncio
+    async def test_delete_nonexistent(self, cache: PostgresCache) -> None:
+        deleted = await cache.delete_purls(["pkg:pypi/nonexistent"])
+        assert deleted == 0
+
+    @pytest.mark.asyncio
+    async def test_delete_empty_list(self, cache: PostgresCache) -> None:
+        deleted = await cache.delete_purls([])
+        assert deleted == 0
+
+
+class TestE2EPostgresUpsertMany:
+
+    @pytest.mark.asyncio
+    async def test_upsert_new_rows(self, cache: PostgresCache) -> None:
+        rows = [
+            UpsertRow(
+                purl="pkg:pypi/newpkg",
+                repository_url="https://github.com/new/pkg",
+                confidence="high",
+            ),
+        ]
+        upserted, errors = await cache.upsert_many(rows)
+        assert upserted == 1
+        assert errors == 0
+        cached = await cache.lookup("pkg:pypi/newpkg")
+        assert cached is not None
+        assert cached.repository_url == "https://github.com/new/pkg"
+
+    @pytest.mark.asyncio
+    async def test_upsert_overwrites_existing(self, cache: PostgresCache) -> None:
+        await _seed_data(cache)
+        rows = [
+            UpsertRow(
+                purl="pkg:pypi/requests",
+                repository_url="https://github.com/psf/requests-v4",
+            ),
+        ]
+        upserted, errors = await cache.upsert_many(rows)
+        assert upserted == 1
+        assert errors == 0
+        cached = await cache.lookup("pkg:pypi/requests")
+        assert cached is not None
+        assert cached.repository_url == "https://github.com/psf/requests-v4"
+
+    @pytest.mark.asyncio
+    async def test_upsert_empty_list(self, cache: PostgresCache) -> None:
+        upserted, errors = await cache.upsert_many([])
+        assert upserted == 0
+        assert errors == 0
