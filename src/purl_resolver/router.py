@@ -24,7 +24,7 @@ from .schemas import (
     PurlRowResponse,
     PurlUpdateRequest,
 )
-from .service import resolve_purl, resolve_batch, process_sbom
+from .service import resolve_purl, resolve_batch, process_sbom, store_preexisting_references
 from .sbom.collector import collect_components
 from .sbom.parser import CycloneDXParser, SbomParseError
 from .purl_utils import safe_normalize
@@ -117,6 +117,7 @@ async def resolve_sbom_endpoint(
     storage = request.app.state.storage
     resolvers = request.app.state.resolvers
     resolved = await resolve_batch(unique_purls, storage, resolvers)
+    await store_preexisting_references(components, storage)
     report = process_sbom(data, components, resolved, skipped=skipped)
 
     return JSONResponse(

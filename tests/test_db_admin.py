@@ -8,6 +8,7 @@ from datetime import date
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from purl_resolver.resolver.interface import Resolution, Resolver
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.storage.interface import PurlFilters, PurlRow
 from purl_resolver.schemas import ResolveResponse
@@ -404,3 +405,49 @@ class TestAdminImportBom:
         )
         assert response.status_code == 200
         assert response.json()["imported"] == 1
+
+
+class TestSbomStoresPreExistingRefs:
+    async def test_sbom_stores_components_with_existing_references(self):
+        storage = InMemoryCache()
+
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "name": "requests",
+                    "purl": "pkg:pypi/requests",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests"}
+                    ],
+                },
+                {
+                    "name": "express",
+                    "purl": "pkg:npm/express",
+                },
+            ],
+        }
+
+        from purl_resolver.sbom.collector import collect_components
+        from purl_resolver.service import resolve_batch, store_preexisting_references
+        from tests.helpers import FakeResolver
+
+        components = collect_components(sbom)
+        purls_to_resolve = [c.purl for c in components if c.needs_enrichment]
+
+        resolver = FakeResolver(
+            resolution=Resolution(
+                purl="pkg:npm/express@4.17.1",
+                repository_url="https://github.com/expressjs/express",
+            )
+        )
+
+        await resolve_batch(purls_to_resolve, storage, [resolver])
+        await store_preexisting_references(components, storage)
+
+        assert "pkg:npm/express" in storage._store
+        assert "pkg:pypi/requests" in storage._store
+        req = storage._store["pkg:pypi/requests"]
+        assert req.repository_url == "https://github.com/psf/requests"

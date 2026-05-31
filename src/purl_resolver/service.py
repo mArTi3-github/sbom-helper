@@ -8,7 +8,7 @@ from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
 from .schemas import ResolveResponse, ResolveResult
 from .storage.interface import Storage
 
-from .sbom.collector import collect_components
+from .sbom.collector import SbomComponent, collect_components
 from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser, SbomParseError
 from .sbom.reporter import build_report
@@ -108,3 +108,26 @@ def process_sbom(
 ) -> dict:
     enrich_sbom(sbom, components, resolved)
     return build_report(components, resolved, skipped=skipped)
+
+
+async def store_preexisting_references(
+    components: list[SbomComponent],
+    storage: Storage,
+) -> None:
+    for comp in components:
+        if comp.needs_enrichment:
+            continue
+        for ref in comp.existing_references:
+            if ref.get("type") == "vcs" and ref.get("url"):
+                purl_key = safe_normalize(comp.purl)
+                try:
+                    existing = await storage.lookup(purl_key)
+                except Exception:
+                    existing = None
+                if existing is None:
+                    await storage.store(ResolveResponse(
+                        purl=purl_key,
+                        repository_url=ref["url"],
+                        evidence=["from SBOM externalReferences"],
+                    ))
+                break
