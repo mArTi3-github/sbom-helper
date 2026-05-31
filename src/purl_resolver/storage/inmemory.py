@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..schemas import ResolveResponse
-from .interface import PurlFilters, PurlRow, Storage
+from .interface import PurlFilters, PurlRow, UpsertRow, Storage
 
 
 class InMemoryCache(Storage):
@@ -103,52 +103,23 @@ class InMemoryCache(Storage):
         return deleted
 
     async def upsert_many(
-        self, rows: list[dict[str, object]]
+        self, rows: list[UpsertRow]
     ) -> tuple[int, int]:
         upserted = 0
         errors = 0
         for row in rows:
-            purl = row.get("purl")
-            repo_url = row.get("repository_url")
-            if not purl or not repo_url:
+            if not row.purl or not row.repository_url:
                 errors += 1
                 continue
-            purl_str = str(purl)
-            evidence = row.get("evidence")
-            evidence_val: list[str] = []
-            if evidence is not None:
-                if isinstance(evidence, list):
-                    evidence_val = [str(e) for e in evidence]
-                elif isinstance(evidence, str):
-                    import json
-                    try:
-                        parsed = json.loads(evidence)
-                        evidence_val = [str(e) for e in parsed] if isinstance(parsed, list) else []
-                    except (json.JSONDecodeError, TypeError):
-                        evidence_val = []
-
-            warnings = row.get("warnings")
-            warnings_val: list[str] = []
-            if warnings is not None:
-                if isinstance(warnings, list):
-                    warnings_val = [str(w) for w in warnings]
-                elif isinstance(warnings, str):
-                    import json
-                    try:
-                        parsed = json.loads(warnings)
-                        warnings_val = [str(w) for w in parsed] if isinstance(parsed, list) else []
-                    except (json.JSONDecodeError, TypeError):
-                        warnings_val = []
-
-            self._store[purl_str] = ResolveResponse(
-                purl=purl_str,
-                repository_url=str(repo_url),
-                repository_type=str(row["repository_type"]) if row.get("repository_type") else None,
-                repository_kind=str(row["repository_kind"]) if row.get("repository_kind") else None,
-                confidence=str(row["confidence"]) if row.get("confidence") else None,
-                evidence=evidence_val,
-                warnings=warnings_val,
-                version_reference=str(row["version_reference"]) if row.get("version_reference") else None,
+            self._store[row.purl] = ResolveResponse(
+                purl=row.purl,
+                repository_url=row.repository_url,
+                repository_type=row.repository_type,
+                repository_kind=row.repository_kind,
+                confidence=row.confidence,
+                evidence=row.evidence,
+                warnings=row.warnings,
+                version_reference=row.version_reference,
             )
             upserted += 1
         return (upserted, errors)

@@ -20,6 +20,8 @@ class ResolveResponse(BaseModel):
     evidence: list[str] = []
     warnings: list[str] = []
     version_reference: str | None = None
+    resolver: str = ""
+    resolved_at: str = ""
 
 
 class ErrorResponse(BaseModel):
@@ -62,21 +64,8 @@ class PurlListParams(BaseModel):
     sort_order: str = "desc"
 
 
-class PurlRowResponse(BaseModel):
-    purl: str
-    repository_url: str
-    repository_type: str | None = None
-    repository_kind: str | None = None
-    confidence: str | None = None
-    evidence: list[str] = []
-    warnings: list[str] = []
-    version_reference: str | None = None
-    resolver: str = ""
-    resolved_at: str = ""
-
-
 class PurlListResponse(BaseModel):
-    rows: list[PurlRowResponse]
+    rows: list[ResolveResponse]
     total: int
     page: int
     page_size: int

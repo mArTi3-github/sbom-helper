@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import csv
-import io
 import json
 import logging
 import pathlib
@@ -14,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from .config import sbom_settings
 from .schemas import (
     ResolveRequest,
+    ResolveResponse,
     DeleteResponse,
     ImportErrorItem,
     ImportResponse,
@@ -21,10 +20,10 @@ from .schemas import (
     PurlDeleteRequest,
     PurlListParams,
     PurlListResponse,
-    PurlRowResponse,
     PurlUpdateRequest,
 )
 from .service import resolve_purl, resolve_batch, process_sbom, store_preexisting_references
+from .csv_io import parse_csv_import, render_csv_export
 from .sbom.collector import collect_components
 from .sbom.parser import CycloneDXParser, SbomParseError
 from .purl_utils import safe_normalize
@@ -146,7 +145,7 @@ async def list_purls_endpoint(request: Request, params: PurlListParams = Query()
         sort_order=params.sort_order,
     )
     row_responses = [
-        PurlRowResponse(
+        ResolveResponse(
             purl=r.purl,
             repository_url=r.repository_url,
             repository_type=r.repository_type,
@@ -220,57 +219,20 @@ async def import_csv_endpoint(
             content={"error": "invalid_csv", "message": "File must be UTF-8 encoded"},
         )
 
-    reader = csv.DictReader(io.StringIO(text), delimiter=";")
-    if reader.fieldnames is None or not reader.fieldnames:
+    rows, errors = parse_csv_import(text)
+    if not rows and errors:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_csv", "message": "CSV has no header row"},
-        )
-
-    if "purl" not in reader.fieldnames or "repository_url" not in reader.fieldnames:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "invalid_csv",
-                "message": "CSV must contain 'purl' and 'repository_url' columns",
-            },
+            content={"error": "invalid_csv", "message": errors[0]["error"]},
         )
 
     storage = request.app.state.storage
-    rows: list[dict[str, object]] = []
-    errors: list[dict[str, object]] = []
-    row_num = 1
-
-    for row in reader:
-        row_num += 1
-        purl = (row.get("purl") or "").strip()
-        repo = (row.get("repository_url") or "").strip()
-
-        if not purl:
-            errors.append({"row": row_num, "error": "empty purl"})
-            continue
-        if not repo:
-            errors.append({"row": row_num, "error": "empty repository_url"})
-            continue
-
-        rows.append({
-            "purl": purl,
-            "repository_url": repo,
-            "repository_type": row.get("repository_type") or None,
-            "repository_kind": row.get("repository_kind") or None,
-            "confidence": row.get("confidence") or None,
-            "evidence": row.get("evidence") or "[]",
-            "warnings": row.get("warnings") or "[]",
-            "version_reference": row.get("version_reference") or None,
-            "resolver": row.get("resolver") or "purl2repo",
-        })
 
     if strategy == ImportStrategy.skip_existing:
-        to_insert: list[dict[str, object]] = []
+        to_insert = []
         skipped = 0
         for row in rows:
-            purl_str = str(row["purl"])
-            existing = await storage.lookup(purl_str)
+            existing = await storage.lookup(row.purl)
             if existing is not None:
                 skipped += 1
             else:
@@ -324,28 +286,8 @@ async def export_csv_endpoint(
         sort_order=sort_order,
     )
 
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow([
-        "purl", "repository_url", "repository_type", "repository_kind",
-        "confidence", "evidence", "warnings", "version_reference",
-        "resolver", "resolved_at",
-    ])
-    for r in rows:
-        writer.writerow([
-            r.purl,
-            r.repository_url,
-            r.repository_type or "",
-            r.repository_kind or "",
-            r.confidence or "",
-            json.dumps(r.evidence),
-            json.dumps(r.warnings),
-            r.version_reference or "",
-            r.resolver,
-            r.resolved_at,
-        ])
-
-    csv_bytes = output.getvalue().encode("utf-8")
+    csv_text = render_csv_export(rows)
+    csv_bytes = csv_text.encode("utf-8")
     return Response(
         content=csv_bytes,
         media_type="text/csv",

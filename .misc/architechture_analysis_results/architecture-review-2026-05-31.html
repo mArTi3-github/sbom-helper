@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — sbom-helper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 4 4; }
+      .leak { stroke: #dc2626; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-2">
+        <h1 class="text-3xl font-serif font-bold text-slate-900">Architecture review</h1>
+        <p class="text-sm text-slate-500">sbom-helper · 2026-05-31 · Post db-admin session</p>
+        <div class="flex gap-4 text-xs text-slate-400 mt-2">
+          <span class="flex items-center gap-1"><span class="w-3 h-3 border border-slate-400 rounded"></span> module</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 border border-dashed border-slate-400 rounded"></span> seam</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 border-2 border-red-500 rounded"></span> leakage</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded deep"></span> deep module</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- Candidate 1: CSV Import/Export -->
+        <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold">Extract CSV import/export from router</h2>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+
+          <div class="font-mono text-sm text-slate-600">
+            src/purl_resolver/router.py · lines 208–353
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</h3>
+              <div class="text-sm text-slate-700 space-y-1">
+                <div class="border border-slate-300 rounded p-2 bg-white text-xs">
+                  <div class="font-bold text-slate-500">router.py</div>
+                  <div class="mt-1 space-y-0.5">
+                    <div class="text-slate-400">├─ resolve_endpoint</div>
+                    <div class="text-slate-400">├─ resolve_sbom_endpoint</div>
+                    <div class="text-red-600 font-medium">├─ import_csv_endpoint <span class="text-red-400">← 90 lines of CSV parsing</span></div>
+                    <div class="text-red-600 font-medium">├─ export_csv_endpoint <span class="text-red-400">← 55 lines of CSV writing</span></div>
+                    <div class="text-slate-400">└─ db_admin_page</div>
+                  </div>
+                </div>
+                <p class="text-xs text-slate-500">CSV format logic, BOM handling, field mapping, error collection — all inline in HTTP handlers.</p>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</h3>
+              <div class="text-sm text-slate-700 space-y-1">
+                <div class="border border-slate-300 rounded p-2 bg-white text-xs">
+                  <div class="font-bold text-slate-500">router.py</div>
+                  <div class="mt-1 space-y-0.5">
+                    <div class="text-slate-400">├─ resolve_endpoint</div>
+                    <div class="text-slate-400">├─ resolve_sbom_endpoint</div>
+                    <div class="text-emerald-700 font-medium">├─ import_csv_endpoint <span class="text-emerald-500">← 15 lines, calls csv_io</span></div>
+                    <div class="text-emerald-700 font-medium">├─ export_csv_endpoint <span class="text-emerald-500">← 15 lines, calls csv_io</span></div>
+                    <div class="text-slate-400">└─ db_admin_page</div>
+                  </div>
+                </div>
+                <div class="border border-slate-300 rounded p-2 bg-white text-xs mt-1">
+                  <div class="font-bold text-emerald-600">csv_io.py <span class="text-emerald-500">← new module</span></div>
+                  <div class="mt-1 space-y-0.5">
+                    <div class="text-slate-600">├─ parse_import(text, strategy) → (rows, errors)</div>
+                    <div class="text-slate-600">├─ render_export(rows) → str</div>
+                    <div class="text-slate-600">└─ detect_delimiter(text) → str</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm text-slate-700"><strong>Problem:</strong> CSV parsing, BOM handling, delimiter detection, field mapping, error collection, and skip-existing strategy logic are all inlined in two HTTP handlers (~145 lines total). This logic has no business knowing about HTTP.</p>
+          <p class="text-sm text-slate-700"><strong>Solution:</strong> Extract a <code>csv_io</code> module with pure functions: <code>parse_import()</code>, <code>render_export()</code>. Router calls these and wraps results in HTTP responses.</p>
+          <ul class="text-sm text-slate-600 space-y-1">
+            <li>• <strong>Leverage:</strong> one interface, reusable for CLI import/export</li>
+            <li>• <strong>Locality:</strong> CSV format bugs concentrate in csv_io, not router</li>
+            <li>• <strong>Testability:</strong> test CSV parsing without FastAPI TestClient</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 2: Untyped Dict Infection -->
+        <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold">Type the upsert_many interface</h2>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+
+          <div class="font-mono text-sm text-slate-600">
+            storage/interface.py:64 · storage/inmemory.py:105–154 · storage/postgres.py:239–305
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</h3>
+              <div class="text-xs text-slate-700 font-mono bg-white rounded border border-slate-200 p-2">
+                <span class="text-red-600">upsert_many(rows: list[dict[str, object]])</span>
+                <br/>→ tuple[int, int]
+                <br/><br/>
+                <span class="text-slate-400">// each implementation manually:</span>
+                <br/>row.get("purl") → str(row.get(...))
+                <br/>json.loads(row.get("evidence"))
+                <br/>json.loads(row.get("warnings"))
+                <br/><span class="text-red-400">× 30 lines of parsing per implementation</span>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</h3>
+              <div class="text-xs text-slate-700 font-mono bg-white rounded border border-slate-200 p-2">
+                <span class="text-emerald-600">@dataclass</span>
+                <br/>class UpsertRow:
+                <br/>&nbsp;&nbsp;purl: str
+                <br/>&nbsp;&nbsp;repository_url: str
+                <br/>&nbsp;&nbsp;evidence: list[str]
+                <br/>&nbsp;&nbsp;warnings: list[str]
+                <br/>&nbsp;&nbsp;...
+                <br/><br/>
+                <span class="text-emerald-600">upsert_many(rows: list[UpsertRow])</span>
+                <br/>→ tuple[int, int]
+                <br/><br/>
+                <span class="text-slate-400">// implementations read typed fields directly</span>
+                <br/><span class="text-emerald-400">× 0 lines of manual parsing</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm text-slate-700"><strong>Problem:</strong> <code>upsert_many</code> takes untyped <code>dict[str, object]</code>. Both InMemoryCache and PostgresCache independently parse each field with <code>str(row.get(...))</code> and <code>json.loads()</code> — ~30 lines of duplicated parsing per implementation. Bugs hide in the parsing, not the storage.</p>
+          <p class="text-sm text-slate-700"><strong>Solution:</strong> Define an <code>UpsertRow</code> dataclass in <code>storage/interface.py</code>. Implementations read typed fields directly. Router constructs <code>UpsertRow</code> from CSV dicts once.</p>
+          <ul class="text-sm text-slate-600 space-y-1">
+            <li>• <strong>Leverage:</strong> one typed interface, two implementations stop duplicating parsing</li>
+            <li>• <strong>Locality:</strong> field mapping lives in one place (csv_io → UpsertRow)</li>
+            <li>• <strong>Deletion test:</strong> deleting the dict forces each caller to re-implement parsing</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 3: Four-Representation Problem -->
+        <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold">Collapse the four purl-record representations</h2>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+
+          <div class="font-mono text-sm text-slate-600">
+            resolver/interface.py · schemas.py · storage/interface.py
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</h3>
+              <div class="text-xs text-slate-700 space-y-1">
+                <div class="bg-white rounded border border-slate-200 p-2 font-mono">
+                  <div class="text-red-500">Resolution</div>
+                  <div class="text-slate-400 text-[10px]">resolver/interface.py</div>
+                  <div class="mt-1">↓ copy fields</div>
+                  <div class="text-red-500 mt-1">ResolveResponse</div>
+                  <div class="text-slate-400 text-[10px]">schemas.py (Pydantic)</div>
+                  <div class="mt-1">↓ copy fields</div>
+                  <div class="text-red-500 mt-1">PurlRow</div>
+                  <div class="text-slate-400 text-[10px]">storage/interface.py (dataclass)</div>
+                  <div class="mt-1">↓ copy fields</div>
+                  <div class="text-red-500 mt-1">PurlRowResponse</div>
+                  <div class="text-slate-400 text-[10px]">schemas.py (Pydantic)</div>
+                </div>
+                <p class="text-xs text-slate-500">Same 8 fields, 4 types, 3 manual copies.</p>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</h3>
+              <div class="text-xs text-slate-700 space-y-1">
+                <div class="bg-white rounded border border-slate-200 p-2 font-mono">
+                  <div class="text-emerald-600">PurlRecord</div>
+                  <div class="text-slate-400 text-[10px]">storage/interface.py (dataclass)</div>
+                  <div class="mt-1">↓ thin adapter at seam</div>
+                  <div class="text-emerald-600 mt-1">ResolveResponse</div>
+                  <div class="text-slate-400 text-[10px]">schemas.py (Pydantic, API boundary)</div>
+                  <div class="mt-2 text-slate-400 text-[10px]">PurlRowResponse = ResolveResponse</div>
+                  <div class="text-slate-400 text-[10px]">(alias, no copy)</div>
+                </div>
+                <p class="text-xs text-slate-500">One domain type, one API adapter.</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm text-slate-700"><strong>Problem:</strong> The same purl→repository mapping exists as 4 types across 3 files. The router copies fields between <code>PurlRow</code> and <code>PurlRowResponse</code> in a 10-field 1:1 mapping. Each boundary forces a manual field copy.</p>
+          <p class="text-sm text-slate-700"><strong>Solution:</strong> Define one canonical <code>PurlRecord</code> dataclass. Use thin adapters at boundaries (Pydantic model for API, asyncpg row reader for DB). Eliminate <code>PurlRowResponse</code> as an alias.</p>
+          <ul class="text-sm text-slate-600 space-y-1">
+            <li>• <strong>Leverage:</strong> one type, adapters handle boundary translation</li>
+            <li>• <strong>Locality:</strong> field additions propagate to one type, not four</li>
+            <li>• <strong>Caution:</strong> touches many files; ADR-0002 may need revisiting</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 4: Storage Interface Split -->
+        <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold">Split Storage into Cache + Repository</h2>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">ports &amp; adapters</span>
+          </div>
+
+          <div class="font-mono text-sm text-slate-600">
+            storage/interface.py · storage/inmemory.py · storage/postgres.py
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</h3>
+              <div class="text-xs text-slate-700 font-mono bg-white rounded border border-slate-200 p-2">
+                <div class="text-red-500 font-bold">Storage (ABC)</div>
+                <div class="text-slate-400 text-[10px]">7 abstract methods</div>
+                <div class="mt-1 space-y-0.5">
+                  <div>lookup() <span class="text-slate-400">← cache</span></div>
+                  <div>store() <span class="text-slate-400">← cache</span></div>
+                  <div class="text-red-400">list_purls() <span class="text-slate-400">← admin</span></div>
+                  <div class="text-red-400">count_purls() <span class="text-slate-400">← admin</span></div>
+                  <div class="text-red-400">update_purl() <span class="text-slate-400">← admin</span></div>
+                  <div class="text-red-400">delete_purls() <span class="text-slate-400">← admin</span></div>
+                  <div class="text-red-400">upsert_many() <span class="text-slate-400">← admin</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</h3>
+              <div class="text-xs text-slate-700 font-mono bg-white rounded border border-slate-200 p-2">
+                <div class="text-emerald-600 font-bold">ResolutionCache (ABC)</div>
+                <div class="text-slate-400 text-[10px]">2 methods</div>
+                <div class="mt-1 space-y-0.5">
+                  <div>lookup()</div>
+                  <div>store()</div>
+                </div>
+                <div class="mt-2 text-emerald-600 font-bold">PurlRepository (ABC)</div>
+                <div class="text-slate-400 text-[10px]">5 methods</div>
+                <div class="mt-1 space-y-0.5">
+                  <div>list_purls()</div>
+                  <div>count_purls()</div>
+                  <div>update_purl()</div>
+                  <div>delete_purls()</div>
+                  <div>upsert_many()</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm text-slate-700"><strong>Problem:</strong> The <code>Storage</code> ABC mixes two concerns: resolution cache (2 methods) and admin CRUD (5 methods). The resolution pipeline only needs <code>lookup</code>/<code>store</code>, but must satisfy the full 7-method interface. InMemoryCache implements admin methods it doesn't need for fallback.</p>
+          <p class="text-sm text-slate-700"><strong>Solution:</strong> Split into <code>ResolutionCache</code> (lookup, store) and <code>PurlRepository</code> (list, count, update, delete, upsert). Each implementation can satisfy one or both.</p>
+          <ul class="text-sm text-slate-600 space-y-1">
+            <li>• <strong>Leverage:</strong> callers see only the interface they need</li>
+            <li>• <strong>Locality:</strong> admin logic vs. cache logic separated at the seam</li>
+            <li>• <strong>Caution:</strong> two adapters needed to justify the split; currently both implementations satisfy both interfaces</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 5: safe_normalize as cross-cutting -->
+        <article class="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold">Centralize PURL normalization</h2>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">Speculative</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+
+          <div class="font-mono text-sm text-slate-600">
+            purl_utils/ · service.py · router.py · sbom/enricher.py · sbom/reporter.py
+          </div>
+
+          <p class="text-sm text-slate-700"><strong>Problem:</strong> <code>safe_normalize</code> is called in 5 different modules. Every caller must remember to normalize — a missed call means a cache miss or incorrect storage key. Normalization is a cross-cutting concern threaded through every layer individually.</p>
+          <p class="text-sm text-slate-700"><strong>Solution:</strong> Normalize once at the storage boundary (normalize on write, normalize on read) or in the service layer. Callers pass raw PURLs; normalization happens internally.</p>
+          <ul class="text-sm text-slate-600 space-y-1">
+            <li>• <strong>Leverage:</strong> one normalization point, callers stop worrying about it</li>
+            <li>• <strong>Locality:</strong> normalization bugs concentrate at one seam</li>
+            <li>• <strong>Caution:</strong> the resolver needs the original PURL (not normalized) for version-specific lookups; must preserve both forms</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-6 space-y-3">
+        <h2 class="text-xl font-serif font-bold text-emerald-900">Top recommendation</h2>
+        <p class="text-sm text-emerald-800">
+          <strong>Extract CSV import/export from router</strong> — the strongest candidate. The 145 lines of CSV parsing, BOM handling, delimiter detection, field mapping, error collection, and skip-existing strategy are all inlined in HTTP handlers. Extracting a <code>csv_io</code> module would make this logic testable without FastAPI, reusable for CLI, and concentrated in one place. This is the change with the highest leverage-to-effort ratio.
+        </p>
+        <p class="text-sm text-emerald-800">
+          Tackle this alongside <strong>typing the upsert_many interface</strong> — the untyped <code>dict[str, object]</code> in <code>upsert_many</code> is the root cause of duplicated parsing in both InMemoryCache and PostgresCache. An <code>UpsertRow</code> dataclass would collapse ~60 lines of duplicated code.
+        </p>
+      </section>
+
+    </main>
+  </body>
+</html>

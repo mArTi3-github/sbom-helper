@@ -7,7 +7,7 @@ import asyncpg
 
 from ..config import storage_settings
 from ..schemas import ResolveResponse
-from .interface import PurlFilters, PurlRow, Storage
+from .interface import PurlFilters, PurlRow, UpsertRow, Storage
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +237,7 @@ class PostgresCache(Storage):
             return deleted
 
     async def upsert_many(
-        self, rows: list[dict[str, object]]
+        self, rows: list[UpsertRow]
     ) -> tuple[int, int]:
         upserted = 0
         errors = 0
@@ -245,35 +245,9 @@ class PostgresCache(Storage):
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 for row in rows:
-                    purl_val = row.get("purl")
-                    repo_url = row.get("repository_url")
-                    if not purl_val or not repo_url:
+                    if not row.purl or not row.repository_url:
                         errors += 1
                         continue
-
-                    purl_str = str(purl_val)
-
-                    evidence = row.get("evidence")
-                    if evidence is not None:
-                        if isinstance(evidence, str):
-                            evidence_val = evidence
-                        elif isinstance(evidence, list):
-                            evidence_val = json.dumps([str(e) for e in evidence])
-                        else:
-                            evidence_val = json.dumps(evidence)
-                    else:
-                        evidence_val = "[]"
-
-                    warn = row.get("warnings")
-                    if warn is not None:
-                        if isinstance(warn, str):
-                            warnings_val = warn
-                        elif isinstance(warn, list):
-                            warnings_val = json.dumps([str(w) for w in warn])
-                        else:
-                            warnings_val = json.dumps(warn)
-                    else:
-                        warnings_val = "[]"
 
                     await conn.execute(
                         """INSERT INTO resolved_purls (
@@ -290,15 +264,15 @@ class PostgresCache(Storage):
                             version_reference = EXCLUDED.version_reference,
                             resolver = EXCLUDED.resolver,
                             resolved_at = NOW()""",
-                        purl_str,
-                        str(repo_url),
-                        row.get("repository_type"),
-                        row.get("repository_kind"),
-                        row.get("confidence"),
-                        evidence_val,
-                        warnings_val,
-                        row.get("version_reference"),
-                        row.get("resolver", "purl2repo"),
+                        row.purl,
+                        row.repository_url,
+                        row.repository_type,
+                        row.repository_kind,
+                        row.confidence,
+                        json.dumps(row.evidence),
+                        json.dumps(row.warnings),
+                        row.version_reference,
+                        row.resolver,
                     )
                     upserted += 1
 

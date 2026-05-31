@@ -30,6 +30,19 @@ class PurlRow:
     resolved_at: str = ""
 
 
+@dataclass
+class UpsertRow:
+    purl: str
+    repository_url: str
+    repository_type: str | None = None
+    repository_kind: str | None = None
+    confidence: str | None = None
+    evidence: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    version_reference: str | None = None
+    resolver: str = "purl2repo"
+
+
 class Storage(ABC):
 
     @abstractmethod
@@ -61,5 +74,5 @@ class Storage(ABC):
 
     @abstractmethod
     async def upsert_many(
-        self, rows: list[dict[str, object]]
+        self, rows: list[UpsertRow]
     ) -> tuple[int, int]: ...
