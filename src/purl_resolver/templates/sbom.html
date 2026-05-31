@@ -14,8 +14,6 @@
         .container { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; flex: 1; }
         h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
         .subtitle { color: #666; margin-bottom: 1.5rem; }
-        .back-link { display: inline-block; margin-bottom: 1rem; color: #2563eb; text-decoration: none; font-size: 0.9rem; }
-        .back-link:hover { text-decoration: underline; }
         .upload-area {
             background: #fff; border: 2px dashed #ccc; border-radius: 8px;
             padding: 2rem; text-align: center; cursor: pointer;
@@ -73,7 +71,11 @@
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-link">&larr; Back to PURL resolver</a>
+        <div style="margin-bottom:1rem;display:flex;gap:1rem;">
+            <a href="/" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">PURL Resolver</a>
+            <a href="/sbom-updater" style="text-decoration:none;color:inherit;font-weight:600;font-size:0.9rem;">SBOM Updater</a>
+            <a href="/db-admin" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">Database Admin</a>
+        </div>
         <h1>SBOM-updater</h1>
         <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы обогатить компоненты ссылками на репозитории исходных текстов</p>
 
