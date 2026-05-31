@@ -7,7 +7,7 @@ import asyncpg
 
 from ..config import storage_settings
 from ..schemas import ResolveResponse
-from .interface import Storage
+from .interface import PurlFilters, PurlRow, Storage
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,221 @@ class PostgresCache(Storage):
     else json.dumps(result.warnings),
                 result.version_reference,
             )
+
+
+    _SORTABLE_COLUMNS: frozenset[str] = frozenset({
+        "purl", "repository_url", "resolver", "confidence", "resolved_at",
+    })
+
+    async def list_purls(
+        self,
+        offset: int,
+        limit: int,
+        filters: PurlFilters,
+        sort_by: str = "resolved_at",
+        sort_order: str = "desc",
+    ) -> list[PurlRow]:
+        clauses: list[str] = []
+        params: list[object] = []
+        idx = 1
+
+        if filters.search is not None:
+            clauses.append(f"purl ILIKE ${idx}")
+            params.append(f"%{filters.search}%")
+            idx += 1
+        if filters.resolver is not None:
+            clauses.append(f"resolver = ${idx}")
+            params.append(filters.resolver)
+            idx += 1
+        if filters.confidence is not None:
+            clauses.append(f"confidence = ${idx}")
+            params.append(filters.confidence)
+            idx += 1
+        if filters.date_from is not None:
+            clauses.append(f"resolved_at >= ${idx}")
+            params.append(filters.date_from)
+            idx += 1
+        if filters.date_to is not None:
+            clauses.append(f"resolved_at < ${idx}")
+            params.append(filters.date_to)
+            idx += 1
+
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
+        safe_sort = sort_by if sort_by in self._SORTABLE_COLUMNS else "resolved_at"
+        safe_order = "DESC" if sort_order == "desc" else "ASC"
+
+        query = (
+            f"SELECT * FROM resolved_purls{where}"
+            f" ORDER BY {safe_sort} {safe_order}"
+            f" LIMIT ${idx} OFFSET ${idx + 1}"
+        )
+        params.extend([limit, offset])
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
+
+        return [
+            PurlRow(
+                purl=r["purl"],
+                repository_url=r["repository_url"],
+                repository_type=r.get("repository_type"),
+                repository_kind=r.get("repository_kind"),
+                confidence=r.get("confidence"),
+                evidence=self._decode_jsonb(r.get("evidence")),
+                warnings=self._decode_jsonb(r.get("warnings")),
+                version_reference=r.get("version_reference"),
+                resolver=r.get("resolver", "purl2repo"),
+                resolved_at=str(r["resolved_at"]),
+            )
+            for r in rows
+        ]
+
+    async def count_purls(self, filters: PurlFilters) -> int:
+        clauses: list[str] = []
+        params: list[object] = []
+        idx = 1
+
+        if filters.search is not None:
+            clauses.append(f"purl ILIKE ${idx}")
+            params.append(f"%{filters.search}%")
+            idx += 1
+        if filters.resolver is not None:
+            clauses.append(f"resolver = ${idx}")
+            params.append(filters.resolver)
+            idx += 1
+        if filters.confidence is not None:
+            clauses.append(f"confidence = ${idx}")
+            params.append(filters.confidence)
+            idx += 1
+        if filters.date_from is not None:
+            clauses.append(f"resolved_at >= ${idx}")
+            params.append(filters.date_from)
+            idx += 1
+        if filters.date_to is not None:
+            clauses.append(f"resolved_at < ${idx}")
+            params.append(filters.date_to)
+            idx += 1
+
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        query = f"SELECT COUNT(*) as cnt FROM resolved_purls{where}"
+
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(query, *params)
+        return row["cnt"] if row else 0
+
+    async def update_purl(
+        self, old_purl: str, purl: str, repository_url: str
+    ) -> bool:
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                existing = await conn.fetchrow(
+                    "SELECT * FROM resolved_purls WHERE purl = $1", old_purl
+                )
+                if existing is None:
+                    return False
+                if old_purl == purl:
+                    await conn.execute(
+                        "UPDATE resolved_purls SET repository_url = $1, resolved_at = NOW() WHERE purl = $2",
+                        repository_url, old_purl,
+                    )
+                else:
+                    await conn.execute(
+                        "DELETE FROM resolved_purls WHERE purl = $1", old_purl
+                    )
+                    await conn.execute(
+                        """INSERT INTO resolved_purls (
+                            purl, repository_url, repository_type, repository_kind,
+                            confidence, evidence, warnings, version_reference, resolver
+                        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)""",
+                        purl,
+                        repository_url,
+                        existing.get("repository_type"),
+                        existing.get("repository_kind"),
+                        existing.get("confidence"),
+                        json.dumps(self._decode_jsonb(existing.get("evidence"))),
+                        json.dumps(self._decode_jsonb(existing.get("warnings"))),
+                        existing.get("version_reference"),
+                        existing.get("resolver", "purl2repo"),
+                    )
+                return True
+
+    async def delete_purls(self, purls: list[str]) -> int:
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM resolved_purls WHERE purl = ANY($1::text[])",
+                purls,
+            )
+            deleted = int(result.split()[-1]) if result else 0
+            return deleted
+
+    async def upsert_many(
+        self, rows: list[dict[str, object]]
+    ) -> tuple[int, int]:
+        upserted = 0
+        errors = 0
+
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                for row in rows:
+                    purl_val = row.get("purl")
+                    repo_url = row.get("repository_url")
+                    if not purl_val or not repo_url:
+                        errors += 1
+                        continue
+
+                    purl_str = str(purl_val)
+
+                    evidence = row.get("evidence")
+                    if evidence is not None:
+                        if isinstance(evidence, str):
+                            evidence_val = evidence
+                        elif isinstance(evidence, list):
+                            evidence_val = json.dumps([str(e) for e in evidence])
+                        else:
+                            evidence_val = json.dumps(evidence)
+                    else:
+                        evidence_val = "[]"
+
+                    warn = row.get("warnings")
+                    if warn is not None:
+                        if isinstance(warn, str):
+                            warnings_val = warn
+                        elif isinstance(warn, list):
+                            warnings_val = json.dumps([str(w) for w in warn])
+                        else:
+                            warnings_val = json.dumps(warn)
+                    else:
+                        warnings_val = "[]"
+
+                    await conn.execute(
+                        """INSERT INTO resolved_purls (
+                            purl, repository_url, repository_type, repository_kind,
+                            confidence, evidence, warnings, version_reference, resolver
+                        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
+                        ON CONFLICT (purl) DO UPDATE SET
+                            repository_url = EXCLUDED.repository_url,
+                            repository_type = EXCLUDED.repository_type,
+                            repository_kind = EXCLUDED.repository_kind,
+                            confidence = EXCLUDED.confidence,
+                            evidence = EXCLUDED.evidence,
+                            warnings = EXCLUDED.warnings,
+                            version_reference = EXCLUDED.version_reference,
+                            resolver = EXCLUDED.resolver,
+                            resolved_at = NOW()""",
+                        purl_str,
+                        str(repo_url),
+                        row.get("repository_type"),
+                        row.get("repository_kind"),
+                        row.get("confidence"),
+                        evidence_val,
+                        warnings_val,
+                        row.get("version_reference"),
+                        row.get("resolver", "purl2repo"),
+                    )
+                    upserted += 1
+
+        return (upserted, errors)
 
 
 async def create_pool() -> asyncpg.Pool:
