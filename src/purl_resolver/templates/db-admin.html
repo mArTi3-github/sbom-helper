@@ -110,6 +110,16 @@
         .modal .strategy-group label { margin-right: 1rem; font-size: 0.9rem; cursor: pointer; }
         .modal .import-results { margin-top: 1rem; font-size: 0.85rem; }
         .modal .import-results .error-list { color: #991b1b; }
+        .modal .format-ref {
+            background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+            padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #555;
+            max-height: 200px; overflow-y: auto;
+        }
+        .modal .format-ref summary { cursor: pointer; font-weight: 500; color: #1a1a1a; margin-bottom: 0.5rem; }
+        .modal .format-ref code { background: #e5e7eb; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
+        .modal .format-ref table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+        .modal .format-ref th, .modal .format-ref td { padding: 0.25rem 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 0.78rem; }
+        .modal .format-ref th { color: #888; text-transform: uppercase; font-size: 0.7rem; }
         footer { text-align: center; padding: 0.75rem; color: #999; font-size: 0.8rem; }
     </style>
 </head>
@@ -203,6 +213,32 @@
     <div class="modal-overlay" id="import-modal">
         <div class="modal">
             <h3>Import CSV</h3>
+            <details class="format-ref">
+                <summary>CSV format reference</summary>
+                <p><strong>Separator:</strong> <code>;</code> (semicolon)</p>
+                <p><strong>Encoding:</strong> UTF-8 (BOM is handled automatically)</p>
+                <p><strong>First row:</strong> column headers (required)</p>
+                <p style="margin-top:0.5rem;"><strong>Columns:</strong></p>
+                <table>
+                    <thead><tr><th>Column</th><th>Required</th><th>Format</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>purl</code></td><td>Yes</td><td>Package URL, e.g. <code>pkg:pypi/requests</code></td></tr>
+                        <tr><td><code>repository_url</code></td><td>Yes</td><td>Source code repository URL</td></tr>
+                        <tr><td><code>repository_type</code></td><td>No</td><td>e.g. <code>github</code>, <code>gitlab</code></td></tr>
+                        <tr><td><code>repository_kind</code></td><td>No</td><td>e.g. <code>source_code</code></td></tr>
+                        <tr><td><code>confidence</code></td><td>No</td><td><code>high</code>, <code>medium</code>, or <code>low</code></td></tr>
+                        <tr><td><code>evidence</code></td><td>No</td><td>JSON array, e.g. <code>["reason1", "reason2"]</code></td></tr>
+                        <tr><td><code>warnings</code></td><td>No</td><td>JSON array, e.g. <code>["warning1"]</code></td></tr>
+                        <tr><td><code>version_reference</code></td><td>No</td><td>URL to version-specific reference</td></tr>
+                        <tr><td><code>resolver</code></td><td>No</td><td>Defaults to <code>purl2repo</code></td></tr>
+                        <tr><td><code>resolved_at</code></td><td>No</td><td>ISO-8601 timestamp</td></tr>
+                    </tbody>
+                </table>
+                <p style="margin-top:0.5rem;"><strong>Example:</strong></p>
+                <pre style="background:#e5e7eb;padding:0.5rem;border-radius:4px;font-size:0.75rem;overflow-x:auto;margin-top:0.25rem;">purl;repository_url;confidence
+pkg:pypi/requests;https://github.com/psf/requests;high
+pkg:npm/express;https://github.com/expressjs/express;medium</pre>
+            </details>
             <div class="upload-area" id="import-upload-area">
                 <input type="file" id="import-file-input" accept=".csv">
                 <div>Drag & drop a CSV file here or click to select</div>
