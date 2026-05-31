@@ -57,3 +57,15 @@ PURL, приведённый к минимальной форме `scheme:type/n
 
 **PurlComponents**:
 Структура данных, представляющая разобранный PURL на составные части: scheme, type, namespace, name, version, qualifiers, subpath.
+
+**Safe Normalize**:
+Функция `safe_normalize(purl) → str` в `purl_utils`. Оборачивает `validate()` + `normalize()` с обработкой исключений — при ошибке парсинга возвращает оригинальный PURL как есть. Устраняет дублирование логики нормализации в различных модулях.
+
+**SBOM Module**:
+Группа модулей `sbom/`, реализующих обработку CycloneDX SBOM: `parser.py` (валидация JSON-формата), `collector.py` (рекурсивный обход компонентов и выявление нуждающихся в обогащении), `enricher.py` (вставка VCS-ссылок в `externalReferences`), `reporter.py` (построение отчёта о результатах). Модуль импортирует `purl_utils` для нормализации PURL; не зависит от Storage или Resolver напрямую.
+
+**SBOM Enrichment**:
+Процесс обогащения CycloneDX SBOM-файла. Принимает на вход JSON-файл, находит компоненты без VCS/source-distribution ссылок в `externalReferences`, резолвит их PURL через существующий Service Layer, вставляет найденные ссылки и возвращает обогащённый SBOM вместе с отчётом (summary + results table).
+
+**Batch Resolution**:
+Функция `resolve_batch(purls, storage, resolvers) → dict` в Service Layer. Параллельно резолвит список PURL через `asyncio.gather()` с ограничением конкурентности (semaphore=10). Возвращает словарь `normalized_purl → repository_url` только для успешных резолвингов.

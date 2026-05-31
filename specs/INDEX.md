@@ -19,6 +19,9 @@
 | Add or change database integration | `architecture/layers.md`, `domains/purl-resolution.md` |
 | Add or modify storage layer | `architecture/layers.md` |
 | Add PURL validation or normalization | `domains/purl-resolution.md`, `architecture/layers.md` |
+| Enrich CycloneDX SBOM files | `contracts/api-contract.md`, `architecture/layers.md`, `domains/purl-resolution.md`, `domains/web-ui.md` |
+| Add batch PURL resolution | `domains/purl-resolution.md`, `architecture/layers.md` |
+| Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
 
 ## Dependency Graph
 
