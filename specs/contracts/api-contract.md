@@ -93,11 +93,110 @@ Simple health check for monitoring and container orchestration.
 
 ### `GET /`
 
-Serve the web UI HTML page.
+Serve the web UI HTML page (PURL resolver).
 
 #### Response (200)
 
 Content-Type: `text/html`. Returns the Jinja2-rendered index page.
+
+---
+
+### `GET /sbom-updater`
+
+Serve the SBOM-updater web UI page.
+
+#### Response (200)
+
+Content-Type: `text/html`. Returns the Jinja2-rendered sbom.html page with a file upload form for CycloneDX JSON SBOM files. The page handles file selection, upload, result display, and enriched SBOM download via JavaScript.
+
+---
+
+### `POST /api/v1/resolve/sbom`
+
+Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS or source-distribution external references, resolves each unique normalized PURL via the Service Layer, inserts `type: vcs` external references into the SBOM, and returns the enriched SBOM together with a resolution report.
+
+#### Request
+
+`multipart/form-data` with field `file` containing a CycloneDX JSON file.
+
+- Maximum file size: 200 MB (configurable via `SBOM_MAX_FILE_SIZE`)
+- File must be valid JSON with `bomFormat: "CycloneDX"` and `specVersion: "1.6"`
+- JSON is parsed, the root dict is validated for required CycloneDX fields, then mutated in-place during enrichment
+
+#### Success Response (200)
+
+```json
+{
+  "summary": {
+    "total_purls": 10,
+    "found": 8,
+    "not_found": 2,
+    "skipped": 0
+  },
+  "results": [
+    {
+      "purl": "pkg:pypi/certifi",
+      "status": "found",
+      "repository_url": "https://github.com/certifi/python-certifi"
+    },
+    {
+      "purl": "pkg:pypi/unknown",
+      "status": "not_found",
+      "repository_url": null
+    }
+  ],
+  "enriched_sbom": { "...": "..." }
+}
+```
+
+- `summary.total_purls` — number of unique PURLs that needed enrichment
+- `summary.found` — how many resolved successfully
+- `summary.not_found` — how many had no repository URL found
+- `summary.skipped` — how many PURLs could not be parsed (invalid format)
+- `results` — per-PURL report indust only for components that needed enrichment (components already having VCS/source-distribution references are excluded)
+- `enriched_sbom` — the full enriched SBOM JSON (version incremented by 1, timestamp preserved)
+
+#### Error Response (400) — invalid JSON
+
+```json
+{
+  "error": "invalid_json",
+  "message": "Invalid JSON: Expecting value: line 1 column 1"
+}
+```
+
+#### Error Response (400) — invalid SBOM format
+
+```json
+{
+  "error": "invalid_sbom",
+  "message": "Missing required field: bomFormat"
+}
+```
+
+#### Error Response (413) — file too large
+
+```json
+{
+  "error": "file_too_large",
+  "message": "File size exceeds maximum of 200 MB"
+}
+```
+
+#### Validation Error (422) — missing file field
+
+Standard FastAPI/Pydantic 422 response.
+
+---
+
+## Enrichment Algorithm
+
+1. Recursively walk all `components[]` arrays (including nested `components` inside components)
+2. For each component that has a `purl` AND (has no `externalReferences` OR has no `vcs`/`source-distribution` type in `externalReferences`): mark as needing enrichment
+3. Normalize each PURL to `scheme:type/namespace/name`; deduplicate across the entire SBOM
+4. For each unique normalized PURL: call `service.resolve_purl()` (cache → resolver flow)
+5. For each component matching a resolved PURL: append `{"type": "vcs", "url": "..."}` to its `externalReferences` array; preserve all existing references
+6. Increment `version` field by 1
 
 ## Error Handling Rules
 

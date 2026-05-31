@@ -10,15 +10,17 @@
 |  |  (Browser, curl, scripts)   |                   |
 |  +-------------+---------------+                   |
 |                |                                   |
-|                | HTTP JSON                         |
+|                | HTTP JSON / multipart              |
 |                v                                   |
 |  +-----------------------------+                   |
 |  |     API Layer               |                   |
 |  |  src/purl_resolver/router   |                   |
 |  |                             |                   |
 |  |  POST /api/v1/resolve      |                   |
+|  |  POST /api/v1/resolve/sbom |                   |
 |  |  GET /health               |                   |
 |  |  GET / (HTML page)         |                   |
+|  |  GET /sbom-updater         |                   |
 |  +-------------+---------------+                   |
 |                |                                   |
 |                | Python call                       |
@@ -27,12 +29,9 @@
 |  |     Service Layer           |                   |
 |  |  src/purl_resolver/service  |                   |
 |  |                             |                   |
-|  |  Orchestrates:              |                   |
-|  |  purl_utils.validate() →    |                   |
-|  |  purl_utils.normalize() →   |                   |
-|  |  storage.lookup() →         |                   |
-|  |  resolver.resolve() →       |                   |
-|  |  storage.store()            |                   |
+|  |  resolve_purl()             |                   |
+|  |  resolve_batch()            |                   |
+|  |  process_sbom()             |                   |
 |  +----+--------------------+---+                   |
 |       |                    |                       |
 |       | Python call        | Python call           |
@@ -44,17 +43,17 @@
 |  |          |     |  lookup()        |             |
 |  | validate |     |  store()         |             |
 |  | normalize|     +----+-------------+             |
-|  +----------+          |                           |
-|       |                | asyncpg                   |
-|       v                v                           |
+|  | safe_    |          |                           |
+|  | normalize|          | asyncpg                   |
+|  +----------+          v                           |
+|       |         +----------+                       |
+|       v         |PostgreSQL|                       |
 |  +-----------------------------+                   |
 |  |   Resolver Layer            |                   |
 |  |  resolver/                  |                   |
 |  |                             |                   |
 |  |  Resolver (ABC)             |                   |
 |  |  Resolution dataclass       |                   |
-|  |  InvalidPurlError           |                   |
-|  |  UpstreamError              |                   |
 |  |  Purl2RepoResolver          |                   |
 |  |  (future: LLM, purl2src)   |                   |
 |  +----+------------------------+                   |
@@ -67,9 +66,18 @@
 |  |  resolve(original_purl)     |                   |
 |  +-----------------------------+                   |
 |                                                    |
-|  +----------+                                      |
-|  |PostgreSQL|                                      |
-|  +----------+                                      |
+|  +-----------------------------+                   |
+|  |     SBOM Module             |                   |
+|  |  src/purl_resolver/sbom/    |                   |
+|  |                             |                   |
+|  |  parser.py — CycloneDX     |                   |
+|  |             validation      |                   |
+|  |  collector.py — recursive   |                   |
+|  |             PURL collection |                   |
+|  |  enricher.py — insert VCS  |                   |
+|  |             refs            |                   |
+|  |  reporter.py — result table|                   |
+|  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
 |  |     Config Layer            |                   |
@@ -78,14 +86,16 @@
 |  |  Pydantic Settings          |                   |
 |  |  PURL2REPO_* prefix         |                   |
 |  |  DB_* prefix                |                   |
+|  |  SBOM_* prefix              |                   |
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
 |  |     Web UI Layer            |                   |
 |  |  src/purl_resolver/         |                   |
 |  |  templates/index.html       |                   |
+|  |  templates/sbom.html        |                   |
 |  |                             |                   |
-|  |  Jinja2 template            |                   |
+|  |  Jinja2 templates           |                   |
 |  |  Vanilla JS + fetch()       |                   |
 |  +-----------------------------+                   |
 +---------------------------------------------------+
@@ -95,7 +105,8 @@
 
 - **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
 - **API Layer** imports **Config Layer** (settings)
-- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`)
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), and **SBOM Module** (`sbom/`)
+- **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`
 - **Resolver Layer** (`resolver/`) defines the `Resolver` ABC, `Resolution` dataclass, and resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`). `Purl2RepoResolver` wraps the purl2repo library.
@@ -110,24 +121,45 @@
 ### API Layer (`router.py`)
 - Define HTTP endpoints (routes, methods, status codes)
 - Validate request input via Pydantic schemas
-- Delegate resolution to Service Layer (`service.resolve_purl()`)
+- Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
+- Delegate SBOM enrichment to Service Layer (`service.resolve_batch()` + `service.process_sbom()`)
 - Handle error responses from Service Layer
-- Serve Jinja2 template for the web UI
+- Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`)
 
 ### Service Layer (`service.py`)
-- Orchestrate resolution flow: validate PURL → normalize cache key → storage lookup → resolver call → storage store
+- Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → resolver call → storage store
+- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions
+- SBOM enrichment flow (`process_sbom`): accept parsed SBOM dict + components + resolved map → call `enricher.enrich_sbom()` → call `reporter.build_report()` → return combined report
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
 
 ### PURL Utils Layer (`purl_utils/`)
-- **`__init__.py`** — `validate(purl) → PurlComponents` (raises `PurlValidationError`), `normalize(components) → str`
+- **`__init__.py`** — `validate(purl) → PurlComponents` (raises `PurlValidationError`), `normalize(components) → str`, `safe_normalize(purl) → str`
+- `safe_normalize` wraps `validate` + `normalize` with exception handling — returns the original purl string on any error
 - Validate PURL format using the official `packageurl-python` library
 - Normalize PURL to `scheme:type/namespace/name` form (namespace only if present)
 - `PurlValidationError` — resolver-agnostic exception for invalid PURLs
 - Has zero dependency on any resolver implementation
 
-### Storage Layer (`storage/`)
+### SBOM Module (`sbom/`)
+- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `build_report`
+- **`parser.py`** — `CycloneDXParser.parse(data) → dict` validates `bomFormat: CycloneDX` and `specVersion: 1.6`; raises `SbomParseError` on violation
+- **`collector.py`** — `collect_components(sbom) → list[SbomComponent]` recursively walks `components[]` arrays; `SbomComponent` dataclass tracks purl, path tuple, needs_enrichment flag, and existing references; components with `vcs` or `source-distribution` external references are marked as not needing enrichment
+- **`enricher.py`** — `enrich_sbom(sbom, components, resolved)` inserts `{"type": "vcs", "url": "..."}` into component `externalReferences` arrays at the correct paths; preserves existing references; increments `version` field by 1
+- **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL
+- Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly
+
+### Config Layer (`config.py`)
+- Provide typed access to all runtime configuration
+- Load from environment variables (set via docker-compose.yml in production, or `.env` in development)
+- `Settings` class uses the `PURL2REPO_` prefix for resolver settings
+- `StorageSettings` class uses the `DB_` prefix for database connection settings (`DB_URL`, etc.)
+- `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
+
+### Web UI Layer (`templates/`)
+- `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater page
+- `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download
 - **interface.py** — Abstract `Storage` ABC with `lookup(purl) → ResolveResponse | None` and `store(result) → None`
 - **postgres.py** — `PostgresCache` implementation via asyncpg; handles JSONB encoding/decoding; creates table on startup
 - **inmemory.py** — `InMemoryCache` implementation (dict-based) for tests and fallback when PostgreSQL is unavailable
@@ -158,6 +190,7 @@
 - Importing purl2repo exception classes in the Web UI layer
 - Bypassing the API Layer — direct calls to purl2repo from the test client
 - Calling purl2repo directly from the API Layer (must go through Service Layer)
+- Bypassing Service Layer for SBOM enrichment orchestration — all enrichment logic lives in `service.py`, not `router.py`
 - Storing state in the API Layer (the service is stateless by design)
 - Changing the canonical response format without updating contracts/api-contract.md
 - Running outside Docker for production deployment (development-only bare uvicorn)

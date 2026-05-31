@@ -6,12 +6,13 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 
 ## Key Files
 
-- `src/purl_resolver/router.py` — API endpoint handler that calls the Service Layer
-- `src/purl_resolver/service.py` — Orchestration: validation → normalization → storage lookup → resolver → storage store
-- `src/purl_resolver/purl_utils/` — PURL validation and normalization layer
+- `src/purl_resolver/router.py` — API endpoint handlers that call the Service Layer
+- `src/purl_resolver/service.py` — Orchestration: validation → normalization → storage lookup → resolver → storage store; also `resolve_batch()` for concurrent resolution and `process_sbom()` for SBOM enrichment flow
+- `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
 - `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions) and purl2repo wrapper
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
+- `src/purl_resolver/sbom/` — SBOM enrichment modules: parser, collector, enricher, reporter
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
 
@@ -118,3 +119,4 @@ Client                    API Layer (router)         Service Layer             p
 | `DB_URL` | `postgresql://sbom:sbom@localhost:5432/sbom` | PostgreSQL connection string |
 | `DB_POOL_MIN_SIZE` | `2` | Minimum asyncpg pool connections |
 | `DB_POOL_MAX_SIZE` | `10` | Maximum asyncpg pool connections |
+| `SBOM_MAX_FILE_SIZE` | `209715200` (200 MB) | Maximum uploaded SBOM file size (bytes) |
