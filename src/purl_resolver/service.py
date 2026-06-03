@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 
 from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
 from .schemas import ResolveResponse, ResolveResult
 from .storage.interface import Storage
+from .url_validator import UrlValidationResult, validate_url
 
 from .sbom.collector import SbomComponent, collect_components
 from .sbom.enricher import enrich_sbom
@@ -22,6 +24,7 @@ async def resolve_purl(
     purl: str,
     storage: Storage,
     resolvers: list[Resolver],
+    settings_store=None,
 ) -> ResolveResult:
     try:
         components = validate(purl)
@@ -34,7 +37,43 @@ async def resolve_purl(
         cached = await storage.lookup(purl_key)
         if cached is not None:
             logger.info("Cache hit for %s", purl_key)
-            return ResolveResult.ok(cached)
+
+            # URL validation
+            if settings_store is not None:
+                app_settings = settings_store.load()
+                if app_settings.validate_db_urls:
+                    resolved_date = None
+                    if cached.resolved_at:
+                        try:
+                            resolved_date = datetime.fromisoformat(cached.resolved_at).date()
+                        except (ValueError, TypeError):
+                            pass
+                    if resolved_date != datetime.now().date():
+                        vresult = await validate_url(
+                            cached.repository_url,
+                            app_settings.url_validation_timeout,
+                        )
+                        if vresult == UrlValidationResult.VALID:
+                            try:
+                                await storage.store(cached)
+                            except Exception:
+                                logger.warning(
+                                    "Failed to update resolved_at for %s",
+                                    purl_key, exc_info=True,
+                                )
+                        elif vresult == UrlValidationResult.INVALID:
+                            try:
+                                await storage.delete_purls([purl_key])
+                            except Exception:
+                                logger.warning(
+                                    "Failed to delete invalid URL for %s",
+                                    purl_key, exc_info=True,
+                                )
+                            cached = None
+                        # NETWORK_ERROR and RATE_LIMITED: return cached as-is
+
+            if cached is not None:
+                return ResolveResult.ok(cached)
     except Exception:
         logger.warning(
             "Cache lookup failed for %s, falling through to resolver",
