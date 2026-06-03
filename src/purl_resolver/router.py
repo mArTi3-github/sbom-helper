@@ -22,7 +22,10 @@ from .schemas import (
     PurlListResponse,
     PurlUpdateRequest,
 )
+from pydantic import BaseModel, Field
+
 from .service import resolve_purl, resolve_batch, process_sbom, store_preexisting_references
+from .settings_store import SettingsStore, AppSettings
 from .csv_io import parse_csv_import, render_csv_export
 from .sbom.collector import collect_components
 from .sbom.parser import CycloneDXParser, SbomParseError
@@ -30,6 +33,11 @@ from .purl_utils import safe_normalize
 from .storage.interface import PurlFilters
 
 logger = logging.getLogger(__name__)
+
+class SettingsUpdate(BaseModel):
+    validate_db_urls: bool | None = None
+    url_validation_timeout: int | None = Field(None, ge=1, le=60)
+
 
 router = APIRouter()
 _templates_dir = (pathlib.Path(__file__).parent / "templates").resolve()
@@ -42,6 +50,7 @@ async def resolve_endpoint(body: ResolveRequest, request: Request) -> JSONRespon
         purl=body.purl,
         storage=request.app.state.storage,
         resolvers=request.app.state.resolvers,
+        settings_store=request.app.state.settings_store,
     )
 
     if result.error_status is not None:
@@ -298,3 +307,23 @@ async def export_csv_endpoint(
 @router.get("/db-admin", response_class=HTMLResponse)
 async def db_admin_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="db-admin.html")
+
+
+@router.get("/api/v1/settings")
+async def get_settings(request: Request) -> JSONResponse:
+    store: SettingsStore = request.app.state.settings_store
+    settings = store.load()
+    return JSONResponse(content=settings.model_dump())
+
+
+@router.patch("/api/v1/settings")
+async def update_settings(body: SettingsUpdate, request: Request) -> JSONResponse:
+    store: SettingsStore = request.app.state.settings_store
+    current = store.load()
+    update_data = body.model_dump(exclude_unset=True)
+    if update_data:
+        updated = current.model_copy(update=update_data)
+        store.save(updated)
+    else:
+        updated = current
+    return JSONResponse(content=updated.model_dump())

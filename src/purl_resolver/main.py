@@ -8,6 +8,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from .config import settings, storage_settings
+from .settings_store import SettingsStore
 from .resolver.purl2repo import Purl2RepoResolver
 from .router import router
 from .storage.inmemory import InMemoryCache
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
         ),
     ]
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
+    app.state.settings_store = SettingsStore()
     yield
     if pool is not None:
         await pool.close()

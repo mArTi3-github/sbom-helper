@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.router import router
+from purl_resolver.settings_store import SettingsStore
 from purl_resolver.storage.inmemory import InMemoryCache
 
 from tests.helpers import FakeResolver
@@ -27,6 +28,7 @@ def client() -> TestClient:
             ),
         ),
     ]
+    test_app.state.settings_store = SettingsStore()
     test_app.include_router(router)
     with TestClient(test_app) as c:
         yield c
