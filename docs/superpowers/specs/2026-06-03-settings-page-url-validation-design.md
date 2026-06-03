@@ -1,0 +1,189 @@
+# Settings Page with URL Validation Toggle
+
+## Overview
+
+Add a Settings page to the web UI with a toggle for validating repository URLs from the local database before using them. When enabled, URLs found in the local DB are verified (HTTP HEAD + git ls-remote) before being returned. Invalid URLs are deleted from the DB, and resolution continues through the resolver chain.
+
+## Requirements
+
+- Settings page accessible at `/settings` with nav-bar link on all pages
+- Toggle: enable/disable URL validation from local DB (default: off)
+- Timeout input: seconds for validation checks (default: 5, range: 1–60)
+- Settings persisted in JSON file on disk (`data/settings.json`)
+- API endpoints: `GET /api/v1/settings`, `PATCH /api/v1/settings`
+- Validation applies everywhere: single PURL, batch, SBOM enrichment
+- Validation cooldown: skip if `resolved_at` is today (same calendar date)
+- Must distinguish "repo not found" from "internet connectivity issues"
+- Never crash on validation errors — always return a result
+
+## Architecture
+
+**Approach: Validation in Service Layer**
+
+Validation logic lives in `service.py::resolve_purl()`, after `storage.lookup()` and before returning the cached result. A new `url_validator.py` module handles the actual checks. A new `settings_store.py` module manages the JSON config file.
+
+```
+┌─────────────┐    ┌────────────────┐    ┌─────────────────┐
+│  Web UI     │───▶│  Router        │───▶│  Service Layer   │
+│  /settings  │    │  GET/PATCH     │    │  resolve_purl()  │
+└─────────────┘    │  /api/v1/      │    │                  │
+                   │  settings      │    │  lookup → validate│
+                   └────────────────┘    │  → resolver chain │
+                                         └────────┬─────────┘
+                                                  │
+                              ┌────────────────────┼──────────────────┐
+                              ▼                    ▼                  ▼
+                    ┌──────────────┐    ┌──────────────────┐  ┌────────────┐
+                    │ Storage      │    │ URL Validator     │  │ Resolvers  │
+                    │ (PostgresCache)  │ HEAD + git ls-remote│  │ (purl2repo)│
+                    └──────────────┘    └──────────────────┘  └────────────┘
+                              ▲
+                              │
+                    ┌──────────────────┐
+                    │ Settings Store    │
+                    │ (JSON file)       │
+                    └──────────────────┘
+```
+
+## Components
+
+### 1. SettingsStore (`src/purl_resolver/settings_store.py`)
+
+Pydantic model for app settings:
+```python
+class AppSettings(BaseModel):
+    validate_db_urls: bool = False
+    url_validation_timeout: int = 5  # seconds, 1–60
+```
+
+Class with methods:
+- `load() -> AppSettings` — reads from JSON file, creates with defaults if missing
+- `save(settings: AppSettings)` — writes to JSON file
+- Path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
+- On corrupt JSON: log warning, return defaults
+
+### 2. URL Validator (`src/purl_resolver/url_validator.py`)
+
+```python
+class UrlValidationResult(Enum):
+    VALID = "valid"
+    INVALID = "invalid"
+    NETWORK_ERROR = "network_error"
+
+async def validate_url(url: str, timeout: int) -> UrlValidationResult
+```
+
+**Algorithm:**
+1. HEAD `https://github.com` with 2-second timeout (connectivity probe)
+2. If GitHub unreachable → return `NETWORK_ERROR`
+3. HEAD `repository_url` with configured timeout:
+   - 200/301/302 → proceed to git ls-remote
+   - 404/405/403 → return `INVALID`
+   - ConnectionError/Timeout/DNS error → return `INVALID` (GitHub was reachable)
+4. `git ls-remote --exit-code <url>` with configured timeout:
+   - Exit 0 → return `VALID`
+   - "repository not found" / "does not exist" → return `INVALID`
+   - Timeout/connection error → return `INVALID` (GitHub was reachable)
+
+**Error handling:** Never raises exceptions. If aiohttp or git is unavailable, logs warning and returns `NETWORK_ERROR`.
+
+### 3. Service Layer Integration (`src/purl_resolver/service.py`)
+
+In `resolve_purl()`, after `storage.lookup()`:
+1. If `settings_store` is None or `validate_db_urls` is False → skip (current behavior)
+2. If `resolved_at` date equals today → skip validation
+3. Call `validate_url(cached.repository_url, timeout)`
+4. `VALID` → call `storage.store(cached)` (ON CONFLICT updates `resolved_at` to NOW()), return cached
+5. `INVALID` → `storage.delete_purls([purl_key])`, set `cached = None`, fall through to resolver chain
+6. `NETWORK_ERROR` → return cached as-is (don't update `resolved_at`)
+
+`settings_store` is an optional parameter (backward compatible).
+
+### 4. API Endpoints (`src/purl_resolver/router.py`)
+
+- `GET /api/v1/settings` → returns `AppSettings` as JSON
+- `PATCH /api/v1/settings` → partial update, validates input, returns updated settings
+
+### 5. Web UI (`src/purl_resolver/templates/settings.html`)
+
+- Route: `GET /settings`
+- Nav-bar: add "Settings" link to all four templates
+- Form: toggle for `validate_db_urls`, number input for `url_validation_timeout`
+- JS: fetch current settings on load, save on button click, show confirmation
+
+## Data Flow
+
+### Single PURL Resolution (with validation enabled)
+
+```
+POST /api/v1/resolve { "purl": "pkg:pypi/requests" }
+  → validate(purl) → normalize → purl_key
+  → storage.lookup(purl_key) → found (resolved_at: 3 days ago)
+  → validate_url("https://github.com/psf/requests", 5)
+    → HEAD github.com → OK
+    → HEAD github.com/psf/requests → 200
+    → git ls-remote https://github.com/psf/requests → exit 0
+    → VALID
+  → update resolved_at → NOW()
+  → return cached result
+```
+
+### Invalid URL Flow
+
+```
+POST /api/v1/resolve { "purl": "pkg:pypi/old-package" }
+  → storage.lookup(purl_key) → found (resolved_at: 5 days ago)
+  → validate_url("https://github.com/deleted/repo", 5)
+    → HEAD github.com → OK
+    → HEAD github.com/deleted/repo → 404
+    → INVALID
+  → storage.delete_purls([purl_key])
+  → fall through to resolver chain
+  → Purl2RepoResolver.resolve(purl) → new URL found
+  → storage.store(new_result)
+  → return new result
+```
+
+### Network Error Flow
+
+```
+POST /api/v1/resolve { "purl": "pkg:pypi/requests" }
+  → storage.lookup(purl_key) → found
+  → validate_url("https://github.com/psf/requests", 5)
+    → HEAD github.com → ConnectionError (no internet)
+    → NETWORK_ERROR
+  → return cached as-is
+```
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `src/purl_resolver/settings_store.py` | **Create** — SettingsStore class |
+| `src/purl_resolver/url_validator.py` | **Create** — validate_url function |
+| `src/purl_resolver/templates/settings.html` | **Create** — Settings page |
+| `src/purl_resolver/service.py` | **Modify** — add validation after lookup |
+| `src/purl_resolver/router.py` | **Modify** — add /settings route + API endpoints |
+| `src/purl_resolver/templates/index.html` | **Modify** — add Settings nav link |
+| `src/purl_resolver/templates/sbom.html` | **Modify** — add Settings nav link |
+| `src/purl_resolver/templates/db-admin.html` | **Modify** — add Settings nav link |
+| `tests/test_url_validator.py` | **Create** — URL validator tests |
+| `tests/test_settings_store.py` | **Create** — Settings store tests |
+| `tests/test_service_validation.py` | **Create** — Service layer validation tests |
+
+## Invariants
+
+- `validate_url()` never raises exceptions — always returns `UrlValidationResult`
+- Settings file is created with defaults if missing or corrupt
+- Validation is skipped if `resolved_at` is today (same calendar date)
+- Network errors never cause URL deletion
+- `settings_store` parameter is optional — backward compatible
+- Batch and SBOM enrichment inherit validation automatically (they call `resolve_purl()`)
+
+## Configuration
+
+| Key | Source | Default | Description |
+|-----|--------|---------|-------------|
+| `SETTINGS_FILE` | env var | `./data/settings.json` | Path to settings JSON file |
+| `validate_db_urls` | JSON file | `false` | Enable URL validation |
+| `url_validation_timeout` | JSON file | `5` | Timeout in seconds (1–60) |
