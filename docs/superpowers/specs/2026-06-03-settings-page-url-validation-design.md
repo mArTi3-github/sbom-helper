@@ -110,6 +110,8 @@ In `resolve_purl()`, after `storage.lookup()`:
 6. `NETWORK_ERROR` → return cached as-is (don't update `resolved_at`)
 7. `RATE_LIMITED` → return cached as-is (don't update `resolved_at`, don't delete)
 
+**Critical ordering:** `storage.lookup()` is SELECT-only — it does NOT update `resolved_at`. The `resolved_at` check in step 2 reads the value from the lookup result, BEFORE any validation or store call. `storage.store()` (which updates `resolved_at` via `ON CONFLICT DO UPDATE resolved_at = NOW()`) is only called AFTER validation succeeds. This ensures the cooldown check always sees the last-validated timestamp, not a freshly written one.
+
 `settings_store` is an optional parameter (backward compatible).
 
 ### 4. API Endpoints (`src/purl_resolver/router.py`)
