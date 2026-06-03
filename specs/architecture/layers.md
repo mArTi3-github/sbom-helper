@@ -95,6 +95,17 @@
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
+|  |  SBOM Enrichment Pipeline   |                   |
+|  |  sbom_enrichment.py         |                   |
+|  |                             |                   |
+|  |  SbomEnrichmentPipeline     |                   |
+|  |    .process(sbom_data)      |                   |
+|  |  SbomEnrichmentResult       |                   |
+|  +----+------------------------+                   |
+|       |                                            |
+|       | uses                                        |
+|       v                                            |
+|  +-----------------------------+                   |
 |  |     SBOM Module             |                   |
 |  |  src/purl_resolver/sbom/    |                   |
 |  |                             |                   |
@@ -132,10 +143,11 @@
 
 ## Import Rules
 
-- **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
+- **API Layer** imports **Service Layer** (`service.py`) and **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) — but not vice versa
 - **API Layer** imports **csv_io** module for CSV parsing/rendering
 - **API Layer** imports **Config Layer** (settings)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use; accepts optional `settings_store` parameter for URL validation; accepts optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
+- **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`service.py`), **SBOM Module** (`sbom/`), **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`); receives dependencies via constructor injection
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
@@ -152,11 +164,11 @@
 - Define HTTP endpoints (routes, methods, status codes)
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
-- Delegate SBOM enrichment to Service Layer (`service.resolve_batch()` + `service.process_sbom()`)
+- Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
 - Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`)
-- Handle error responses from Service Layer
+- Handle error responses from Service Layer and Pipeline
 - Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`, `db-admin.html`, `settings.html`)
 
 ### Service Layer (`service.py`)
@@ -168,6 +180,14 @@
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
+
+### SBOM Enrichment Pipeline (`sbom_enrichment.py`)
+- Orchestrate the complete CycloneDX SBOM enrichment workflow in a single class
+- `SbomEnrichmentPipeline.__init__(storage, resolvers, settings_store)` — receives dependencies via constructor
+- `SbomEnrichmentPipeline.process(sbom_data) → SbomEnrichmentResult` — executes the pipeline: validate SBOM format → collect components → deduplicate PURLs → batch resolve → store pre-existing references → enrich SBOM → build report
+- Decouples HTTP layer (router) from domain orchestration logic
+- Testable without FastAPI TestClient — can be instantiated with mock storage and resolvers
+- Returns `SbomEnrichmentResult` dataclass with `report` and `enriched_sbom` fields
 
 ### CSV I/O Module (`csv_io.py`)
 - Pure functions for CSV parsing and rendering, no HTTP or Storage dependencies
@@ -227,7 +247,7 @@
 - Importing purl2repo exception classes in the Web UI layer
 - Bypassing the API Layer — direct calls to purl2repo from the test client
 - Calling purl2repo directly from the API Layer (must go through Service Layer)
-- Bypassing Service Layer for SBOM enrichment orchestration — all enrichment logic lives in `service.py`, not `router.py`
+- Putting SBOM enrichment orchestration logic in `router.py` — use `SbomEnrichmentPipeline` instead
 - Storing state in the API Layer (the service is stateless by design)
 - Changing the canonical response format without updating contracts/api-contract.md
 - Running outside Docker for production deployment (development-only bare uvicorn)

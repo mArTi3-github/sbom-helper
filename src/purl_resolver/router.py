@@ -24,12 +24,11 @@ from .schemas import (
 )
 from pydantic import BaseModel, Field
 
-from .service import resolve_purl, resolve_batch, process_sbom, store_preexisting_references
+from .service import resolve_purl
+from .sbom_enrichment import SbomEnrichmentPipeline
+from .sbom.parser import SbomParseError
 from .settings_store import SettingsStore, AppSettings
 from .csv_io import parse_csv_import, render_csv_export
-from .sbom.collector import collect_components
-from .sbom.parser import CycloneDXParser, SbomParseError
-from .purl_utils import safe_normalize
 from .storage.interface import PurlFilters
 
 logger = logging.getLogger(__name__)
@@ -99,39 +98,23 @@ async def resolve_sbom_endpoint(
             content={"error": "invalid_json", "message": f"Invalid JSON: {e}"},
         )
 
+    pipeline = SbomEnrichmentPipeline(
+        storage=request.app.state.storage,
+        resolvers=request.app.state.resolvers,
+        settings_store=getattr(request.app.state, "settings_store", None),
+    )
+
     try:
-        CycloneDXParser.parse(data)
+        result = await pipeline.process(data)
     except SbomParseError as e:
         return JSONResponse(
             status_code=400,
             content={"error": "invalid_sbom", "message": str(e)},
         )
 
-    components = collect_components(data)
-    purls_to_resolve = [c for c in components if c.needs_enrichment]
-
-    seen: set[str] = set()
-    unique_purls: list[str] = []
-    skipped = 0
-    for comp in purls_to_resolve:
-        n = safe_normalize(comp.purl)
-        if n == comp.purl:
-            skipped += 1
-            continue
-        if n not in seen:
-            seen.add(n)
-            unique_purls.append(comp.purl)
-
-    storage = request.app.state.storage
-    resolvers = request.app.state.resolvers
-    settings_store = getattr(request.app.state, "settings_store", None)
-    resolved = await resolve_batch(unique_purls, storage, resolvers, settings_store=settings_store, resolver="import-sbom")
-    await store_preexisting_references(components, storage, resolver="import-sbom")
-    report = process_sbom(data, components, resolved, skipped=skipped)
-
     return JSONResponse(
         status_code=200,
-        content={**report, "enriched_sbom": data},
+        content={**result.report, "enriched_sbom": result.enriched_sbom},
     )
 
 
