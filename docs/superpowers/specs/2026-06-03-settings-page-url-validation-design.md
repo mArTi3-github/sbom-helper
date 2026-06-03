@@ -69,6 +69,7 @@ class UrlValidationResult(Enum):
     VALID = "valid"
     INVALID = "invalid"
     NETWORK_ERROR = "network_error"
+    RATE_LIMITED = "rate_limited"
 
 async def validate_url(url: str, timeout: int) -> UrlValidationResult
 ```
@@ -76,16 +77,27 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult
 **Algorithm:**
 1. HEAD `https://github.com` with 2-second timeout (connectivity probe)
 2. If GitHub unreachable → return `NETWORK_ERROR`
-3. HEAD `repository_url` with configured timeout:
+3. If GitHub returns 429 or 403 with `X-RateLimit-Remaining: 0` → return `RATE_LIMITED`
+4. HEAD `repository_url` with configured timeout:
    - 200/301/302 → proceed to git ls-remote
-   - 404/405/403 → return `INVALID`
+   - 404/405 → return `INVALID`
+   - 403 **without** rate limit headers → return `INVALID` (private/not accessible)
+   - 429 or 403 with `X-RateLimit-Remaining: 0` → return `RATE_LIMITED`
    - ConnectionError/Timeout/DNS error → return `INVALID` (GitHub was reachable)
-4. `git ls-remote --exit-code <url>` with configured timeout:
+5. `git ls-remote --exit-code <url>` with configured timeout:
    - Exit 0 → return `VALID`
    - "repository not found" / "does not exist" → return `INVALID`
    - Timeout/connection error → return `INVALID` (GitHub was reachable)
 
+**Rate limit detection:** Check for HTTP 429 status, or HTTP 403 with response header `X-RateLimit-Remaining: 0`. Both indicate the service is temporarily rejecting requests due to too many calls — not that the URL is invalid.
+
 **Error handling:** Never raises exceptions. If aiohttp or git is unavailable, logs warning and returns `NETWORK_ERROR`.
+
+**Rate limit mitigation:**
+- Global in-memory counter tracks consecutive `RATE_LIMITED` results across all validations
+- If counter exceeds a threshold (default: 5), skip all validation for 60 seconds (cooldown period)
+- Counter resets on any non-RATE_LIMITED result or after cooldown expires
+- Log a warning when entering/exiting cooldown
 
 ### 3. Service Layer Integration (`src/purl_resolver/service.py`)
 
@@ -96,6 +108,7 @@ In `resolve_purl()`, after `storage.lookup()`:
 4. `VALID` → call `storage.store(cached)` (ON CONFLICT updates `resolved_at` to NOW()), return cached
 5. `INVALID` → `storage.delete_purls([purl_key])`, set `cached = None`, fall through to resolver chain
 6. `NETWORK_ERROR` → return cached as-is (don't update `resolved_at`)
+7. `RATE_LIMITED` → return cached as-is (don't update `resolved_at`, don't delete)
 
 `settings_store` is an optional parameter (backward compatible).
 
@@ -155,6 +168,26 @@ POST /api/v1/resolve { "purl": "pkg:pypi/requests" }
   → return cached as-is
 ```
 
+### Rate Limit Flow
+
+```
+POST /api/v1/resolve { "purl": "pkg:pypi/requests" }
+  → storage.lookup(purl_key) → found
+  → validate_url("https://github.com/psf/requests", 5)
+    → HEAD github.com → 403 with X-RateLimit-Remaining: 0
+    → RATE_LIMITED
+  → return cached as-is
+  → global counter incremented (consecutive rate limits: 3)
+```
+
+After 5 consecutive RATE_LIMITED results → enter 60-second cooldown:
+```
+POST /api/v1/resolve { "purl": "pkg:pypi/flask" }
+  → storage.lookup(purl_key) → found
+  → validate_url skipped (cooldown active, 42s remaining)
+  → return cached as-is
+```
+
 ## Files to Create/Modify
 
 | File | Action |
@@ -171,12 +204,53 @@ POST /api/v1/resolve { "purl": "pkg:pypi/requests" }
 | `tests/test_settings_store.py` | **Create** — Settings store tests |
 | `tests/test_service_validation.py` | **Create** — Service layer validation tests |
 
+## Error Handling
+
+- `validate_url()` never raises exceptions — always returns `UrlValidationResult`
+- If `git ls-remote` is not installed → log warning, return `NETWORK_ERROR`
+- If `aiohttp` is not installed → log warning, skip HEAD check, proceed to git ls-remote only
+- Settings file not found → create with defaults
+- Settings file corrupt → log warning, use defaults
+
+## Tests
+
+### `tests/test_url_validator.py`
+- Mock HEAD github.com: 200, HEAD target: 200, git ls-remote: exit 0 → VALID
+- Mock HEAD github.com: 200, HEAD target: 404 → INVALID
+- Mock HEAD github.com: 200, HEAD target: 403 (no rate limit headers) → INVALID
+- Mock HEAD github.com: 200, HEAD target: 403 with X-RateLimit-Remaining: 0 → RATE_LIMITED
+- Mock HEAD github.com: 200, HEAD target: 429 → RATE_LIMITED
+- Mock HEAD github.com: 200, HEAD target: ConnectionError → INVALID
+- Mock HEAD github.com: ConnectionError → NETWORK_ERROR
+- Mock git ls-remote: "repository not found" → INVALID
+- Mock git ls-remote: timeout + GitHub reachable → INVALID
+- resolved_at is today → skip validation (return None or sentinel)
+- 5 consecutive RATE_LIMITED → cooldown active, skip validation
+
+### `tests/test_settings_store.py`
+- File does not exist → creates with defaults
+- File exists with valid JSON → loads correctly
+- File is corrupt JSON → returns defaults + logs warning
+- save/load roundtrip works
+
+### `tests/test_service_validation.py`
+- lookup returns result + validate_db_urls=True + resolved_at not today → validation runs
+- VALID → store called (updates resolved_at), returns cached
+- INVALID → delete called, falls through to resolver chain
+- NETWORK_ERROR → returns cached as-is
+- RATE_LIMITED → returns cached as-is
+- validate_db_urls=False → no validation
+- resolved_at is today → no validation
+- settings_store is None → no validation (backward compatible)
+
 ## Invariants
 
 - `validate_url()` never raises exceptions — always returns `UrlValidationResult`
 - Settings file is created with defaults if missing or corrupt
 - Validation is skipped if `resolved_at` is today (same calendar date)
 - Network errors never cause URL deletion
+- Rate limits never cause URL deletion — return cached as-is
+- After 5 consecutive rate limits, skip all validation for 60 seconds
 - `settings_store` parameter is optional — backward compatible
 - Batch and SBOM enrichment inherit validation automatically (they call `resolve_purl()`)
 
