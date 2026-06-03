@@ -123,12 +123,13 @@ async def resolve_batch(
     purls: list[str],
     storage: Storage,
     resolvers: list[Resolver],
+    settings_store=None,
 ) -> dict[str, str]:
     semaphore = asyncio.Semaphore(_BATCH_SEMAPHORE_LIMIT)
 
     async def _resolve_one(original: str) -> tuple[str, str | None]:
         async with semaphore:
-            result = await resolve_purl(original, storage, resolvers)
+            result = await resolve_purl(original, storage, resolvers, settings_store=settings_store)
             key = safe_normalize(original)
             if result.response and result.response.repository_url:
                 return (key, result.response.repository_url)
