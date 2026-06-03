@@ -5,14 +5,14 @@ import logging
 import os
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 
 class AppSettings(BaseModel):
     validate_db_urls: bool = False
-    url_validation_timeout: int = 5
+    url_validation_timeout: int = Field(default=5, ge=1, le=60)
 
 
 class SettingsStore:
@@ -33,7 +33,7 @@ class SettingsStore:
             raw = self._path.read_text(encoding="utf-8")
             data = json.loads(raw)
             return AppSettings(**data)
-        except (json.JSONDecodeError, Exception) as exc:
+        except json.JSONDecodeError as exc:
             logger.warning("Corrupt settings file at %s, using defaults: %s", self._path, exc)
             return AppSettings()
 
