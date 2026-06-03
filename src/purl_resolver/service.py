@@ -25,6 +25,7 @@ async def resolve_purl(
     storage: Storage,
     resolvers: list[Resolver],
     settings_store=None,
+    resolver: str = "",
 ) -> ResolveResult:
     try:
         components = validate(purl)
@@ -81,9 +82,9 @@ async def resolve_purl(
             exc_info=True,
         )
 
-    for resolver in resolvers:
+    for r in resolvers:
         try:
-            resolution = resolver.resolve(purl)
+            resolution = r.resolve(purl)
         except InvalidPurlError as e:
             return ResolveResult.err(400, "invalid_purl", str(e))
         except UpstreamError as e:
@@ -101,6 +102,7 @@ async def resolve_purl(
             evidence=list(resolution.evidence),
             warnings=list(resolution.warnings),
             version_reference=resolution.version_reference,
+            resolver=resolver,
         )
 
         try:
@@ -124,12 +126,13 @@ async def resolve_batch(
     storage: Storage,
     resolvers: list[Resolver],
     settings_store=None,
+    resolver: str = "",
 ) -> dict[str, str]:
     semaphore = asyncio.Semaphore(_BATCH_SEMAPHORE_LIMIT)
 
     async def _resolve_one(original: str) -> tuple[str, str | None]:
         async with semaphore:
-            result = await resolve_purl(original, storage, resolvers, settings_store=settings_store)
+            result = await resolve_purl(original, storage, resolvers, settings_store=settings_store, resolver=resolver)
             key = safe_normalize(original)
             if result.response and result.response.repository_url:
                 return (key, result.response.repository_url)
@@ -153,6 +156,7 @@ def process_sbom(
 async def store_preexisting_references(
     components: list[SbomComponent],
     storage: Storage,
+    resolver: str = "",
 ) -> None:
     for comp in components:
         if comp.needs_enrichment:
@@ -169,5 +173,6 @@ async def store_preexisting_references(
                         purl=purl_key,
                         repository_url=ref["url"],
                         evidence=["from SBOM externalReferences"],
+                        resolver=resolver,
                     ))
                 break

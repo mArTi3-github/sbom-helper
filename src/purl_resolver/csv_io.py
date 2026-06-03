@@ -52,7 +52,7 @@ def parse_csv_import(text: str) -> tuple[list[UpsertRow], list[dict]]:
             evidence=evidence,
             warnings=warnings,
             version_reference=row.get("version_reference") or None,
-            resolver=row.get("resolver") or "purl2repo",
+            resolver=row.get("resolver") or "import-csv",
         ))
 
     return rows, errors

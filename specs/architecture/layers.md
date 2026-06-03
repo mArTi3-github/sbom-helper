@@ -135,7 +135,7 @@
 - **API Layer** imports **Service Layer** (`service.py`) — but not vice versa
 - **API Layer** imports **csv_io** module for CSV parsing/rendering
 - **API Layer** imports **Config Layer** (settings)
-- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use; accepts optional `settings_store` parameter for URL validation
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use; accepts optional `settings_store` parameter for URL validation; accepts optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
@@ -160,11 +160,11 @@
 - Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`, `db-admin.html`, `settings.html`)
 
 ### Service Layer (`service.py`)
-- Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver call → storage store
+- Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver call → storage store; accepts optional `resolver` parameter to tag stored records with their origin
 - URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + git ls-remote; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today
-- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; accepts optional `settings_store` for URL validation
+- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; accepts optional `settings_store` for URL validation; accepts optional `resolver` parameter passed through to `resolve_purl`
 - SBOM enrichment flow (`process_sbom`): accept parsed SBOM dict + components + resolved map → call `enricher.enrich_sbom()` → call `reporter.build_report()` → return combined report
-- Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `storage.store()`
+- Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `storage.store()`; accepts optional `resolver` parameter to tag stored records with their origin
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
@@ -172,7 +172,7 @@
 ### CSV I/O Module (`csv_io.py`)
 - Pure functions for CSV parsing and rendering, no HTTP or Storage dependencies
 - `detect_delimiter(text) → str` — detects semicolon or comma delimiter from header line
-- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, semicolon delimiter, required column validation
+- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, semicolon delimiter, required column validation; when `resolver` column is absent, defaults to `"import-csv"`
 - `render_csv_export(rows: list[PurlRow]) → str` — renders PurlRow objects as semicolon-delimited CSV string
 - Dependencies: only `csv`, `io`, `json` from stdlib
 

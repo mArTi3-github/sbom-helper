@@ -125,8 +125,8 @@ async def resolve_sbom_endpoint(
     storage = request.app.state.storage
     resolvers = request.app.state.resolvers
     settings_store = getattr(request.app.state, "settings_store", None)
-    resolved = await resolve_batch(unique_purls, storage, resolvers, settings_store=settings_store)
-    await store_preexisting_references(components, storage)
+    resolved = await resolve_batch(unique_purls, storage, resolvers, settings_store=settings_store, resolver="import-sbom")
+    await store_preexisting_references(components, storage, resolver="import-sbom")
     report = process_sbom(data, components, resolved, skipped=skipped)
 
     return JSONResponse(

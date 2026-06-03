@@ -55,6 +55,7 @@ class PostgresCache(Storage):
             evidence=self._decode_jsonb(row.get("evidence")),
             warnings=self._decode_jsonb(row.get("warnings")),
             version_reference=row.get("version_reference"),
+            resolver=row.get("resolver", ""),
         )
 
     async def store(self, result: ResolveResponse) -> None:
@@ -63,8 +64,8 @@ class PostgresCache(Storage):
                 """
                 INSERT INTO resolved_purls (
                     purl, repository_url, repository_type, repository_kind,
-                    confidence, evidence, warnings, version_reference
-                ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)
+                    confidence, evidence, warnings, version_reference, resolver
+                ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
                 ON CONFLICT (purl) DO UPDATE SET
                     repository_url = EXCLUDED.repository_url,
                     repository_type = EXCLUDED.repository_type,
@@ -73,6 +74,7 @@ class PostgresCache(Storage):
                     evidence = EXCLUDED.evidence,
                     warnings = EXCLUDED.warnings,
                     version_reference = EXCLUDED.version_reference,
+                    resolver = EXCLUDED.resolver,
                     resolved_at = NOW()
                 """,
                 result.purl,
@@ -87,6 +89,7 @@ class PostgresCache(Storage):
     if isinstance(result.warnings, str)
     else json.dumps(result.warnings),
                 result.version_reference,
+                result.resolver or "purl2repo",
             )
 
 

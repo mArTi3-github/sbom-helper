@@ -37,7 +37,7 @@ class InMemoryCache(Storage):
                 evidence=r.evidence,
                 warnings=r.warnings,
                 version_reference=r.version_reference,
-                resolver="purl2repo",
+                resolver=r.resolver or "",
                 resolved_at="",
             ))
 
@@ -59,7 +59,7 @@ class InMemoryCache(Storage):
     ) -> bool:
         if filters.search and filters.search.lower() not in r.purl.lower():
             return False
-        if filters.resolver and filters.resolver != "purl2repo":
+        if filters.resolver and filters.resolver != (r.resolver or ""):
             return False
         if filters.confidence and filters.confidence != r.confidence:
             return False

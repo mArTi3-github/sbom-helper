@@ -115,7 +115,7 @@ Content-Type: `text/html`. Returns the Jinja2-rendered sbom.html page with a fil
 
 ### `POST /api/v1/resolve/sbom`
 
-Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS or source-distribution external references, resolves each unique normalized PURL via the Service Layer, inserts `type: vcs` external references into the SBOM, and returns the enriched SBOM together with a resolution report. Components that already have VCS external references are stored in the database via `store_preexisting_references()` without resolution.
+Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS or source-distribution external references, resolves each unique normalized PURL via the Service Layer, inserts `type: vcs` external references into the SBOM, and returns the enriched SBOM together with a resolution report. Resolved PURLs and pre-existing references are stored in the database with `resolver: "import-sbom"`. Components that already have VCS external references are stored in the database via `store_preexisting_references()` without resolution.
 
 #### Request
 
@@ -224,7 +224,7 @@ Response (200): `{ "deleted": N }`
 
 Import CSV. Multipart: `file` (CSV) + `strategy` (`"upsert"` or `"skip_existing"`).
 
-CSV format: semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `repository_type`, `repository_kind`, `confidence`, `evidence` (JSON array), `warnings` (JSON array), `version_reference`, `resolver`, `resolved_at`.
+CSV format: semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `repository_type`, `repository_kind`, `confidence`, `evidence` (JSON array), `warnings` (JSON array), `version_reference`, `resolver` (default: `"import-csv"` when absent), `resolved_at`.
 
 Response (200): `{ "imported": N, "skipped": N, "errors": [...] }`
 Response (400): `{ "error": "invalid_csv", "message": "..." }` (missing columns, wrong format)
@@ -297,8 +297,8 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 1. Recursively walk all `components[]` arrays (including nested `components` inside components)
 2. For each component that has a `purl` AND (has no `externalReferences` OR has no `vcs`/`source-distribution` type in `externalReferences`): mark as needing enrichment
 3. Normalize each PURL to `scheme:type/namespace/name`; deduplicate across the entire SBOM
-4. For each unique normalized PURL: call `service.resolve_purl()` (cache → resolver flow)
-5. Store pre-existing references: for components with `needs_enrichment=False`, store their PURL and VCS repository URL in the database via `store_preexisting_references()`
+4. For each unique normalized PURL: call `service.resolve_purl()` (cache → resolver flow) with `resolver="import-sbom"`
+5. Store pre-existing references: for components with `needs_enrichment=False`, store their PURL and VCS repository URL in the database via `store_preexisting_references()` with `resolver="import-sbom"`
 6. For each component matching a resolved PURL: append `{"type": "vcs", "url": "..."}` to its `externalReferences` array; preserve all existing references
 7. Increment `version` field by 1
 

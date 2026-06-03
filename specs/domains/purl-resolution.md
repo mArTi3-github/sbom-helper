@@ -33,6 +33,8 @@ class ResolveResponse(BaseModel):
     evidence: list[str] = []
     warnings: list[str] = []
     version_reference: str | None = None
+    resolver: str = ""
+    resolved_at: str = ""
 
 class ErrorResponse(BaseModel):
     error: str
@@ -125,6 +127,9 @@ Client                    API Layer (router)         Service Layer             p
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationResult`, never raises exceptions
+- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` for single PURL resolution, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
+- **SBOM enrichment uses resolver="import-sbom"**: both `resolve_batch()` and `store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
+- **CSV import uses resolver="import-csv"**: when the `resolver` column is absent from the imported CSV, the value `"import-csv"` is used as default
 
 ## Configuration
 
