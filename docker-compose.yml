@@ -13,6 +13,8 @@ services:
         condition: service_healthy
     ports:
       - "${PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
     environment:
       - PURL2REPO_TIMEOUT=${PURL2REPO_TIMEOUT:-15.0}
       - PURL2REPO_USE_CACHE=${PURL2REPO_USE_CACHE:-true}

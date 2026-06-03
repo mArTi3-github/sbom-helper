@@ -4,5 +4,6 @@ services:
       target: dev
     volumes:
       - ./src:/app/src
+      - ./data:/app/data
     environment:
       - UVICORN_RELOAD=true
