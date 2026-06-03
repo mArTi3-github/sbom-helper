@@ -18,17 +18,17 @@ def reset_rate_limit_tracker():
     _RateLimitTracker._cooldown_until = 0.0
 
 
-def _mock_response(status: int = 200, headers: dict | None = None) -> AsyncMock:
+def _mock_response(status_code: int = 200, headers: dict | None = None) -> AsyncMock:
     resp = AsyncMock()
-    resp.status = status
+    resp.status_code = status_code
     resp.headers = headers or {}
     resp.__aenter__ = AsyncMock(return_value=resp)
     resp.__aexit__ = AsyncMock(return_value=False)
     return resp
 
 
-def _mock_head(status: int = 200, headers: dict | None = None):
-    return _mock_response(status, headers)
+def _mock_head(status_code: int = 200, headers: dict | None = None):
+    return _mock_response(status_code, headers)
 
 
 class TestValidateUrl:

@@ -120,7 +120,7 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
     try:
         resp = await _head_request(url, timeout)
         headers = dict(resp.headers)
-        status = resp.status
+        status = resp.status_code
     except Exception:
         _RateLimitTracker.reset()
         return UrlValidationResult.NETWORK_ERROR
