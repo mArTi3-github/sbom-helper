@@ -99,7 +99,7 @@ Serve the web UI HTML page (PURL resolver).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns the Jinja2-rendered index page.
+Content-Type: `text/html`. Returns the Jinja2-rendered index page with a navigation bar linking to PURL Resolver, SBOM Updater, Database Admin, and Settings pages.
 
 ---
 
@@ -245,6 +245,53 @@ Response (200): `Content-Type: text/html`. Jinja2-rendered `db-admin.html`.
 
 ---
 
+### `GET /settings`
+
+Serve the settings page HTML.
+
+Response (200): `Content-Type: text/html`. Jinja2-rendered `settings.html`.
+
+---
+
+### `GET /api/v1/settings`
+
+Return current application settings.
+
+#### Response (200)
+
+```json
+{
+  "validate_db_urls": false,
+  "url_validation_timeout": 5
+}
+```
+
+- `validate_db_urls`: boolean — enable URL validation for cached repository URLs (default: `false`)
+- `url_validation_timeout`: integer — timeout in seconds for HEAD and git ls-remote checks (1–60, default: `5`)
+
+---
+
+### `PATCH /api/v1/settings`
+
+Partially update application settings.
+
+#### Request
+
+```json
+{
+  "validate_db_urls": true,
+  "url_validation_timeout": 10
+}
+```
+
+Both fields optional. Only provided fields are updated.
+
+#### Response (200)
+
+Returns the full updated settings object (same format as `GET /api/v1/settings`).
+
+---
+
 ## Enrichment Algorithm
 
 1. Recursively walk all `components[]` arrays (including nested `components` inside components)
@@ -260,7 +307,7 @@ Response (200): `Content-Type: text/html`. Jinja2-rendered `db-admin.html`.
 | Condition | HTTP Status | Error Code |
 |---|---|---|
 | Invalid PURL format (application-level validation) | 400 | `invalid_purl` |
-| Unsupported ecosystem (resolver-level validation) | 400 | `invalid_purl` |
+| Unsupported ecosystem (resolver returns no result) | 200 | — (`repository_url: null`, `warnings` populated) |
 | Valid PURL, no repository found | 200 | — (`repository_url: null`) |
 | purl2repo network/timeout error | 502 | `upstream_error` |
 | Empty purl string | 422 | (Pydantic validation) |

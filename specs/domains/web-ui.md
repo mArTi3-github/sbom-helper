@@ -2,14 +2,15 @@
 
 ## Description
 
-Three browser interfaces: a single-page PURL resolver, an SBOM-updater page for enriching CycloneDX SBOM files, and a database administration page for managing the `resolved_purls` table.
+Four browser interfaces: a single-page PURL resolver, an SBOM-updater page for enriching CycloneDX SBOM files, a database administration page for managing the `resolved_purls` table, and a settings page for application configuration.
 
 ## Key Files
 
 - `src/purl_resolver/templates/index.html` — PURL resolver page: structure, styles, and logic
 - `src/purl_resolver/templates/sbom.html` — SBOM-updater page: file upload form, results table, download button
 - `src/purl_resolver/templates/db-admin.html` — database administration page: filterable table with pagination, inline editing, CSV import/export, bulk delete
-- `src/purl_resolver/router.py` — Serves templates at `GET /`, `GET /sbom-updater`, and `GET /db-admin`
+- `src/purl_resolver/templates/settings.html` — settings page: URL validation toggle and timeout configuration
+- `src/purl_resolver/router.py` — Serves templates at `GET /`, `GET /sbom-updater`, `GET /db-admin`, and `GET /settings`
 
 ## Flows
 
@@ -92,3 +93,13 @@ User                   Browser                    API Layer
 - Import modal includes a collapsible CSV format reference section
 - Import modal supports drag-and-drop for CSV files
 - All three pages use a consistent navigation bar
+
+### Settings Page
+
+- Settings page is accessible at `/settings` with a nav-bar link on all pages
+- Toggle switch controls `validate_db_urls` (URL validation from local database)
+- Number input controls `url_validation_timeout` (1–60 seconds)
+- Settings are loaded from `GET /api/v1/settings` on page load
+- Settings are saved via `PATCH /api/v1/settings` on button click
+- Success/error feedback is shown after save attempt
+- Nav-bar is consistent with all other pages

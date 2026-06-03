@@ -24,6 +24,9 @@
 | Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
 | Manage database (view, edit, filter, import, export) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 | Refactor CSV import/export or storage interface | `architecture/layers.md`, `contracts/api-contract.md` |
+| Add application settings | `domains/purl-resolution.md`, `contracts/api-contract.md`, `architecture/layers.md` |
+| Add URL validation for cached URLs | `domains/purl-resolution.md`, `architecture/layers.md` |
+| Change resolver error handling | `domains/purl-resolution.md`, `architecture/layers.md` |
 
 ## Dependency Graph
 
@@ -54,9 +57,9 @@ specs/
 │   └── layers.md                    — Layer hierarchy and import rules
 ├── domains/
 │   ├── purl-resolution.md           — Core resolution capability
-│   └── web-ui.md                    — Browser interface (three pages)
+│   └── web-ui.md                    — Browser interface (four pages)
 ├── contracts/
-│   └── api-contract.md              — HTTP API contract (including db-admin endpoints)
+│   └── api-contract.md              — HTTP API contract (including db-admin and settings endpoints)
 └── decisions/
     ├── _template.md                 — ADR template
     └── 0001-purl2repo-as-primary-resolver.md
