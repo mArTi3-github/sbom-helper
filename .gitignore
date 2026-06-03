@@ -8,3 +8,4 @@ __pycache__/
 .kilo/plans/
 openspec/specs/
 .misc/addictional_materials/
+data/
