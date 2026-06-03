@@ -130,7 +130,10 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
     if status >= 400:
         return UrlValidationResult.INVALID
 
-    git_ok = await _git_ls_remote(url, timeout)
+    try:
+        git_ok = await _git_ls_remote(url, timeout)
+    except Exception:
+        return UrlValidationResult.INVALID
     if not git_ok:
         return UrlValidationResult.INVALID
 
