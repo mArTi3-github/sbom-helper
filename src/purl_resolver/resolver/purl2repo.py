@@ -45,7 +45,13 @@ class Purl2RepoResolver(Resolver):
                 no_network=self._no_network,
                 cache_dir=self._cache_dir,
             )
-        except (Purl2RepoInvalidPurlError, UnsupportedEcosystemError) as e:
+        except UnsupportedEcosystemError as e:
+            logger.info("purl2repo does not support type %s, skipping", purl.split(":")[1].split("/")[0] if ":" in purl else "?")
+            return Resolution(
+                purl=purl,
+                warnings=[f"Unsupported package type for purl2repo: {e}"],
+            )
+        except Purl2RepoInvalidPurlError as e:
             raise InvalidPurlError(str(e)) from e
         except (Purl2RepoResolutionError, MetadataFetchError) as e:
             raise UpstreamError(str(e)) from e
