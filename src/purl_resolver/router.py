@@ -304,6 +304,11 @@ async def export_csv_endpoint(
     )
 
 
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="settings.html")
+
+
 @router.get("/db-admin", response_class=HTMLResponse)
 async def db_admin_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="db-admin.html")

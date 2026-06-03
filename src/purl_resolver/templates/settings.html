@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — sbom-helper</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5; color: #1a1a1a; line-height: 1.6;
+            min-height: 100vh; display: flex; flex-direction: column;
+        }
+        .container { max-width: 720px; margin: 0 auto; padding: 2rem 1rem; flex: 1; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+        .subtitle { color: #666; margin-bottom: 1.5rem; }
+        .card {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .card-title { font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 1rem; }
+        .setting-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 0; border-bottom: 1px solid #f3f4f6;
+        }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-label { font-weight: 500; }
+        .setting-desc { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+        .toggle {
+            position: relative; width: 48px; height: 26px; cursor: pointer;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: #ccc; border-radius: 26px; transition: background 0.2s;
+        }
+        .toggle-slider::before {
+            content: ""; position: absolute; height: 20px; width: 20px;
+            left: 3px; bottom: 3px; background: white; border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .toggle input:checked + .toggle-slider { background: #2563eb; }
+        .toggle input:checked + .toggle-slider::before { transform: translateX(22px); }
+        input[type="number"] {
+            width: 80px; padding: 0.5rem; border: 1px solid #ccc;
+            border-radius: 6px; font-size: 0.9rem; text-align: center;
+        }
+        input[type="number"]:focus { outline: none; border-color: #2563eb; }
+        button {
+            padding: 0.75rem 1.5rem; background: #2563eb; color: #fff;
+            border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;
+            margin-top: 1rem;
+        }
+        button:hover { background: #1d4ed8; }
+        .msg { margin-top: 0.75rem; padding: 0.75rem; border-radius: 6px; display: none; }
+        .msg-ok { background: #dcfce7; color: #166534; }
+        .msg-err { background: #fee2e2; color: #991b1b; }
+        footer { text-align: center; padding: 1rem; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>sbom-helper</h1>
+        <p class="subtitle">Application settings</p>
+        <div style="margin-bottom:1rem;display:flex;gap:1rem;">
+            <a href="/" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">PURL Resolver</a>
+            <a href="/sbom-updater" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">SBOM Updater</a>
+            <a href="/db-admin" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">Database Admin</a>
+            <a href="/settings" style="text-decoration:none;color:inherit;font-weight:600;font-size:0.9rem;">Settings</a>
+        </div>
+
+        <div class="card">
+            <div class="card-title">URL Validation</div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Validate URLs from local database</div>
+                    <div class="setting-desc">
+                        When enabled, repository URLs found in the local database are verified
+                        (HTTP HEAD + git ls-remote) before being returned. Invalid URLs are
+                        deleted and resolution continues through the resolver chain.
+                    </div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="validate-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Validation timeout (seconds)</div>
+                    <div class="setting-desc">
+                        Timeout for each HTTP HEAD and git ls-remote check (1-60 seconds).
+                    </div>
+                </div>
+                <input type="number" id="timeout-input" min="1" max="60" value="5">
+            </div>
+        </div>
+
+        <button id="save-btn">Save</button>
+        <div id="msg" class="msg"></div>
+    </div>
+
+    <footer>sbom-helper — Settings</footer>
+
+    <script>
+        const toggle = document.getElementById("validate-toggle");
+        const timeoutInput = document.getElementById("timeout-input");
+        const saveBtn = document.getElementById("save-btn");
+        const msgDiv = document.getElementById("msg");
+
+        async function loadSettings() {
+            try {
+                const res = await fetch("/api/v1/settings");
+                const data = await res.json();
+                toggle.checked = data.validate_db_urls;
+                timeoutInput.value = data.url_validation_timeout;
+            } catch {
+                showMessage("Failed to load settings", true);
+            }
+        }
+
+        async function saveSettings() {
+            saveBtn.disabled = true;
+            try {
+                const res = await fetch("/api/v1/settings", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        validate_db_urls: toggle.checked,
+                        url_validation_timeout: parseInt(timeoutInput.value, 10),
+                    }),
+                });
+                if (res.ok) {
+                    showMessage("Settings saved", false);
+                } else {
+                    showMessage("Failed to save settings", true);
+                }
+            } catch {
+                showMessage("Network error", true);
+            } finally {
+                saveBtn.disabled = false;
+            }
+        }
+
+        function showMessage(text, isError) {
+            msgDiv.textContent = text;
+            msgDiv.className = "msg " + (isError ? "msg-err" : "msg-ok");
+            msgDiv.style.display = "block";
+            setTimeout(() => { msgDiv.style.display = "none"; }, 3000);
+        }
+
+        saveBtn.addEventListener("click", saveSettings);
+        loadSettings();
+    </script>
+</body>
+</html>
