@@ -77,7 +77,8 @@ async def _head_request(url: str, timeout: int):
         return await client.head(url)
 
 
-async def _git_ls_remote(url: str, timeout: int) -> bool:
+async def _git_ls_remote(url: str, timeout: int) -> bool | None:
+    """Return True if valid, False if not found, None if network error."""
     try:
         proc = await asyncio.create_subprocess_exec(
             "git", "ls-remote", "--exit-code", url,
@@ -90,11 +91,18 @@ async def _git_ls_remote(url: str, timeout: int) -> bool:
             proc.kill()
             await proc.wait()
             logger.warning("git ls-remote timed out for %s", url)
+            return None
+        if proc.returncode == 0:
+            return True
+        stderr_text = stderr.decode(errors="replace") if stderr else ""
+        if "not found" in stderr_text.lower() or "does not exist" in stderr_text.lower():
             return False
-        return proc.returncode == 0
+        return None
     except FileNotFoundError:
         logger.warning("git not found, skipping git ls-remote check")
         return True
+    except Exception:
+        return None
 
 
 async def validate_url(url: str, timeout: int) -> UrlValidationResult:
@@ -115,7 +123,7 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
         status = resp.status
     except Exception:
         _RateLimitTracker.reset()
-        return UrlValidationResult.INVALID
+        return UrlValidationResult.NETWORK_ERROR
 
     if _is_rate_limited(status, headers):
         _RateLimitTracker.record_rate_limit()
@@ -131,10 +139,12 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
         return UrlValidationResult.INVALID
 
     try:
-        git_ok = await _git_ls_remote(url, timeout)
+        git_result = await _git_ls_remote(url, timeout)
     except Exception:
-        return UrlValidationResult.INVALID
-    if not git_ok:
+        return UrlValidationResult.NETWORK_ERROR
+    if git_result is None:
+        return UrlValidationResult.NETWORK_ERROR
+    if git_result is False:
         return UrlValidationResult.INVALID
 
     return UrlValidationResult.VALID

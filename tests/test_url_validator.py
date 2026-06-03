@@ -74,12 +74,12 @@ class TestValidateUrl:
             assert result == UrlValidationResult.RATE_LIMITED
 
     @pytest.mark.asyncio
-    async def test_head_connection_error_returns_invalid(self):
+    async def test_head_connection_error_returns_network_error(self):
         with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.side_effect = Exception("Connection refused")
-            result = await validate_url("https://github.com/deleted/repo", timeout=5)
-            assert result == UrlValidationResult.INVALID
+            result = await validate_url("https://example.com/repo", timeout=5)
+            assert result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
     async def test_connectivity_probe_fails_returns_network_error(self):
@@ -95,6 +95,15 @@ class TestValidateUrl:
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/deleted/repo", timeout=5)
             assert result == UrlValidationResult.INVALID
+
+    @pytest.mark.asyncio
+    async def test_git_ls_remote_timeout_returns_network_error(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=None):
+            mock_head.return_value = _mock_head(200)
+            result = await validate_url("https://example.com/repo", timeout=5)
+            assert result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
     async def test_rate_limit_cooldown_skips_validation(self):
