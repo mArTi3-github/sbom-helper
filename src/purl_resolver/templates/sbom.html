@@ -51,6 +51,7 @@
         th { background: #f9fafb; font-size: 0.8rem; text-transform: uppercase; color: #888; }
         .status-found { color: #166534; font-weight: 500; }
         .status-not-found { color: #991b1b; font-weight: 500; }
+        .status-removed { color: #b45309; font-weight: 500; }
         .repo-url-cell { word-break: break-all; }
         .repo-url-cell a { color: #2563eb; text-decoration: none; }
         .repo-url-cell a:hover { text-decoration: underline; }
@@ -90,6 +91,10 @@
         </div>
 
         <div class="toolbar">
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;color:#555;cursor:pointer;">
+                <input type="checkbox" id="remove-unresolved">
+                Удалять ненайденные компоненты без подкомпонентов
+            </label>
             <button id="process-btn" disabled>Обработать</button>
         </div>
 
@@ -176,6 +181,11 @@
             const formData = new FormData();
             formData.append("file", file);
 
+            const removeCheckbox = document.getElementById("remove-unresolved");
+            if (removeCheckbox.checked) {
+                formData.append("remove_unresolved_no_subcomponents", "true");
+            }
+
             try {
                 const res = await fetch("/api/v1/resolve/sbom", {
                     method: "POST",
@@ -221,12 +231,13 @@
                         <div class="summary-label">Не найдено</div>
                     </div>
                     ${s.skipped > 0 ? `<div class="summary-item"><div class="summary-value skipped">${s.skipped}</div><div class="summary-label">Пропущено</div></div>` : ""}
+                    ${s.removed > 0 ? `<div class="summary-item"><div class="summary-value" style="color:#b45309;">${s.removed}</div><div class="summary-label">Удалено</div></div>` : ""}
                 </div>
             `;
 
             resultsBody.innerHTML = data.results.map(r => {
-                const statusClass = r.status === "found" ? "status-found" : "status-not-found";
-                const statusText = r.status === "found" ? "Found" : "Not found";
+                const statusClass = r.status === "found" ? "status-found" : r.status === "removed" ? "status-removed" : "status-not-found";
+                const statusText = r.status === "found" ? "Found" : r.status === "removed" ? "Removed" : "Not found";
                 const urlHtml = r.repository_url
                     ? `<a href="${escapeHtml(r.repository_url)}" target="_blank">${escapeHtml(r.repository_url)}</a>`
                     : "&mdash;";
