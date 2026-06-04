@@ -88,8 +88,8 @@ async def _git_ls_remote(url: str, timeout: int, github_token: str | None = None
     """Return True if valid, False if not found, None if network error."""
     try:
         git_url = url
-        if github_token and "github.com" in url:
-            git_url = url.replace("https://", f"https://oauth2:{github_token}@")
+        if github_token and "github.com" in url and url.startswith("https://"):
+            git_url = f"https://oauth2:{github_token}@{url[len('https://'):]}"
         proc = await asyncio.create_subprocess_exec(
             "git", "ls-remote", "--exit-code", git_url,
             stdout=asyncio.subprocess.DEVNULL,

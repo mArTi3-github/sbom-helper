@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from purl_resolver.url_validator import UrlValidationResult, validate_url, _RateLimitTracker
+from purl_resolver.url_validator import UrlValidationResult, validate_url, _RateLimitTracker, _git_ls_remote
 
 
 @pytest.fixture(autouse=True)
@@ -153,6 +153,30 @@ class TestValidateUrlWithToken:
             mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
             result = await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_invalid")
             assert result == UrlValidationResult.TOKEN_INVALID
+
+
+class TestGitLsRemoteTokenTransformation:
+    @pytest.mark.asyncio
+    async def test_github_url_rewrites_with_token(self):
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
+        mock_proc.returncode = 0
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+            result = await _git_ls_remote("https://github.com/psf/requests", 5, github_token="ghp_test123")
+            assert result is True
+            call_args = mock_exec.call_args
+            assert "https://oauth2:ghp_test123@github.com/psf/requests" in call_args[0]
+
+    @pytest.mark.asyncio
+    async def test_non_github_url_no_token_injection(self):
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
+        mock_proc.returncode = 0
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+            result = await _git_ls_remote("https://gitlab.com/org/repo", 5, github_token="ghp_test123")
+            assert result is True
+            call_args = mock_exec.call_args
+            assert "oauth2" not in str(call_args[0])
 
 
 class TestTokenInvalidResult:
