@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from purl_resolver.url_validator import UrlValidationResult, validate_url, _RateLimitTracker, _git_ls_remote
+from purl_resolver.url_validator import UrlValidationResult, validate_url, validate_github_token, _RateLimitTracker, _git_ls_remote
 
 
 @pytest.fixture(autouse=True)
@@ -182,3 +182,27 @@ class TestGitLsRemoteTokenTransformation:
 class TestTokenInvalidResult:
     def test_token_invalid_is_enum_value(self):
         assert UrlValidationResult.TOKEN_INVALID.value == "token_invalid"
+
+
+class TestValidateGithubToken:
+    @pytest.mark.asyncio
+    async def test_valid_token_returns_true(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+            mock_head.return_value = _mock_response(200)
+            result = await validate_github_token("ghp_valid")
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_returns_false(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+            mock_head.return_value = _mock_response(401)
+            result = await validate_github_token("ghp_invalid")
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_network_error_returns_false(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
+            result = await validate_github_token("ghp_test")
+            assert result is False

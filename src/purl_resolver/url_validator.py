@@ -115,6 +115,19 @@ async def _git_ls_remote(url: str, timeout: int, github_token: str | None = None
         return None
 
 
+async def validate_github_token(token: str) -> bool:
+    """Validate a GitHub token by checking /rate_limit endpoint."""
+    try:
+        result = await _head_request(
+            "https://api.github.com/rate_limit",
+            timeout=5,
+            github_token=token,
+        )
+        return result.status_code == 200
+    except Exception:
+        return False
+
+
 async def validate_url(url: str, timeout: int, github_token: str | None = None) -> UrlValidationResult:
     if _RateLimitTracker.is_in_cooldown():
         return UrlValidationResult.VALID
