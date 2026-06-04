@@ -28,6 +28,7 @@ from .service import resolve_purl
 from .sbom_enrichment import SbomEnrichmentPipeline
 from .sbom.parser import SbomParseError
 from .settings_store import SettingsStore, AppSettings
+from .url_validator import validate_github_token
 from .csv_io import parse_csv_import, render_csv_export
 from .storage.interface import PurlFilters
 
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 class SettingsUpdate(BaseModel):
     validate_db_urls: bool | None = None
     url_validation_timeout: int | None = Field(None, ge=1, le=60)
+    github_token: str | None = None
 
 
 router = APIRouter()
@@ -303,7 +305,13 @@ async def db_admin_page(request: Request) -> HTMLResponse:
 async def get_settings(request: Request) -> JSONResponse:
     store: SettingsStore = request.app.state.settings_store
     settings = store.load()
-    return JSONResponse(content=settings.model_dump())
+    return JSONResponse(content={
+        "validate_db_urls": settings.validate_db_urls,
+        "url_validation_timeout": settings.url_validation_timeout,
+        "token_set": {
+            "github_token": settings.github_token is not None,
+        },
+    })
 
 
 @router.patch("/api/v1/settings")
@@ -311,9 +319,29 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
     store: SettingsStore = request.app.state.settings_store
     current = store.load()
     update_data = body.model_dump(exclude_unset=True)
+
+    if "github_token" in update_data:
+        token_value = update_data["github_token"]
+        if token_value == "" or token_value is None:
+            update_data["github_token"] = None
+        else:
+            is_valid = await validate_github_token(token_value)
+            if not is_valid:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "invalid_token", "message": "GitHub token is invalid or expired"},
+                )
+
     if update_data:
         updated = current.model_copy(update=update_data)
         store.save(updated)
     else:
         updated = current
-    return JSONResponse(content=updated.model_dump())
+
+    return JSONResponse(content={
+        "validate_db_urls": updated.validate_db_urls,
+        "url_validation_timeout": updated.url_validation_timeout,
+        "token_set": {
+            "github_token": updated.github_token is not None,
+        },
+    })
