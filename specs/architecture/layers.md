@@ -220,9 +220,11 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout)
+- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
 - `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60)
+- `ServiceTokens` dataclass for extracting API tokens from settings (extensible for future services)
+- `AppSettings.service_tokens() → ServiceTokens` method
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
 - Graceful handling: missing file → create with defaults; corrupt JSON → log warning, return defaults
 

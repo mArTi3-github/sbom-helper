@@ -272,12 +272,16 @@ Return current application settings.
 ```json
 {
   "validate_db_urls": false,
-  "url_validation_timeout": 5
+  "url_validation_timeout": 5,
+  "token_set": {
+    "github_token": false
+  }
 }
 ```
 
 - `validate_db_urls`: boolean — enable URL validation for cached repository URLs (default: `false`)
 - `url_validation_timeout`: integer — timeout in seconds for HEAD and git ls-remote checks (1–60, default: `5`)
+- `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 
 ---
 
@@ -294,11 +298,30 @@ Partially update application settings.
 }
 ```
 
+```json
+{
+  "validate_db_urls": true,
+  "url_validation_timeout": 10,
+  "github_token": "ghp_..."
+}
+```
+
 Both fields optional. Only provided fields are updated.
+
+- `github_token`: optional string — GitHub Personal Access Token. Empty string or null clears the token. Invalid tokens are rejected with `400 invalid_token`.
 
 #### Response (200)
 
 Returns the full updated settings object (same format as `GET /api/v1/settings`).
+
+#### Error Response (400) — invalid token
+
+```json
+{
+  "error": "invalid_token",
+  "message": "GitHub token is invalid or expired"
+}
+```
 
 ---
 

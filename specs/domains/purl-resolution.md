@@ -161,3 +161,4 @@ Client                    API Layer (router)         Service Layer             p
 |---|---|---|
 | `validate_db_urls` | `false` | Enable URL validation for cached repository URLs |
 | `url_validation_timeout` | `5` | Timeout in seconds for HEAD and git ls-remote checks (1–60) |
+| `github_token` | `null` | GitHub Personal Access Token for authenticated requests (git ls-remote, HTTP HEAD) |
