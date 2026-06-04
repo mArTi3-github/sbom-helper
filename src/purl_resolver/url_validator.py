@@ -61,28 +61,37 @@ def _is_rate_limited(status: int, headers: dict) -> bool:
     return False
 
 
-async def _check_connectivity() -> bool:
+async def _check_connectivity(github_token: str | None = None) -> bool:
     try:
         import httpx
+        headers = {}
+        if github_token:
+            headers["Authorization"] = f"Bearer {github_token}"
         async with httpx.AsyncClient(timeout=_CONNECTIVITY_TIMEOUT) as client:
-            resp = await client.head(_CONNECTIVITY_URL)
+            resp = await client.head(_CONNECTIVITY_URL, headers=headers)
             return resp.status_code < 500
     except Exception:
         logger.warning("Connectivity probe to %s failed", _CONNECTIVITY_URL)
         return False
 
 
-async def _head_request(url: str, timeout: int):
+async def _head_request(url: str, timeout: int, github_token: str | None = None):
     import httpx
+    headers = {}
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        return await client.head(url)
+        return await client.head(url, headers=headers)
 
 
-async def _git_ls_remote(url: str, timeout: int) -> bool | None:
+async def _git_ls_remote(url: str, timeout: int, github_token: str | None = None) -> bool | None:
     """Return True if valid, False if not found, None if network error."""
     try:
+        git_url = url
+        if github_token and "github.com" in url:
+            git_url = url.replace("https://", f"https://oauth2:{github_token}@")
         proc = await asyncio.create_subprocess_exec(
-            "git", "ls-remote", "--exit-code", url,
+            "git", "ls-remote", "--exit-code", git_url,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -106,12 +115,12 @@ async def _git_ls_remote(url: str, timeout: int) -> bool | None:
         return None
 
 
-async def validate_url(url: str, timeout: int) -> UrlValidationResult:
+async def validate_url(url: str, timeout: int, github_token: str | None = None) -> UrlValidationResult:
     if _RateLimitTracker.is_in_cooldown():
         return UrlValidationResult.VALID
 
     try:
-        github_ok = await _check_connectivity()
+        github_ok = await _check_connectivity(github_token=github_token)
     except Exception:
         return UrlValidationResult.NETWORK_ERROR
 
@@ -119,7 +128,7 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
         return UrlValidationResult.NETWORK_ERROR
 
     try:
-        resp = await _head_request(url, timeout)
+        resp = await _head_request(url, timeout, github_token=github_token)
         headers = dict(resp.headers)
         status = resp.status_code
     except Exception:
@@ -132,6 +141,9 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
 
     _RateLimitTracker.reset()
 
+    if status in (401, 403) and github_token:
+        return UrlValidationResult.TOKEN_INVALID
+
     if status in (404, 405):
         return UrlValidationResult.INVALID
     if status == 403:
@@ -140,7 +152,7 @@ async def validate_url(url: str, timeout: int) -> UrlValidationResult:
         return UrlValidationResult.INVALID
 
     try:
-        git_result = await _git_ls_remote(url, timeout)
+        git_result = await _git_ls_remote(url, timeout, github_token=github_token)
     except Exception:
         return UrlValidationResult.NETWORK_ERROR
     if git_result is None:

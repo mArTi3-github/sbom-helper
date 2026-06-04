@@ -114,6 +114,47 @@ class TestValidateUrl:
         assert result == UrlValidationResult.VALID
 
 
+class TestValidateUrlWithToken:
+    @pytest.mark.asyncio
+    async def test_token_passed_to_head_request(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            mock_head.return_value = _mock_head(200)
+            await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_test")
+            mock_head.assert_called_once_with("https://github.com/psf/requests", 5, github_token="ghp_test")
+
+    @pytest.mark.asyncio
+    async def test_head_request_with_bearer_token(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            mock_head.return_value = _mock_head(200)
+            await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_test")
+            call_kwargs = mock_head.call_args
+            assert call_kwargs[1]["github_token"] == "ghp_test"
+
+    @pytest.mark.asyncio
+    async def test_git_ls_remote_with_token_in_url(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock) as mock_git:
+            mock_head.return_value = _mock_head(200)
+            mock_git.return_value = True
+            await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_test")
+            call_args = mock_git.call_args
+            assert call_args[0][0] == "https://github.com/psf/requests"
+            assert call_args[1]["github_token"] == "ghp_test"
+
+    @pytest.mark.asyncio
+    async def test_token_invalid_response(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+            mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
+            result = await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_invalid")
+            assert result == UrlValidationResult.TOKEN_INVALID
+
+
 class TestTokenInvalidResult:
     def test_token_invalid_is_enum_value(self):
         assert UrlValidationResult.TOKEN_INVALID.value == "token_invalid"
