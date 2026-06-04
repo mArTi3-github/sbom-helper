@@ -10,10 +10,7 @@ from .schemas import ResolveResponse, ResolveResult
 from .storage.interface import Storage
 from .url_validator import UrlValidationResult, validate_url
 
-from .sbom.collector import SbomComponent, collect_components
-from .sbom.enricher import enrich_sbom
-from .sbom.parser import CycloneDXParser, SbomParseError
-from .sbom.reporter import build_report
+from .sbom.collector import SbomComponent
 
 logger = logging.getLogger(__name__)
 
@@ -141,17 +138,6 @@ async def resolve_batch(
     tasks = [_resolve_one(p) for p in purls]
     results = await asyncio.gather(*tasks)
     return {k: v for k, v in results if v is not None}
-
-
-def process_sbom(
-    sbom: dict,
-    components: list,
-    resolved: dict[str, str],
-    skipped: int = 0,
-    removed: list[dict] | None = None,
-) -> dict:
-    enrich_sbom(sbom, components, resolved)
-    return build_report(components, resolved, skipped=skipped, removed=removed or [])
 
 
 async def store_preexisting_references(

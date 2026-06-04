@@ -165,8 +165,8 @@ class TestEnrichSbom:
         assert sbom["components"][0]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"]
         assert sbom["components"][1]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"]
 
-    def test_process_sbom_passes_removed_to_report(self) -> None:
-        from purl_resolver.service import process_sbom
+    def test_build_report_includes_removed(self) -> None:
+        from purl_resolver.sbom.reporter import build_report
         sbom = {
             "version": 1,
             "metadata": {"timestamp": "2024-01-01T00:00:00"},
@@ -177,6 +177,6 @@ class TestEnrichSbom:
         components = collect_components(sbom)
         resolved = {"pkg:pypi/a": "https://github.com/example/a"}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
-        report = process_sbom(sbom, components, resolved, skipped=0, removed=removed)
+        report = build_report(components, resolved, skipped=0, removed=removed)
         assert report["summary"]["removed"] == 1
         assert any(r["status"] == "removed" for r in report["results"])

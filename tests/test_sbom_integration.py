@@ -325,3 +325,51 @@ class TestSbomResolve:
         assert data["summary"]["not_found"] == 1
         enriched = data["enriched_sbom"]
         assert len(enriched["components"]) == 1
+
+    def test_remove_with_resolved_and_unresolved_children(
+        self, client: TestClient
+    ) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "metadata": {
+                "timestamp": "2024-01-01T00:00:00",
+                "component": {"type": "application", "name": "app", "version": "1.0"},
+            },
+            "components": [
+                {
+                    "type": "application",
+                    "name": "parent-pkg",
+                    "version": "1.0",
+                    "purl": "pkg:generic/parent-pkg@1.0",
+                    "components": [
+                        {
+                            "type": "library",
+                            "name": "certifi",
+                            "version": "2026.1.4",
+                            "purl": "pkg:pypi/certifi@2026.1.4",
+                        },
+                        {
+                            "type": "library",
+                            "name": "unknown",
+                            "version": "1.0",
+                            "purl": "pkg:pypi/unknown-pkg@1.0",
+                        },
+                    ],
+                },
+            ],
+        }
+        response = client.post(
+            "/api/v1/resolve/sbom",
+            data={"remove_unresolved_no_subcomponents": "true"},
+            files={"file": ("test.json", json.dumps(sbom), "application/json")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["summary"]["removed"] == 1
+        enriched = data["enriched_sbom"]
+        assert len(enriched["components"]) == 1
+        assert enriched["components"][0]["name"] == "parent-pkg"
+        assert len(enriched["components"][0]["components"]) == 1
+        assert enriched["components"][0]["components"][0]["name"] == "certifi"

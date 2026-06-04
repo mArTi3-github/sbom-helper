@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from .purl_utils import safe_normalize
 from .resolver.interface import Resolver
 from .sbom.collector import collect_components
+from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser, SbomParseError
 from .sbom.remover import remove_unresolved_components
-from .service import process_sbom, resolve_batch, store_preexisting_references
+from .sbom.reporter import build_report
+from .service import resolve_batch, store_preexisting_references
 from .storage.interface import Storage
 
 logger = logging.getLogger(__name__)
@@ -68,10 +70,12 @@ class SbomEnrichmentPipeline:
         )
 
         removed: list[dict] = []
+        enrich_sbom(sbom_data, components, resolved)
+
         if remove_unresolved_no_subcomponents:
             removed = remove_unresolved_components(sbom_data, components, resolved)
 
-        report = process_sbom(sbom_data, components, resolved, skipped=skipped, removed=removed)
+        report = build_report(components, resolved, skipped=skipped, removed=removed)
 
         return SbomEnrichmentResult(
             report=report,
