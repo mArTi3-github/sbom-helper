@@ -46,15 +46,18 @@ User                   Browser                    API Layer
   |                       |<--------------------------|
   |                       |                           |
   | Selects .json file,   |                           |
+  | toggles remove option,|                           |
   | clicks "Обработать"   |                           |
   |---------------------->|                           |
   |                       | POST /api/v1/resolve/sbom |
-  |                       | (multipart/form-data)     |
+  |                       | (multipart/form-data +    |
+  |                       |  optional boolean)        |
   |                       |-------------------------->|
   |                       | 200 {summary, enriched}   |
   |                       |<--------------------------|
   | Sees results table    |                           |
   | with summary cards    |                           |
+  | (including removed)   |                           |
   | and download button   |                           |
   |<----------------------|                           |
 ```
@@ -75,9 +78,10 @@ User                   Browser                    API Layer
 - The page never reloads during enrichment (single-page behaviour via `fetch()`)
 - Upload area supports drag-and-drop and file picker
 - Process button is disabled until a file is selected
+- Checkbox "Удалять ненайденные компоненты без подкомпонентов" controls `remove_unresolved_no_subcomponents` form parameter
 - Loading spinner is shown during server-side processing
-- Results table displays: PURL (normalized), status (Found/Not found), repository URL (clickable)
-- Summary cards show: total PURLs, found, not found, skipped
+- Results table displays: PURL (normalized), status (Found/Not found/Removed), repository URL (clickable)
+- Summary cards show: total PURLs, found, not found, skipped, removed
 - "Скачать обогащённый SBOM" button triggers JSON file download
 - All states (empty, loading, success, partial, error, network failure) have distinct visual representations
 - Main page (`GET /`) includes a navigation link to the SBOM-updater page

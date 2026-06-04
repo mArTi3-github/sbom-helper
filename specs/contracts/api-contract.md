@@ -124,6 +124,7 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 - Maximum file size: 200 MB (configurable via `SBOM_MAX_FILE_SIZE`)
 - File must be valid JSON with `bomFormat: "CycloneDX"` and `specVersion: "1.6"`
 - JSON is parsed, the root dict is validated for required CycloneDX fields, then mutated in-place during enrichment
+- Optional field `remove_unresolved_no_subcomponents` (boolean, default: `false`) — when `true`, removes components that were not resolved and have no nested subcomponents
 
 #### Success Response (200)
 
@@ -132,8 +133,9 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
   "summary": {
     "total_purls": 10,
     "found": 8,
-    "not_found": 2,
-    "skipped": 0
+    "not_found": 1,
+    "skipped": 0,
+    "removed": 1
   },
   "results": [
     {
@@ -145,6 +147,13 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
       "purl": "pkg:pypi/unknown",
       "status": "not_found",
       "repository_url": null
+    },
+    {
+      "purl": "pkg:pypi/obscure",
+      "status": "removed",
+      "repository_url": null,
+      "name": "obscure",
+      "version": "1.0"
     }
   ],
   "enriched_sbom": { "...": "..." }
@@ -153,10 +162,11 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 
 - `summary.total_purls` — number of unique PURLs that needed enrichment
 - `summary.found` — how many resolved successfully
-- `summary.not_found` — how many had no repository URL found
+- `summary.not_found` — how many had no repository URL found (excludes removed components)
 - `summary.skipped` — how many PURLs could not be parsed (invalid format)
-- `results` — per-PURL report indust only for components that needed enrichment (components already having VCS/source-distribution references are excluded)
-- `enriched_sbom` — the full enriched SBOM JSON (version incremented by 1, timestamp preserved)
+- `summary.removed` — how many components were removed (only when `remove_unresolved_no_subcomponents=true`)
+- `results` — per-PURL report for components that needed enrichment; components already having VCS/source-distribution references are excluded; removed components appear only as `status: "removed"`, not as `status: "not_found"`
+- `enriched_sbom` — the full enriched SBOM JSON (version incremented by 1, timestamp preserved); removed components are absent from `components` arrays
 
 #### Error Response (400) — invalid JSON
 
@@ -301,6 +311,7 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 5. Store pre-existing references: for components with `needs_enrichment=False`, store their PURL and VCS repository URL in the database via `store_preexisting_references()` with `resolver="import-sbom"`
 6. For each component matching a resolved PURL: append `{"type": "vcs", "url": "..."}` to its `externalReferences` array; preserve all existing references
 7. Increment `version` field by 1
+8. If `remove_unresolved_no_subcomponents=true`: remove components from the SBOM where `needs_enrichment=True`, `has_subcomponents=False`, and PURL was not resolved; removed components are reported with `status: "removed"` and excluded from `status: "not_found"` counts
 
 ## Error Handling Rules
 

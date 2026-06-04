@@ -7,12 +7,17 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 ## Key Files
 
 - `src/purl_resolver/router.py` — API endpoint handlers that call the Service Layer
-- `src/purl_resolver/service.py` — Orchestration: validation → normalization → storage lookup → URL validation → resolver → storage store; also `resolve_batch()` for concurrent resolution and `process_sbom()` for SBOM enrichment flow
+- `src/purl_resolver/service.py` — Orchestration: validation → normalization → storage lookup → URL validation → resolver → storage store; also `resolve_batch()` for concurrent resolution and `store_preexisting_references()` for SBOM pre-existing refs
+- `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
 - `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions) and purl2repo wrapper
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
-- `src/purl_resolver/sbom/` — SBOM enrichment modules: parser, collector, enricher, reporter
+- `src/purl_resolver/sbom/parser.py` — CycloneDX SBOM validation and parsing
+- `src/purl_resolver/sbom/collector.py` — Recursive component collection with path tracking, `needs_enrichment` and `has_subcomponents` detection
+- `src/purl_resolver/sbom/enricher.py` — Inserts VCS external references into SBOM components
+- `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
+- `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
 - `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + git ls-remote with rate limit mitigation
 - `tests/test_api.py` — Integration tests for resolution workflow
@@ -130,6 +135,8 @@ Client                    API Layer (router)         Service Layer             p
 - **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` for single PURL resolution, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **SBOM enrichment uses resolver="import-sbom"**: both `resolve_batch()` and `store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
 - **CSV import uses resolver="import-csv"**: when the `resolver` column is absent from the imported CSV, the value `"import-csv"` is used as default
+- **SBOM enrichment enriches before removing**: `enrich_sbom()` is called before `remove_unresolved_components()` to avoid stale component paths after in-place removal
+- **Removed components excluded from not_found**: components with `status: "removed"` do not appear as `status: "not_found"` in the report
 
 ## Configuration
 

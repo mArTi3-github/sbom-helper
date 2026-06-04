@@ -25,7 +25,7 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 | Endpoint | Description |
 |---|---|
 | `POST /api/v1/resolve` | Resolve a PURL to its repository URL |
-| `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references |
+| `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references (optional: remove unresolved components) |
 | `GET /api/v1/db/purls` | List PURLs with pagination and filtering |
 | `PATCH /api/v1/db/purls/{purl}` | Edit a PURL row |
 | `DELETE /api/v1/db/purls` | Bulk delete PURL rows |
@@ -45,7 +45,7 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 
 ## Status
 
-Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references), and database administration (view, edit, filter, import/export via CSV, bulk delete). CSV uses semicolon delimiter with BOM handling.
+Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), and database administration (view, edit, filter, import/export via CSV, bulk delete). CSV uses semicolon delimiter with BOM handling.
 See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
 
 ## Specs

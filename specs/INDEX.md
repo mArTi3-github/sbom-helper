@@ -27,6 +27,7 @@
 | Add application settings | `domains/purl-resolution.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 | Add URL validation for cached URLs | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Change resolver error handling | `domains/purl-resolution.md`, `architecture/layers.md` |
+| Remove unresolved SBOM components | `contracts/api-contract.md`, `domains/purl-resolution.md`, `domains/web-ui.md` |
 
 ## Dependency Graph
 
