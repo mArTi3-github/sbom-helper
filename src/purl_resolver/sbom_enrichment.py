@@ -7,6 +7,7 @@ from .purl_utils import safe_normalize
 from .resolver.interface import Resolver
 from .sbom.collector import collect_components
 from .sbom.parser import CycloneDXParser, SbomParseError
+from .sbom.remover import remove_unresolved_components
 from .service import process_sbom, resolve_batch, store_preexisting_references
 from .storage.interface import Storage
 
@@ -32,7 +33,11 @@ class SbomEnrichmentPipeline:
         self._resolvers = resolvers
         self._settings_store = settings_store
 
-    async def process(self, sbom_data: dict) -> SbomEnrichmentResult:
+    async def process(
+        self,
+        sbom_data: dict,
+        remove_unresolved_no_subcomponents: bool = False,
+    ) -> SbomEnrichmentResult:
         """Parse, collect, deduplicate, resolve, enrich, and report."""
         CycloneDXParser.parse(sbom_data)
 
@@ -61,7 +66,12 @@ class SbomEnrichmentPipeline:
         await store_preexisting_references(
             components, self._storage, resolver="import-sbom"
         )
-        report = process_sbom(sbom_data, components, resolved, skipped=skipped)
+
+        removed: list[dict] = []
+        if remove_unresolved_no_subcomponents:
+            removed = remove_unresolved_components(sbom_data, components, resolved)
+
+        report = process_sbom(sbom_data, components, resolved, skipped=skipped, removed=removed)
 
         return SbomEnrichmentResult(
             report=report,

@@ -148,9 +148,10 @@ def process_sbom(
     components: list,
     resolved: dict[str, str],
     skipped: int = 0,
+    removed: list[dict] | None = None,
 ) -> dict:
     enrich_sbom(sbom, components, resolved)
-    return build_report(components, resolved, skipped=skipped)
+    return build_report(components, resolved, skipped=skipped, removed=removed or [])
 
 
 async def store_preexisting_references(
