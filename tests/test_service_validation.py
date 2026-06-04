@@ -39,6 +39,7 @@ def mock_settings_store():
 @pytest.fixture
 def resolver():
     r = MagicMock()
+    r.name = "test_resolver"
     r.resolve = MagicMock(return_value=MagicMock(
         repository_url="https://github.com/new/repo",
         repository_type="git",

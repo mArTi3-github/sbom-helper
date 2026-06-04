@@ -112,7 +112,7 @@ async def resolve_purl(
             evidence=list(resolution.evidence),
             warnings=list(resolution.warnings),
             version_reference=resolution.version_reference,
-            resolver=resolver,
+            resolver=r.name,
         )
 
         try:
