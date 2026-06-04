@@ -30,5 +30,9 @@ class Resolution:
 
 class Resolver(ABC):
 
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
     @abstractmethod
     def resolve(self, purl: str) -> Resolution: ...

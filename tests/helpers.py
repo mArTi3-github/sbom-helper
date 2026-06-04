@@ -12,6 +12,10 @@ class FakeResolver(Resolver):
         self._error = error
         self.call_count = 0
 
+    @property
+    def name(self) -> str:
+        return "fake"
+
     def resolve(self, purl: str) -> Resolution:
         self.call_count += 1
         if self._error:

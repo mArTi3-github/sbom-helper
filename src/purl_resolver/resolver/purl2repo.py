@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 class Purl2RepoResolver(Resolver):
 
+    @property
+    def name(self) -> str:
+        return "purl2repo"
+
     def __init__(
         self,
         timeout: float = 15.0,
