@@ -8,7 +8,10 @@ def build_report(
     components: list[SbomComponent],
     resolved: dict[str, str],
     skipped: int = 0,
+    removed: list[dict] | None = None,
 ) -> dict:
+    if removed is None:
+        removed = []
     seen: set[str] = set()
     results: list[dict] = []
     found_count = 0
@@ -29,12 +32,22 @@ def build_report(
             not_found_count += 1
             results.append({"purl": key, "status": "not_found", "repository_url": None})
 
+    for r in removed:
+        results.append({
+            "purl": r["purl"],
+            "status": "removed",
+            "repository_url": None,
+            "name": r["name"],
+            "version": r["version"],
+        })
+
     return {
         "summary": {
             "total_purls": found_count + not_found_count,
             "found": found_count,
             "not_found": not_found_count,
             "skipped": skipped,
+            "removed": len(removed),
         },
         "results": results,
     }

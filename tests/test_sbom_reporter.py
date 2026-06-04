@@ -70,3 +70,43 @@ class TestBuildReport:
         assert report["summary"]["found"] == 1
         assert len(report["results"]) == 1
         assert report["results"][0]["purl"] == "pkg:pypi/b"
+
+    def test_removed_count_in_summary(self) -> None:
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+        ]
+        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
+        report = build_report(components, resolved, skipped=0, removed=removed)
+        assert report["summary"]["removed"] == 1
+        assert report["summary"]["found"] == 1
+
+    def test_removed_entries_in_results(self) -> None:
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+        ]
+        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
+        report = build_report(components, resolved, skipped=0, removed=removed)
+        removed_results = [r for r in report["results"] if r["status"] == "removed"]
+        assert len(removed_results) == 1
+        assert removed_results[0]["purl"] == "pkg:pypi/b@2"
+        assert removed_results[0]["name"] == "b"
+        assert removed_results[0]["version"] == "2"
+
+    def test_no_removed_when_empty_list(self) -> None:
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+        ]
+        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        report = build_report(components, resolved, skipped=0, removed=[])
+        assert report["summary"]["removed"] == 0
+        assert all(r["status"] != "removed" for r in report["results"])
+
+    def test_no_removed_when_parameter_omitted(self) -> None:
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+        ]
+        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        report = build_report(components, resolved, skipped=0)
+        assert report["summary"]["removed"] == 0
