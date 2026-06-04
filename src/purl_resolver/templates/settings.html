@@ -122,6 +122,44 @@
             </div>
         </div>
 
+        <div class="card" style="margin-top:1rem;">
+            <div class="card-title">Libraries.io Resolver (optional)</div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Enable libraries.io resolver</div>
+                    <div class="setting-desc">
+                        When enabled, libraries.io is used as a fallback resolver
+                        when purl2repo cannot find a repository URL.
+                    </div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="librariesio-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">API Key</div>
+                    <div class="setting-desc">
+                        Optional API key for higher rate limits (60 req/min vs 10 req/min).
+                    </div>
+                    <div class="setting-desc" style="margin-top:0.25rem;">
+                        <a href="https://libraries.io/login" target="_blank" style="color:#2563eb;">
+                            Log in to libraries.io
+                        </a> → API Settings
+                    </div>
+                    <div id="librariesio-key-status" class="setting-desc" style="margin-top:0.5rem;">
+                        Status: <span id="librariesio-key-badge" style="font-weight:600;">not set</span>
+                        <button id="clear-librariesio-key-btn" class="btn-danger btn-small" style="margin-left:0.5rem;display:none;">Clear key</button>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <input type="password" id="librariesio-key-input"
+                           placeholder="libraries.io API key" style="width:240px;padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;">
+                </div>
+            </div>
+        </div>
+
         <button id="save-btn" style="margin-top:1rem;">Save</button>
         <div id="msg" class="msg"></div>
     </div>
@@ -134,6 +172,10 @@
         const saveBtn = document.getElementById("save-btn");
         const msgDiv = document.getElementById("msg");
         const clearTokenBtn = document.getElementById("clear-token-btn");
+        const lioToggle = document.getElementById("librariesio-toggle");
+        const lioKeyInput = document.getElementById("librariesio-key-input");
+        const lioBadge = document.getElementById("librariesio-key-badge");
+        const lioClearBtn = document.getElementById("clear-librariesio-key-btn");
 
         async function loadSettings() {
             try {
@@ -145,6 +187,10 @@
                 badge.textContent = data.token_set.github_token ? "set" : "not set";
                 badge.style.color = data.token_set.github_token ? "#166534" : "#991b1b";
                 clearTokenBtn.style.display = data.token_set.github_token ? "inline-block" : "none";
+                lioToggle.checked = data.librariesio_enabled;
+                lioBadge.textContent = data.token_set.librariesio_api_key ? "set" : "not set";
+                lioBadge.style.color = data.token_set.librariesio_api_key ? "#166534" : "#991b1b";
+                lioClearBtn.style.display = data.token_set.librariesio_api_key ? "inline-block" : "none";
             } catch {
                 showMessage("Failed to load settings", true);
             }
@@ -161,6 +207,10 @@
                 if (tokenInput.value.trim() !== "") {
                     body.github_token = tokenInput.value.trim();
                 }
+                body.librariesio_enabled = lioToggle.checked;
+                if (lioKeyInput.value.trim() !== "") {
+                    body.librariesio_api_key = lioKeyInput.value.trim();
+                }
                 const res = await fetch("/api/v1/settings", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -169,6 +219,7 @@
                 if (res.ok) {
                     showMessage("Settings saved", false);
                     tokenInput.value = "";
+                    lioKeyInput.value = "";
                     loadSettings();
                 } else {
                     const data = await res.json();
@@ -203,6 +254,28 @@
             }
         }
 
+        async function clearLibrariesIoKey() {
+            lioClearBtn.disabled = true;
+            try {
+                const res = await fetch("/api/v1/settings", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ librariesio_api_key: null }),
+                });
+                if (res.ok) {
+                    showMessage("Libraries.io key cleared", false);
+                    loadSettings();
+                } else {
+                    const data = await res.json();
+                    showMessage(data.message || "Failed to clear key", true);
+                }
+            } catch {
+                showMessage("Network error", true);
+            } finally {
+                lioClearBtn.disabled = false;
+            }
+        }
+
         function showMessage(text, isError) {
             msgDiv.textContent = text;
             msgDiv.className = "msg " + (isError ? "msg-err" : "msg-ok");
@@ -212,6 +285,7 @@
 
         saveBtn.addEventListener("click", saveSettings);
         clearTokenBtn.addEventListener("click", clearToken);
+        lioClearBtn.addEventListener("click", clearLibrariesIoKey);
         loadSettings();
     </script>
 </body>
