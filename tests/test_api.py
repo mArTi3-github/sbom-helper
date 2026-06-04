@@ -141,8 +141,8 @@ class TestResolve:
 
 
 class TestSettingsAPI:
-    def test_get_settings_masks_github_token(self, client: TestClient) -> None:
-        client.app.state.settings_store = SettingsStore(path="/tmp/test_settings_gh1.json")
+    def test_get_settings_masks_github_token(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings1.json")
         client.app.state.settings_store.save(AppSettings(github_token="ghp_secret"))
         response = client.get("/api/v1/settings")
         assert response.status_code == 200
@@ -150,16 +150,16 @@ class TestSettingsAPI:
         assert "github_token" not in data
         assert data["token_set"]["github_token"] is True
 
-    def test_get_settings_shows_token_not_set(self, client: TestClient) -> None:
-        client.app.state.settings_store = SettingsStore(path="/tmp/test_settings_gh2.json")
+    def test_get_settings_shows_token_not_set(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings2.json")
         client.app.state.settings_store.save(AppSettings())
         response = client.get("/api/v1/settings")
         assert response.status_code == 200
         data = response.json()
         assert data["token_set"]["github_token"] is False
 
-    def test_patch_settings_with_valid_token(self, client: TestClient) -> None:
-        client.app.state.settings_store = SettingsStore(path="/tmp/test_settings_gh3.json")
+    def test_patch_settings_with_valid_token(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings3.json")
         with patch("purl_resolver.router.validate_github_token", new_callable=AsyncMock, return_value=True):
             response = client.patch(
                 "/api/v1/settings",
@@ -169,8 +169,8 @@ class TestSettingsAPI:
         data = response.json()
         assert data["token_set"]["github_token"] is True
 
-    def test_patch_settings_with_invalid_token(self, client: TestClient) -> None:
-        client.app.state.settings_store = SettingsStore(path="/tmp/test_settings_gh4.json")
+    def test_patch_settings_with_invalid_token(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings4.json")
         with patch("purl_resolver.router.validate_github_token", new_callable=AsyncMock, return_value=False):
             response = client.patch(
                 "/api/v1/settings",
@@ -180,8 +180,8 @@ class TestSettingsAPI:
         data = response.json()
         assert data["error"] == "invalid_token"
 
-    def test_patch_settings_clears_token_with_empty_string(self, client: TestClient) -> None:
-        client.app.state.settings_store = SettingsStore(path="/tmp/test_settings_gh5.json")
+    def test_patch_settings_clears_token_with_empty_string(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings5.json")
         client.app.state.settings_store.save(AppSettings(github_token="ghp_old"))
         response = client.patch(
             "/api/v1/settings",
