@@ -14,7 +14,7 @@ Add a `LibrariesIoResolver` as a fallback resolver in the existing resolver chai
 2. **Used in enrichment**: libraries.io resolver participates in both single PURL resolution and SBOM file enrichment.
 3. **Optional**: Disabled by default. Enabled via checkbox + API key in the Settings page.
 4. **Graceful degradation**: Errors from libraries.io (timeouts, 429, 5xx, network failures) are logged as warnings and do not interrupt processing. The resolver returns `Resolution()` with no URL, allowing the chain to continue.
-5. **Custom rate limiter**: Minimum 1 second between requests, enforced via `asyncio.Semaphore` + timestamp tracking. libraries.io allows 60 req/min with an API key.
+5. **Custom rate limiter**: Minimum 1 second between requests, enforced via `time.monotonic()` + `time.sleep()`. libraries.io allows 60 req/min with an API key.
 6. **Key validation at save time**: The API key is validated via `GET https://libraries.io/api/platforms?api_key={key}` before saving. Network errors during validation do not block saving.
 
 ## Architecture
@@ -32,6 +32,10 @@ class LibrariesIoResolver(Resolver):
         'maven': 'Maven',
         'cargo': 'Cargo',
     }
+
+    @property
+    def name(self) -> str:
+        return "libraries.io"
 
     def __init__(self, api_key: str, timeout: float = 15.0):
         self._api_key = api_key
@@ -86,6 +90,49 @@ def validate_librariesio_key(api_key: str) -> bool:
     # 200 → valid, 401/403 → invalid, error → assume valid (don't block save)
 ```
 
+### Modified file: `src/purl_resolver/resolver/interface.py`
+
+Add `name` property to the `Resolver` ABC:
+
+```python
+class Resolver(ABC):
+
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    @abstractmethod
+    def resolve(self, purl: str) -> Resolution: ...
+```
+
+`Purl2RepoResolver.name` → `"purl2repo"`
+`LibrariesIoResolver.name` → `"libraries.io"`
+
+### Modified file: `src/purl_resolver/resolver/purl2repo.py`
+
+Add `name` property:
+
+```python
+class Purl2RepoResolver(Resolver):
+
+    @property
+    def name(self) -> str:
+        return "purl2repo"
+```
+
+### Modified file: `src/purl_resolver/service.py`
+
+In the resolver iteration loop (line 115), replace `resolver=resolver` with `resolver=r.name`:
+
+```python
+response = ResolveResponse(
+    ...
+    resolver=r.name,  # was: resolver=resolver
+)
+```
+
+This ensures the DB `resolver` field reflects which resolver actually found the result, not the caller-provided parameter. The `resolver` parameter from the router is retained for backward compatibility but `r.name` takes precedence.
+
 ### Modified file: `src/purl_resolver/main.py`
 
 In `lifespan()`:
@@ -110,9 +157,7 @@ New card «Libraries.io Resolver»:
 
 ### Unchanged files
 
-- `service.py` — resolver chain already iterates `resolvers` list; no changes needed
 - `sbom_enrichment.py` — uses `resolve_batch()` which works with the resolver list; no changes needed
-- `resolver/interface.py` — no changes needed
 
 ## Error Handling
 
