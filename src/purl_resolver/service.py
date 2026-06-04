@@ -55,7 +55,10 @@ async def resolve_purl(
                         )
                         if vresult == UrlValidationResult.TOKEN_INVALID:
                             logger.warning("GitHub token invalid, removing from settings")
-                            settings_store.save(app_settings.model_copy(update={"github_token": None}))
+                            try:
+                                settings_store.save(app_settings.model_copy(update={"github_token": None}))
+                            except Exception:
+                                logger.warning("Failed to persist token removal to settings", exc_info=True)
                             vresult = await validate_url(
                                 cached.repository_url,
                                 app_settings.url_validation_timeout,
