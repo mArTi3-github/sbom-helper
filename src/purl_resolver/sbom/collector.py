@@ -14,6 +14,7 @@ class SbomComponent:
     purl: str
     path: _COMPONENT_PATH
     needs_enrichment: bool
+    has_subcomponents: bool = False
     existing_references: list[dict] = field(default_factory=list)
 
 
@@ -40,6 +41,9 @@ def _collect(
         if not isinstance(existing, list):
             existing = []
 
+        nested = comp.get("components")
+        has_subs = isinstance(nested, list) and len(nested) > 0
+
         accumulator.append(
             SbomComponent(
                 name=comp.get("name", ""),
@@ -47,11 +51,11 @@ def _collect(
                 purl=purl,
                 path=current_path,
                 needs_enrichment=needs,
+                has_subcomponents=has_subs,
                 existing_references=list(existing),
             )
         )
 
-        nested = comp.get("components")
         if isinstance(nested, list):
             _collect(nested, (*current_path, "components"), accumulator)
 

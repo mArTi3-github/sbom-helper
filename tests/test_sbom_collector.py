@@ -169,3 +169,74 @@ class TestCollectComponents:
     def test_empty_components_array(self) -> None:
         result = collect_components({"components": []})
         assert result == []
+
+
+def test_has_subcomponents_true_when_nested_components_present() -> None:
+    sbom = {
+        "components": [
+            {
+                "type": "application",
+                "name": "app",
+                "version": "1.0",
+                "purl": "pkg:generic/app@1.0",
+                "components": [
+                    {
+                        "type": "library",
+                        "name": "sub",
+                        "version": "0.5",
+                        "purl": "pkg:pypi/sub@0.5",
+                    }
+                ],
+            }
+        ]
+    }
+    result = collect_components(sbom)
+    app = next(c for c in result if c.purl == "pkg:generic/app@1.0")
+    assert app.has_subcomponents is True
+
+
+def test_has_subcomponents_false_when_no_nested_components() -> None:
+    sbom = {
+        "components": [
+            {
+                "type": "library",
+                "name": "lib-a",
+                "version": "1.0",
+                "purl": "pkg:pypi/lib-a@1.0",
+            }
+        ]
+    }
+    result = collect_components(sbom)
+    assert result[0].has_subcomponents is False
+
+
+def test_has_subcomponents_false_when_empty_components_list() -> None:
+    sbom = {
+        "components": [
+            {
+                "type": "library",
+                "name": "lib-a",
+                "version": "1.0",
+                "purl": "pkg:pypi/lib-a@1.0",
+                "components": [],
+            }
+        ]
+    }
+    result = collect_components(sbom)
+    assert result[0].has_subcomponents is False
+
+
+def test_has_subcomponents_false_when_components_not_a_list() -> None:
+    sbom = {
+        "components": [
+            {
+                "type": "library",
+                "name": "lib-a",
+                "version": "1.0",
+                "purl": "pkg:pypi/lib-a@1.0",
+                "components": "not-a-list",
+            }
+        ]
+    }
+    result = collect_components(sbom)
+    assert result[0].has_subcomponents is False
