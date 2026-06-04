@@ -7,6 +7,7 @@ import pytest
 
 from purl_resolver.schemas import ResolveResponse, ResolveResult
 from purl_resolver.service import resolve_purl
+from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.url_validator import UrlValidationResult
 
 
@@ -125,3 +126,53 @@ class TestValidationIntegration:
         with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
             result = await resolve_purl("pkg:pypi/requests", mock_storage, [])
             mock_validate.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_resolve_purl_passes_token_to_validate_url():
+    storage = AsyncMock()
+    storage.lookup = AsyncMock(return_value=_cached_response(days_ago=3))
+    storage.store = AsyncMock()
+    settings_store = MagicMock(spec=SettingsStore)
+    settings_store.load.return_value = AppSettings(
+        validate_db_urls=True,
+        github_token="ghp_test123",
+    )
+    with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID) as mock_validate:
+        await resolve_purl(
+            purl="pkg:pypi/requests@2.31.0",
+            storage=storage,
+            resolvers=[],
+            settings_store=settings_store,
+        )
+        mock_validate.assert_called()
+        call_kwargs = mock_validate.call_args[1]
+        assert call_kwargs.get("github_token") == "ghp_test123"
+
+
+@pytest.mark.asyncio
+async def test_resolve_purl_handles_token_invalid():
+    storage = AsyncMock()
+    storage.lookup = AsyncMock(return_value=_cached_response(days_ago=3))
+    storage.store = AsyncMock()
+    storage.delete_purls = AsyncMock(return_value=1)
+    settings_store = MagicMock(spec=SettingsStore)
+    settings_store.load.return_value = AppSettings(
+        validate_db_urls=True,
+        github_token="ghp_invalid",
+    )
+    with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate, \
+         patch.object(settings_store, "save") as mock_save:
+        mock_validate.side_effect = [
+            UrlValidationResult.TOKEN_INVALID,
+            UrlValidationResult.VALID,
+        ]
+        await resolve_purl(
+            purl="pkg:pypi/requests@2.31.0",
+            storage=storage,
+            resolvers=[],
+            settings_store=settings_store,
+        )
+        mock_save.assert_called_once()
+        saved_settings = mock_save.call_args[0][0]
+        assert saved_settings.github_token is None

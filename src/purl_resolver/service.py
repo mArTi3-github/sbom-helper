@@ -47,10 +47,20 @@ async def resolve_purl(
                         except (ValueError, TypeError):
                             pass
                     if resolved_date != datetime.now().date():
+                        github_token = app_settings.github_token
                         vresult = await validate_url(
                             cached.repository_url,
                             app_settings.url_validation_timeout,
+                            github_token=github_token,
                         )
+                        if vresult == UrlValidationResult.TOKEN_INVALID:
+                            logger.warning("GitHub token invalid, removing from settings")
+                            settings_store.save(app_settings.model_copy(update={"github_token": None}))
+                            vresult = await validate_url(
+                                cached.repository_url,
+                                app_settings.url_validation_timeout,
+                                github_token=None,
+                            )
                         if vresult == UrlValidationResult.VALID:
                             try:
                                 await storage.store(cached)
