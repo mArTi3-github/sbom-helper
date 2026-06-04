@@ -96,6 +96,32 @@
             </div>
         </div>
 
+        <div class="card" style="margin-top:1rem;">
+            <div class="card-title">GitHub API Token</div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">GitHub Personal Access Token</div>
+                    <div class="setting-desc">
+                        Used for authenticated git ls-remote and HTTP requests.
+                        Increases rate limits from 60/hr to 5000/hr for API,
+                        and removes limits for git operations.
+                    </div>
+                    <div class="setting-desc" style="margin-top:0.25rem;">
+                        <a href="https://github.com/settings/tokens" target="_blank" style="color:#2563eb;">
+                            Generate token
+                        </a> → Settings → Developer settings → Personal access tokens → Fine-grained or classic
+                    </div>
+                    <div id="token-status" class="setting-desc" style="margin-top:0.5rem;">
+                        Status: <span id="token-badge" style="font-weight:600;">not set</span>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <input type="password" id="token-input"
+                           placeholder="ghp_..." style="width:240px;padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;">
+                </div>
+            </div>
+        </div>
+
         <button id="save-btn">Save</button>
         <div id="msg" class="msg"></div>
     </div>
@@ -114,6 +140,9 @@
                 const data = await res.json();
                 toggle.checked = data.validate_db_urls;
                 timeoutInput.value = data.url_validation_timeout;
+                const badge = document.getElementById("token-badge");
+                badge.textContent = data.token_set.github_token ? "set" : "not set";
+                badge.style.color = data.token_set.github_token ? "#166534" : "#991b1b";
             } catch {
                 showMessage("Failed to load settings", true);
             }
@@ -122,18 +151,26 @@
         async function saveSettings() {
             saveBtn.disabled = true;
             try {
+                const body = {
+                    validate_db_urls: toggle.checked,
+                    url_validation_timeout: parseInt(timeoutInput.value, 10),
+                };
+                const tokenInput = document.getElementById("token-input");
+                if (tokenInput.value.trim() !== "") {
+                    body.github_token = tokenInput.value.trim();
+                }
                 const res = await fetch("/api/v1/settings", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        validate_db_urls: toggle.checked,
-                        url_validation_timeout: parseInt(timeoutInput.value, 10),
-                    }),
+                    body: JSON.stringify(body),
                 });
                 if (res.ok) {
                     showMessage("Settings saved", false);
+                    tokenInput.value = "";
+                    loadSettings();
                 } else {
-                    showMessage("Failed to save settings", true);
+                    const data = await res.json();
+                    showMessage(data.message || "Failed to save settings", true);
                 }
             } catch {
                 showMessage("Network error", true);
