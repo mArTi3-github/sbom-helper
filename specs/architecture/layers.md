@@ -81,8 +81,10 @@
 |  |  url_validator.py           |                   |
 |  |                             |                   |
 |  |  validate_url()             |                   |
+|  |  validate_github_token()    |                   |
 |  |  HEAD + git ls-remote       |                   |
 |  |  Rate limit mitigation      |                   |
+|  |  Token authentication       |                   |
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
@@ -173,7 +175,7 @@
 
 ### Service Layer (`service.py`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver call → storage store; accepts optional `resolver` parameter to tag stored records with their origin
-- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + git ls-remote; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today
+- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + git ls-remote with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today; remove invalid tokens from settings automatically
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; accepts optional `settings_store` for URL validation; accepts optional `resolver` parameter passed through to `resolve_purl`
 - SBOM enrichment flow (`process_sbom`): accept parsed SBOM dict + components + resolved map → call `enricher.enrich_sbom()` → call `reporter.build_report()` → return combined report
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `storage.store()`; accepts optional `resolver` parameter to tag stored records with their origin
@@ -232,7 +234,7 @@
 - `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater, DB-admin, and Settings pages
 - `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download; navigation link to PURL resolver, DB-admin, and Settings pages
 - `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export (semicolon delimiter, BOM handling), bulk delete; column visibility controls; navigation link to PURL resolver, SBOM-updater, and Settings pages
-- `settings.html` — settings page: URL validation toggle, timeout configuration; loads settings via `GET /api/v1/settings`, saves via `PATCH /api/v1/settings`; navigation link to all other pages
+- `settings.html` — settings page: URL validation toggle, timeout configuration, GitHub token management (set/clear); loads settings via `GET /api/v1/settings`, saves via `PATCH /api/v1/settings`; navigation link to all other pages
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence

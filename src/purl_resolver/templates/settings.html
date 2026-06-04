@@ -46,12 +46,11 @@
             border-radius: 6px; font-size: 0.9rem; text-align: center;
         }
         input[type="number"]:focus { outline: none; border-color: #2563eb; }
-        button {
-            padding: 0.75rem 1.5rem; background: #2563eb; color: #fff;
-            border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;
-            margin-top: 1rem;
-        }
+        button { padding: 0.75rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
         button:hover { background: #1d4ed8; }
+        .btn-danger { background: #dc2626; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-small { padding: 0.4rem 0.8rem; font-size: 0.85rem; margin-top: 0; }
         .msg { margin-top: 0.75rem; padding: 0.75rem; border-radius: 6px; display: none; }
         .msg-ok { background: #dcfce7; color: #166534; }
         .msg-err { background: #fee2e2; color: #991b1b; }
@@ -97,7 +96,7 @@
         </div>
 
         <div class="card" style="margin-top:1rem;">
-            <div class="card-title">GitHub API Token</div>
+            <div class="card-title">GitHub API Token (optional)</div>
             <div class="setting-row">
                 <div>
                     <div class="setting-label">GitHub Personal Access Token</div>
@@ -113,6 +112,7 @@
                     </div>
                     <div id="token-status" class="setting-desc" style="margin-top:0.5rem;">
                         Status: <span id="token-badge" style="font-weight:600;">not set</span>
+                        <button id="clear-token-btn" class="btn-danger btn-small" style="margin-left:0.5rem;display:none;">Clear token</button>
                     </div>
                 </div>
                 <div style="text-align:right;">
@@ -122,7 +122,7 @@
             </div>
         </div>
 
-        <button id="save-btn">Save</button>
+        <button id="save-btn" style="margin-top:1rem;">Save</button>
         <div id="msg" class="msg"></div>
     </div>
 
@@ -133,6 +133,7 @@
         const timeoutInput = document.getElementById("timeout-input");
         const saveBtn = document.getElementById("save-btn");
         const msgDiv = document.getElementById("msg");
+        const clearTokenBtn = document.getElementById("clear-token-btn");
 
         async function loadSettings() {
             try {
@@ -143,6 +144,7 @@
                 const badge = document.getElementById("token-badge");
                 badge.textContent = data.token_set.github_token ? "set" : "not set";
                 badge.style.color = data.token_set.github_token ? "#166534" : "#991b1b";
+                clearTokenBtn.style.display = data.token_set.github_token ? "inline-block" : "none";
             } catch {
                 showMessage("Failed to load settings", true);
             }
@@ -179,6 +181,28 @@
             }
         }
 
+        async function clearToken() {
+            clearTokenBtn.disabled = true;
+            try {
+                const res = await fetch("/api/v1/settings", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ github_token: null }),
+                });
+                if (res.ok) {
+                    showMessage("Token cleared", false);
+                    loadSettings();
+                } else {
+                    const data = await res.json();
+                    showMessage(data.message || "Failed to clear token", true);
+                }
+            } catch {
+                showMessage("Network error", true);
+            } finally {
+                clearTokenBtn.disabled = false;
+            }
+        }
+
         function showMessage(text, isError) {
             msgDiv.textContent = text;
             msgDiv.className = "msg " + (isError ? "msg-err" : "msg-ok");
@@ -187,6 +211,7 @@
         }
 
         saveBtn.addEventListener("click", saveSettings);
+        clearTokenBtn.addEventListener("click", clearToken);
         loadSettings();
     </script>
 </body>

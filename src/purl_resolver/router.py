@@ -322,8 +322,10 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
 
     if "github_token" in update_data:
         token_value = update_data["github_token"]
-        if token_value == "" or token_value is None:
-            update_data["github_token"] = None
+        if token_value is None:
+            pass
+        elif token_value == "":
+            del update_data["github_token"]
         else:
             is_valid = await validate_github_token(token_value)
             if not is_valid:

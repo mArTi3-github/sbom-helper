@@ -180,12 +180,23 @@ class TestSettingsAPI:
         data = response.json()
         assert data["error"] == "invalid_token"
 
-    def test_patch_settings_clears_token_with_empty_string(self, client: TestClient, tmp_path) -> None:
+    def test_patch_empty_string_does_not_clear_token(self, client: TestClient, tmp_path) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings5.json")
         client.app.state.settings_store.save(AppSettings(github_token="ghp_old"))
         response = client.patch(
             "/api/v1/settings",
             json={"github_token": ""},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["token_set"]["github_token"] is True
+
+    def test_patch_null_clears_token(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings6.json")
+        client.app.state.settings_store.save(AppSettings(github_token="ghp_old"))
+        response = client.patch(
+            "/api/v1/settings",
+            json={"github_token": None},
         )
         assert response.status_code == 200
         data = response.json()

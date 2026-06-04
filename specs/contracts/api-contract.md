@@ -308,7 +308,7 @@ Partially update application settings.
 
 Both fields optional. Only provided fields are updated.
 
-- `github_token`: optional string — GitHub Personal Access Token. Empty string or null clears the token. Invalid tokens are rejected with `400 invalid_token`.
+- `github_token`: optional string — GitHub Personal Access Token. Set to `null` to clear the token. Empty string is ignored. Invalid tokens are rejected with `400 invalid_token`.
 
 #### Response (200)
 
@@ -348,6 +348,7 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 | PURL not found on PATCH | 404 | `not_found` |
 | Invalid CSV (missing columns, wrong format) | 400 | `invalid_csv` |
 | CSV too large | 413 | `file_too_large` |
+| Invalid GitHub token on settings save | 400 | `invalid_token` |
 
 ## Breaking Change Checklist
 
