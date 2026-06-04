@@ -103,6 +103,7 @@ User                   Browser                    API Layer
 - Settings page is accessible at `/settings` with a nav-bar link on all pages
 - Toggle switch controls `validate_db_urls` (URL validation from local database)
 - Number input controls `url_validation_timeout` (1–60 seconds)
+- Libraries.io Resolver card: enable toggle, API key input, status badge, clear button
 - Settings are loaded from `GET /api/v1/settings` on page load
 - Settings are saved via `PATCH /api/v1/settings` on button click
 - Success/error feedback is shown after save attempt

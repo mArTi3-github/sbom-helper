@@ -11,6 +11,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
 - `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions) and purl2repo wrapper
+- `src/purl_resolver/resolver/librariesio.py` — `LibrariesIoResolver`: fallback resolver using libraries.io API, optional (settings-controlled), supports: nuget, npm, pypi, gem, golang, maven, cargo
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
 - `src/purl_resolver/sbom/parser.py` — CycloneDX SBOM validation and parsing
