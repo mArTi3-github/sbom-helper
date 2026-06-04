@@ -19,6 +19,7 @@ class UrlValidationResult(Enum):
     INVALID = "invalid"
     NETWORK_ERROR = "network_error"
     RATE_LIMITED = "rate_limited"
+    TOKEN_INVALID = "token_invalid"
 
 
 class _RateLimitTracker:

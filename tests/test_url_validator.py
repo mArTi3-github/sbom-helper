@@ -112,3 +112,8 @@ class TestValidateUrl:
         _RateLimitTracker._cooldown_until = time.time() + 60
         result = await validate_url("https://github.com/psf/requests", timeout=5)
         assert result == UrlValidationResult.VALID
+
+
+class TestTokenInvalidResult:
+    def test_token_invalid_is_enum_value(self):
+        assert UrlValidationResult.TOKEN_INVALID.value == "token_invalid"
