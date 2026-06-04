@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -10,9 +11,18 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ServiceTokens:
+    github_token: str | None = None
+
+
 class AppSettings(BaseModel):
     validate_db_urls: bool = False
     url_validation_timeout: int = Field(default=5, ge=1, le=60)
+    github_token: str | None = None
+
+    def service_tokens(self) -> ServiceTokens:
+        return ServiceTokens(github_token=self.github_token)
 
 
 class SettingsStore:
