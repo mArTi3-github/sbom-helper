@@ -20,6 +20,8 @@ class AppSettings(BaseModel):
     validate_db_urls: bool = False
     url_validation_timeout: int = Field(default=5, ge=1, le=60)
     github_token: str | None = None
+    librariesio_enabled: bool = False
+    librariesio_api_key: str | None = None
 
     def service_tokens(self) -> ServiceTokens:
         return ServiceTokens(github_token=self.github_token)

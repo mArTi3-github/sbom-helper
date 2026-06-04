@@ -93,3 +93,37 @@ class TestAppSettingsServiceTokens:
         store.save(original)
         loaded = store.load()
         assert loaded.github_token == "ghp_test123"
+
+
+class TestLibrariesIoSettings:
+    def test_default_librariesio_disabled(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        settings = store.load()
+        assert settings.librariesio_enabled is False
+        assert settings.librariesio_api_key is None
+
+    def test_save_and_load_librariesio_settings(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        settings = store.load()
+        updated = settings.model_copy(update={
+            "librariesio_enabled": True,
+            "librariesio_api_key": "test_key_123",
+        })
+        store.save(updated)
+
+        loaded = store.load()
+        assert loaded.librariesio_enabled is True
+        assert loaded.librariesio_api_key == "test_key_123"
+
+    def test_clear_librariesio_key(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        settings = store.load()
+        with_key = settings.model_copy(update={"librariesio_api_key": "key"})
+        store.save(with_key)
+
+        loaded = store.load()
+        cleared = loaded.model_copy(update={"librariesio_api_key": None})
+        store.save(cleared)
+
+        final = store.load()
+        assert final.librariesio_api_key is None
