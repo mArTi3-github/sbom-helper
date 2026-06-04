@@ -12,6 +12,7 @@ def build_report(
 ) -> dict:
     if removed is None:
         removed = []
+    removed_keys = {safe_normalize(r["purl"]) for r in removed}
     seen: set[str] = set()
     results: list[dict] = []
     found_count = 0
@@ -24,6 +25,8 @@ def build_report(
         if key in seen:
             continue
         seen.add(key)
+        if key in removed_keys:
+            continue
         repo_url = resolved.get(key)
         if repo_url is not None:
             found_count += 1
