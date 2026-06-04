@@ -29,15 +29,31 @@ from .sbom_enrichment import SbomEnrichmentPipeline
 from .sbom.parser import SbomParseError
 from .settings_store import SettingsStore, AppSettings
 from .url_validator import validate_github_token
+import httpx
 from .csv_io import parse_csv_import, render_csv_export
 from .storage.interface import PurlFilters
 
 logger = logging.getLogger(__name__)
 
+
+def validate_librariesio_key(api_key: str) -> bool:
+    try:
+        response = httpx.get(
+            "https://libraries.io/api/platforms",
+            params={"api_key": api_key},
+            timeout=10.0,
+        )
+        return response.status_code == 200
+    except httpx.HTTPError:
+        return True
+
+
 class SettingsUpdate(BaseModel):
     validate_db_urls: bool | None = None
     url_validation_timeout: int | None = Field(None, ge=1, le=60)
     github_token: str | None = None
+    librariesio_enabled: bool | None = None
+    librariesio_api_key: str | None = None
 
 
 router = APIRouter()
@@ -301,6 +317,30 @@ async def db_admin_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="db-admin.html")
 
 
+def _rebuild_resolvers(request: Request) -> None:
+    store: SettingsStore = request.app.state.settings_store
+    app_settings = store.load()
+
+    from .resolver.purl2repo import Purl2RepoResolver
+    from .resolver.librariesio import LibrariesIoResolver
+    from .config import settings
+
+    resolvers = [
+        Purl2RepoResolver(
+            timeout=settings.timeout,
+            use_cache=settings.use_cache,
+            strict=settings.strict,
+            no_network=settings.no_network,
+            cache_dir=settings.cache_dir,
+        ),
+    ]
+    if app_settings.librariesio_enabled and app_settings.librariesio_api_key:
+        resolvers.append(
+            LibrariesIoResolver(api_key=app_settings.librariesio_api_key)
+        )
+    request.app.state.resolvers = resolvers
+
+
 @router.get("/api/v1/settings")
 async def get_settings(request: Request) -> JSONResponse:
     store: SettingsStore = request.app.state.settings_store
@@ -308,8 +348,10 @@ async def get_settings(request: Request) -> JSONResponse:
     return JSONResponse(content={
         "validate_db_urls": settings.validate_db_urls,
         "url_validation_timeout": settings.url_validation_timeout,
+        "librariesio_enabled": settings.librariesio_enabled,
         "token_set": {
             "github_token": settings.github_token is not None,
+            "librariesio_api_key": settings.librariesio_api_key is not None,
         },
     })
 
@@ -334,16 +376,33 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
                     content={"error": "invalid_token", "message": "GitHub token is invalid or expired"},
                 )
 
+    if "librariesio_api_key" in update_data:
+        key_value = update_data["librariesio_api_key"]
+        if key_value is None:
+            pass
+        elif key_value == "":
+            del update_data["librariesio_api_key"]
+        else:
+            if not validate_librariesio_key(key_value):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "invalid_token", "message": "Libraries.io API key is invalid"},
+                )
+
     if update_data:
         updated = current.model_copy(update=update_data)
         store.save(updated)
     else:
         updated = current
 
+    _rebuild_resolvers(request)
+
     return JSONResponse(content={
         "validate_db_urls": updated.validate_db_urls,
         "url_validation_timeout": updated.url_validation_timeout,
+        "librariesio_enabled": updated.librariesio_enabled,
         "token_set": {
             "github_token": updated.github_token is not None,
+            "librariesio_api_key": updated.librariesio_api_key is not None,
         },
     })

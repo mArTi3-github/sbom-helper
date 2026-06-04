@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -201,3 +203,54 @@ class TestSettingsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["token_set"]["github_token"] is False
+
+
+class TestLibrariesIoSettings:
+    def test_get_settings_includes_librariesio(self, client: TestClient) -> None:
+        response = client.get("/api/v1/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert "librariesio_enabled" in data
+        assert "token_set" in data
+        assert "librariesio_api_key" in data["token_set"]
+
+    def test_patch_settings_enable_librariesio(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        response = client.patch("/api/v1/settings", json={
+            "librariesio_enabled": True,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["librariesio_enabled"] is True
+
+    def test_patch_settings_with_valid_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        with patch("purl_resolver.router.validate_librariesio_key", return_value=True):
+            response = client.patch("/api/v1/settings", json={
+                "librariesio_api_key": "lib_test_key",
+            })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["token_set"]["librariesio_api_key"] is True
+
+    def test_patch_settings_with_invalid_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        with patch("purl_resolver.router.validate_librariesio_key", return_value=False):
+            response = client.patch("/api/v1/settings", json={
+                "librariesio_api_key": "invalid_key",
+            })
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "invalid_token"
+
+    def test_patch_settings_clear_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        client.app.state.settings_store.save(
+            client.app.state.settings_store.load().model_copy(update={"librariesio_api_key": "key"})
+        )
+        response = client.patch("/api/v1/settings", json={
+            "librariesio_api_key": None,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["token_set"]["librariesio_api_key"] is False
