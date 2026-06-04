@@ -8,6 +8,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from .config import settings, storage_settings
+from .resolver.librariesio import LibrariesIoResolver
 from .settings_store import SettingsStore
 from .resolver.purl2repo import Purl2RepoResolver
 from .router import router
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
             "PostgreSQL unavailable, falling back to in-memory cache", exc_info=True
         )
         app.state.storage = InMemoryCache()
+    app.state.settings_store = SettingsStore()
+
     app.state.resolvers = [
         Purl2RepoResolver(
             timeout=settings.timeout,
@@ -38,8 +41,14 @@ async def lifespan(app: FastAPI):
             cache_dir=settings.cache_dir,
         ),
     ]
+
+    app_settings = app.state.settings_store.load()
+    if app_settings.librariesio_enabled and app_settings.librariesio_api_key:
+        app.state.resolvers.append(
+            LibrariesIoResolver(api_key=app_settings.librariesio_api_key)
+        )
+
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
-    app.state.settings_store = SettingsStore()
     yield
     if pool is not None:
         await pool.close()
