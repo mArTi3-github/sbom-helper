@@ -41,7 +41,7 @@ class TestRemoveUnresolvedComponents:
         assert len(removed) == 1
         assert removed[0]["purl"] == "pkg:pypi/b@2.0"
 
-    def test_keeps_unresolved_with_subcomponents(self) -> None:
+    def test_keeps_parent_with_subcomponents_removes_child(self) -> None:
         sbom = {
             "components": [
                 {
@@ -63,7 +63,8 @@ class TestRemoveUnresolvedComponents:
         removed = remove_unresolved_components(sbom, components, resolved)
         assert len(sbom["components"]) == 1
         assert sbom["components"][0]["name"] == "parent"
-        assert len(removed) == 0
+        assert len(removed) == 1
+        assert removed[0]["purl"] == "pkg:pypi/child@1.0"
 
     def test_removes_child_but_keeps_parent_with_subcomponents(self) -> None:
         sbom = {
