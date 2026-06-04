@@ -203,6 +203,7 @@ class TestValidateGithubToken:
 
     @pytest.mark.asyncio
     async def test_network_error_returns_false(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+            mock_head.side_effect = Exception("Connection refused")
             result = await validate_github_token("ghp_test")
             assert result is False
