@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-from urllib.parse import quote
-
 import httpx
 
 from ..purl_utils import PurlValidationError, validate
@@ -46,7 +44,7 @@ class EcosystemsResolver(Resolver):
 
     def resolve(self, purl: str) -> Resolution:
         try:
-            components = validate(purl)
+            validate(purl)
         except PurlValidationError as e:
             return Resolution(purl=purl, warnings=[f"Invalid PURL: {e}"])
 
@@ -69,7 +67,7 @@ class EcosystemsResolver(Resolver):
             return Resolution(purl=purl, warnings=[f"ecosyste.ms network error for {purl}: {exc}"])
 
         data = response.json()
-        if not data:
+        if not isinstance(data, list) or not data:
             return Resolution(purl=purl, warnings=[f"No package found on ecosyste.ms for {purl}"])
 
         package = data[0]
