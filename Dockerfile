@@ -8,9 +8,10 @@ RUN apt-get update && \
 
 COPY pyproject.toml ./
 COPY src/ ./src/
-COPY scripts/ ./scripts/
 
 RUN pip install --no-cache-dir -e ".[dev]"
+
+COPY scripts/ ./scripts/
 RUN bash scripts/generate-ssl-cert.sh
 
 EXPOSE 8443
@@ -32,11 +33,11 @@ RUN apt-get update && \
 
 COPY pyproject.toml ./
 COPY src/ ./src/
-COPY scripts/ ./scripts/
 
 RUN pip install --no-cache-dir . && \
     rm -rf /root/.cache
 
+COPY scripts/ ./scripts/
 RUN bash scripts/generate-ssl-cert.sh && \
     chown -R app:app /app
 
