@@ -65,6 +65,7 @@
 |  |  Resolver (ABC)             |                   |
 |  |  Resolution dataclass       |                   |
 |  |  Purl2RepoResolver          |                   |
+|  |  LibrariesIoResolver        |                   |
 |  |  (future: LLM, purl2src)   |                   |
 |  +----+------------------------+                   |
 |       |                                            |
@@ -148,13 +149,14 @@
 - **API Layer** imports **Service Layer** (`service.py`) and **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) — but not vice versa
 - **API Layer** imports **csv_io** module for CSV parsing/rendering
 - **API Layer** imports **Config Layer** (settings)
+- **API Layer** imports **Resolver Layer** for `_rebuild_resolvers()` helper (reconstructs resolver list on settings change)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use; accepts optional `settings_store` parameter for URL validation; accepts optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`service.py`), **SBOM Module** (`sbom/`), **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`); receives dependencies via constructor injection
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
-- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC, `Resolution` dataclass, and resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`). `Purl2RepoResolver` wraps the purl2repo library.
-- **Resolver Layer** imports purl2repo; internal project code does NOT import purl2repo directly
+- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, and resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`). `Purl2RepoResolver` wraps the purl2repo library. `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation.
+- **Resolver Layer** imports purl2repo, httpx, and `purl_utils`; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
 - **Web UI Layer** is served by the API Layer and communicates via HTTP (fetch → API Layer)
@@ -169,17 +171,17 @@
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
 - Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
-- Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`)
+- Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()`
 - Handle error responses from Service Layer and Pipeline
 - Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`, `db-admin.html`, `settings.html`)
 
 ### Service Layer (`service.py`)
-- Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver call → storage store; accepts optional `resolver` parameter to tag stored records with their origin
+- Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver chain (iterates resolvers, first success wins) → storage store; uses `resolver.name` property to tag stored records with the actual resolver identifier (e.g. `"purl2repo"`, `"libraries.io"`)
 - URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + git ls-remote with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today; remove invalid tokens from settings automatically
-- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; accepts optional `settings_store` for URL validation; accepts optional `resolver` parameter passed through to `resolve_purl`
+- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; accepts optional `settings_store` for URL validation
 - SBOM enrichment flow (`process_sbom`): accept parsed SBOM dict + components + resolved map → call `enricher.enrich_sbom()` → call `reporter.build_report()` → return combined report
-- Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `storage.store()`; accepts optional `resolver` parameter to tag stored records with their origin
-- Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format
+- Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `storage.store()`
+- Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format; tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
 
@@ -222,7 +224,7 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token)
+- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
 - `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60)
 - `ServiceTokens` dataclass for extracting API tokens from settings (extensible for future services)
@@ -234,7 +236,7 @@
 - `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater, DB-admin, and Settings pages
 - `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download; navigation link to PURL resolver, DB-admin, and Settings pages
 - `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export (semicolon delimiter, BOM handling), bulk delete; column visibility controls; navigation link to PURL resolver, SBOM-updater, and Settings pages
-- `settings.html` — settings page: URL validation toggle, timeout configuration, GitHub token management (set/clear); loads settings via `GET /api/v1/settings`, saves via `PATCH /api/v1/settings`; navigation link to all other pages
+- `settings.html` — settings page: URL validation toggle, timeout configuration, GitHub token management (set/clear), Libraries.io resolver card (enable toggle, API key input, status badge, clear button); loads settings via `GET /api/v1/settings`, saves via `PATCH /api/v1/settings`; navigation link to all other pages
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence
@@ -242,8 +244,9 @@
 - Our code does not import or modify purl2repo directly
 
 ### Resolver Layer (`resolver/`)
-- **interface.py** — `Resolver(ABC)` with `resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `repository_type`, `repository_kind`, `confidence`, `evidence`, `warnings`, `version_reference`
-- **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
+- **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"libraries.io"`) and `resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `repository_type`, `repository_kind`, `confidence`, `evidence`, `warnings`, `version_reference`
+- **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
+- **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms (cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift); rate-limited (1 req/sec via `time.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.Client` (synchronous) and `purl_utils.validate()` for PURL parsing
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 
 ## Anti-Patterns

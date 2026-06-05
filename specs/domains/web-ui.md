@@ -9,7 +9,7 @@ Four browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `src/purl_resolver/templates/index.html` — PURL resolver page: structure, styles, and logic
 - `src/purl_resolver/templates/sbom.html` — SBOM-updater page: file upload form, results table, download button
 - `src/purl_resolver/templates/db-admin.html` — database administration page: filterable table with pagination, inline editing, CSV import/export, bulk delete
-- `src/purl_resolver/templates/settings.html` — settings page: URL validation toggle and timeout configuration
+- `src/purl_resolver/templates/settings.html` — settings page: URL validation toggle and timeout, GitHub token management (set/clear), Libraries.io resolver card (enable toggle, API key input, status badge, clear button)
 - `src/purl_resolver/router.py` — Serves templates at `GET /`, `GET /sbom-updater`, `GET /db-admin`, and `GET /settings`
 
 ## Flows
@@ -101,9 +101,9 @@ User                   Browser                    API Layer
 ### Settings Page
 
 - Settings page is accessible at `/settings` with a nav-bar link on all pages
-- Toggle switch controls `validate_db_urls` (URL validation from local database)
-- Number input controls `url_validation_timeout` (1–60 seconds)
-- Libraries.io Resolver card: enable toggle, API key input, status badge, clear button
+- URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds)
+- GitHub API Token card: password input for GitHub PAT, status badge (set/not set), clear button, link to token generation
+- Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
 - Settings are loaded from `GET /api/v1/settings` on page load
 - Settings are saved via `PATCH /api/v1/settings` on button click
 - Success/error feedback is shown after save attempt

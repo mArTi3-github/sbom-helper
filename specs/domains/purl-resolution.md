@@ -2,7 +2,7 @@
 
 ## Description
 
-Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with confidence, evidence, and metadata. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the purl2repo library, storing successful results for future lookups.
+Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with confidence, evidence, and metadata. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo first, then optionally libraries.io as fallback), storing successful results for future lookups.
 
 ## Key Files
 
@@ -133,7 +133,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationResult`, never raises exceptions
-- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` for single PURL resolution, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
+- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **SBOM enrichment uses resolver="import-sbom"**: both `resolve_batch()` and `store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
 - **CSV import uses resolver="import-csv"**: when the `resolver` column is absent from the imported CSV, the value `"import-csv"` is used as default
 - **SBOM enrichment enriches before removing**: `enrich_sbom()` is called before `remove_unresolved_components()` to avoid stale component paths after in-place removal
@@ -163,3 +163,5 @@ Client                    API Layer (router)         Service Layer             p
 | `validate_db_urls` | `false` | Enable URL validation for cached repository URLs |
 | `url_validation_timeout` | `5` | Timeout in seconds for HEAD and git ls-remote checks (1–60) |
 | `github_token` | `null` | GitHub Personal Access Token for authenticated requests (git ls-remote, HTTP HEAD) |
+| `librariesio_enabled` | `false` | Enable libraries.io as a fallback resolver after purl2repo |
+| `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
