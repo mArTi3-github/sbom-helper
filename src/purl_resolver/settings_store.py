@@ -22,6 +22,8 @@ class AppSettings(BaseModel):
     github_token: str | None = None
     librariesio_enabled: bool = False
     librariesio_api_key: str | None = None
+    ecosystems_enabled: bool = True
+    ecosystems_api_key: str | None = None
 
     def service_tokens(self) -> ServiceTokens:
         return ServiceTokens(github_token=self.github_token)
