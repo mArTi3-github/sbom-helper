@@ -54,6 +54,8 @@ class SettingsUpdate(BaseModel):
     github_token: str | None = None
     librariesio_enabled: bool | None = None
     librariesio_api_key: str | None = None
+    ecosystems_enabled: bool | None = None
+    ecosystems_api_key: str | None = None
 
 
 router = APIRouter()
@@ -322,6 +324,7 @@ def _rebuild_resolvers(request: Request) -> None:
     app_settings = store.load()
 
     from .resolver.purl2repo import Purl2RepoResolver
+    from .resolver.ecosystems import EcosystemsResolver
     from .resolver.librariesio import LibrariesIoResolver
     from .config import settings
 
@@ -334,6 +337,10 @@ def _rebuild_resolvers(request: Request) -> None:
             cache_dir=settings.cache_dir,
         ),
     ]
+    if app_settings.ecosystems_enabled:
+        resolvers.append(
+            EcosystemsResolver(api_key=app_settings.ecosystems_api_key)
+        )
     if app_settings.librariesio_enabled and app_settings.librariesio_api_key:
         resolvers.append(
             LibrariesIoResolver(api_key=app_settings.librariesio_api_key)
@@ -349,9 +356,11 @@ async def get_settings(request: Request) -> JSONResponse:
         "validate_db_urls": settings.validate_db_urls,
         "url_validation_timeout": settings.url_validation_timeout,
         "librariesio_enabled": settings.librariesio_enabled,
+        "ecosystems_enabled": settings.ecosystems_enabled,
         "token_set": {
             "github_token": settings.github_token is not None,
             "librariesio_api_key": settings.librariesio_api_key is not None,
+            "ecosystems_api_key": settings.ecosystems_api_key is not None,
         },
     })
 
@@ -401,8 +410,10 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "validate_db_urls": updated.validate_db_urls,
         "url_validation_timeout": updated.url_validation_timeout,
         "librariesio_enabled": updated.librariesio_enabled,
+        "ecosystems_enabled": updated.ecosystems_enabled,
         "token_set": {
             "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,
+            "ecosystems_api_key": updated.ecosystems_api_key is not None,
         },
     })
