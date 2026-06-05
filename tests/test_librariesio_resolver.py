@@ -57,10 +57,7 @@ class TestResolveSuccess:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "name": "requests",
-            "repository": {
-                "url": "https://github.com/psf/requests",
-                "homepage": "https://requests.readthedocs.io",
-            },
+            "repository_url": "https://github.com/psf/requests",
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -83,7 +80,7 @@ class TestResolveNoRepository:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "name": "some-package",
-            "repository": None,
+            "repository_url": "",
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -94,6 +91,25 @@ class TestResolveNoRepository:
         r._client = mock_client
 
         result = r.resolve("pkg:pypi/some-package")
+        assert result.repository_url is None
+        assert any("no repository" in w.lower() for w in result.warnings)
+
+    def test_cran_package_without_repository(self) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "name": "sleev",
+            "repository_url": "",
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_client.get.return_value = mock_response
+
+        r = LibrariesIoResolver(api_key="test_key")
+        r._client = mock_client
+
+        result = r.resolve("pkg:cran/sleev@1.1.1")
         assert result.repository_url is None
         assert any("no repository" in w.lower() for w in result.warnings)
 
@@ -160,7 +176,7 @@ class TestRateLimiting:
     def test_minimum_interval_between_requests(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"name": "pkg", "repository": {"url": "https://example.com"}}
+        mock_response.json.return_value = {"name": "pkg", "repository_url": "https://example.com"}
         mock_response.raise_for_status = MagicMock()
 
         mock_client = MagicMock(spec=httpx.Client)

@@ -17,13 +17,22 @@ _API_BASE = "https://libraries.io/api"
 class LibrariesIoResolver(Resolver):
 
     ECOSYSTEM_MAP: dict[str, str] = {
-        "nuget": "NuGet",
-        "npm": "NPM",
-        "pypi": "PyPI",
-        "gem": "RubyGems",
-        "golang": "Go",
-        "maven": "Maven",
         "cargo": "Cargo",
+        "composer": "Packagist",
+        "conda": "Conda",
+        "cpan": "CPAN",
+        "cran": "CRAN",
+        "gem": "RubyGems",
+        "generic": "GitHub",
+        "golang": "Go",
+        "hackage": "Hackage",
+        "hex": "Hex",
+        "maven": "Maven",
+        "npm": "NPM",
+        "nuget": "NuGet",
+        "pub": "Pub",
+        "pypi": "PyPI",
+        "swift": "SwiftPM",
     }
 
     def __init__(self, api_key: str, timeout: float = 15.0) -> None:
@@ -70,13 +79,9 @@ class LibrariesIoResolver(Resolver):
             return Resolution(purl=purl, warnings=[f"libraries.io network error for {platform}/{name}: {exc}"])
 
         data = response.json()
-        repo = data.get("repository")
-        if repo is None or not isinstance(repo, dict):
-            return Resolution(purl=purl, warnings=[f"No repository found on libraries.io for {platform}/{name}"])
-
-        repo_url = repo.get("url")
+        repo_url = data.get("repository_url", "")
         if not repo_url:
-            return Resolution(purl=purl, warnings=[f"Empty repository URL on libraries.io for {platform}/{name}"])
+            return Resolution(purl=purl, warnings=[f"No repository found on libraries.io for {platform}/{name}"])
 
         return Resolution(
             purl=purl,

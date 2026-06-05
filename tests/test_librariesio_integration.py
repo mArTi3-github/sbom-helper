@@ -26,7 +26,7 @@ class TestResolverChain:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "name": "requests",
-            "repository": {"url": "https://github.com/psf/requests"},
+            "repository_url": "https://github.com/psf/requests",
         }
         mock_response.raise_for_status = MagicMock()
 

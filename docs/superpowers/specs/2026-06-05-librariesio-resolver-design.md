@@ -24,13 +24,22 @@ Add a `LibrariesIoResolver` as a fallback resolver in the existing resolver chai
 ```python
 class LibrariesIoResolver(Resolver):
     ECOSYSTEM_MAP = {
-        'nuget': 'NuGet',
-        'npm': 'NPM',
-        'pypi': 'PyPI',
-        'gem': 'RubyGems',
-        'golang': 'Go',
-        'maven': 'Maven',
         'cargo': 'Cargo',
+        'composer': 'Packagist',
+        'conda': 'Conda',
+        'cpan': 'CPAN',
+        'cran': 'CRAN',
+        'gem': 'RubyGems',
+        'generic': 'GitHub',
+        'golang': 'Go',
+        'hackage': 'Hackage',
+        'hex': 'Hex',
+        'maven': 'Maven',
+        'npm': 'NPM',
+        'nuget': 'NuGet',
+        'pub': 'Pub',
+        'pypi': 'PyPI',
+        'swift': 'SwiftPM',
     }
 
     @property
@@ -177,13 +186,22 @@ In all error cases, the resolver returns `Resolution()` without `repository_url`
 
 | PURL type | libraries.io platform |
 |---|---|
-| `nuget` | NuGet |
-| `npm` | NPM |
-| `pypi` | PyPI |
-| `gem` | RubyGems |
-| `golang` | Go |
-| `maven` | Maven |
 | `cargo` | Cargo |
+| `composer` | Packagist |
+| `conda` | Conda |
+| `cpan` | CPAN |
+| `cran` | CRAN |
+| `gem` | RubyGems |
+| `generic` | GitHub |
+| `golang` | Go |
+| `hackage` | Hackage |
+| `hex` | Hex |
+| `maven` | Maven |
+| `npm` | NPM |
+| `nuget` | NuGet |
+| `pub` | Pub |
+| `pypi` | PyPI |
+| `swift` | SwiftPM |
 
 Unsupported PURL types return a warning without making an API call.
 
