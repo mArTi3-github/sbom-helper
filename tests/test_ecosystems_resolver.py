@@ -145,6 +145,23 @@ class TestResolveErrors:
         assert result.repository_url is None
         assert any("500" in w or "error" in w.lower() for w in result.warnings)
 
+    def test_4xx_returns_warning(self) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "not found", request=MagicMock(), response=mock_response
+        )
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_client.get.return_value = mock_response
+
+        r = EcosystemsResolver()
+        r._client = mock_client
+
+        result = r.resolve("pkg:pypi/requests")
+        assert result.repository_url is None
+        assert any("404" in w or "error" in w.lower() for w in result.warnings)
+
     def test_network_error_returns_warning(self) -> None:
         mock_client = MagicMock(spec=httpx.Client)
         mock_client.get.side_effect = httpx.ConnectError("connection refused")
