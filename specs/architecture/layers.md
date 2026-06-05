@@ -65,6 +65,7 @@
 |  |  Resolver (ABC)             |                   |
 |  |  Resolution dataclass       |                   |
 |  |  Purl2RepoResolver          |                   |
+|  |  EcosystemsResolver         |                   |
 |  |  LibrariesIoResolver        |                   |
 |  |  (future: LLM, purl2src)   |                   |
 |  +----+------------------------+                   |
@@ -247,6 +248,7 @@
 - **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"libraries.io"`) and `resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `repository_type`, `repository_kind`, `confidence`, `evidence`, `warnings`, `version_reference`
 - **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
 - **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms (cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift); rate-limited (1 req/sec via `time.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.Client` (synchronous) and `purl_utils.validate()` for PURL parsing
+- **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.Client` (synchronous) and `purl_utils.validate()` for PURL parsing
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 
 ## Anti-Patterns

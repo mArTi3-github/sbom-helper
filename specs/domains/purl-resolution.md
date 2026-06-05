@@ -165,3 +165,5 @@ Client                    API Layer (router)         Service Layer             p
 | `github_token` | `null` | GitHub Personal Access Token for authenticated requests (git ls-remote, HTTP HEAD) |
 | `librariesio_enabled` | `false` | Enable libraries.io as a fallback resolver after purl2repo |
 | `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
+| `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
+| `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
