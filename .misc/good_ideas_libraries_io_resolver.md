@@ -45,7 +45,3 @@ def purl_type_to_librariesio(purl_type: str) -> str | None:
 
 **Rate limit:** 60 запросов/мин (с API key)
 
-**Зависимости:** Идея 1 (GitHub token) для валидации URL репозиториев
-
-**Статус:** Запланировано
-
