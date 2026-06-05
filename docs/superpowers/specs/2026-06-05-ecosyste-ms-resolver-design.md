@@ -31,7 +31,7 @@ purl2repo → ecosyste.ms → libraries.io
 ```
 
 - purl2repo: primary resolver, always enabled
-- ecosyste.ms: fallback, enabled via Settings toggle (default: off)
+- ecosyste.ms: fallback, enabled via Settings toggle (default: on, no API key required)
 - libraries.io: last resort, enabled via Settings toggle + requires API key
 
 ## URL Selection Logic
@@ -93,7 +93,7 @@ All errors return `Resolution` without `repository_url`, allowing the chain to c
 
 Add to `AppSettings`:
 ```python
-ecosystems_enabled: bool = False
+ecosystems_enabled: bool = True
 ecosystems_api_key: str | None = None
 ```
 
@@ -115,7 +115,7 @@ if app_settings.librariesio_enabled and app_settings.librariesio_api_key:
 ### Modified: `src/purl_resolver/templates/settings.html`
 
 Add new card "eCosyste.ms Resolver":
-- Toggle: enable/disable (default: off)
+- Toggle: enable/disable (default: on)
 - API key input (optional, password field)
 - Status badge: "set" / "not set"
 - Clear key button
@@ -133,7 +133,7 @@ No new environment variables. ecosyste.ms resolver is configured entirely throug
 
 | Key | Default | Description |
 |---|---|---|
-| `ecosystems_enabled` | `false` | Enable ecosyste.ms as a fallback resolver |
+| `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver |
 | `ecosystems_api_key` | `null` | Optional API key for higher rate limits |
 
 ## Testing
