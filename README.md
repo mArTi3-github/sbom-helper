@@ -32,13 +32,16 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 | `POST /api/v1/db/import` | Import PURLs from CSV (semicolon delimiter) |
 | `GET /api/v1/db/export` | Export PURLs to CSV (semicolon delimiter) |
 | `GET /health` | Health check |
+| `GET /api/v1/settings` | Get application settings |
+| `PATCH /api/v1/settings` | Update application settings |
 | `GET /` | Web UI — PURL resolver |
 | `GET /sbom-updater` | Web UI — SBOM enrichment |
 | `GET /db-admin` | Web UI — Database administration |
+| `GET /settings` | Web UI — Application settings |
 
 ## Stack
 
-**Backend:** FastAPI, Pydantic, purl2repo  
+**Backend:** FastAPI, Pydantic, purl2repo, libraries.io  
 **UI:** Jinja2, vanilla JS  
 **Infrastructure:** Docker, Docker Compose  
 **Python:** 3.11+
@@ -46,6 +49,9 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 ## Status
 
 Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), and database administration (view, edit, filter, import/export via CSV, bulk delete). CSV uses semicolon delimiter with BOM handling.
+
+**Optional resolvers:** libraries.io can be enabled as a fallback resolver after purl2repo, configured via the Settings page (`/settings`). Supports: NuGet, NPM, PyPI, RubyGems, Go, Maven, Cargo.
+
 See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
 
 ## Specs
