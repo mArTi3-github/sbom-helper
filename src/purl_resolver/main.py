@@ -59,12 +59,22 @@ app.include_router(router)
 
 
 def main() -> None:
-    uvicorn.run(
-        "purl_resolver.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-    )
+    import os
+
+    ssl_keyfile = os.environ.get("SSL_KEYFILE")
+    ssl_certfile = os.environ.get("SSL_CERTFILE")
+
+    kwargs: dict = {
+        "host": "0.0.0.0",
+        "port": 8443,
+        "reload": True,
+    }
+
+    if ssl_keyfile and ssl_certfile:
+        kwargs["ssl_keyfile"] = ssl_keyfile
+        kwargs["ssl_certfile"] = ssl_certfile
+
+    uvicorn.run("purl_resolver.main:app", **kwargs)
 
 
 if __name__ == "__main__":
