@@ -12,7 +12,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "${PORT:-8000}:8000"
+      - "${PORT:-8443}:8443"
     volumes:
       - ./data:/app/data
     environment:
@@ -22,7 +22,7 @@ services:
       - PURL2REPO_NO_NETWORK=false
       - DB_URL=postgresql://sbom:${DB_PASSWORD:-sbom}@db:5432/sbom
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE; urllib.request.urlopen('https://localhost:8443/health', context=ctx)"]
       interval: 30s
       timeout: 5s
       retries: 3
