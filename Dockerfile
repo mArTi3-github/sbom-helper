@@ -2,14 +2,21 @@ FROM python:3.12-slim AS dev
 
 WORKDIR /app
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 RUN pip install --no-cache-dir -e ".[dev]"
+RUN bash scripts/generate-ssl-cert.sh
 
-EXPOSE 8000
+EXPOSE 8443
 
-CMD ["uvicorn", "purl_resolver.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "purl_resolver.main:app", "--host", "0.0.0.0", "--port", "8443", \
+     "--ssl-keyfile", "/app/ssl/server.key", "--ssl-certfile", "/app/ssl/server.crt", "--reload"]
 
 
 FROM python:3.12-slim AS prod
@@ -19,19 +26,26 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 app && \
     adduser --system --uid 1001 --gid 1001 app
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 RUN pip install --no-cache-dir . && \
     rm -rf /root/.cache
 
-RUN chown -R app:app /app
+RUN bash scripts/generate-ssl-cert.sh && \
+    chown -R app:app /app
 
 USER app
 
-EXPOSE 8000
+EXPOSE 8443
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+    CMD python -c "import urllib.request, ssl; ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE; urllib.request.urlopen('https://localhost:8443/health', context=ctx)"
 
-CMD ["uvicorn", "purl_resolver.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "purl_resolver.main:app", "--host", "0.0.0.0", "--port", "8443", \
+     "--ssl-keyfile", "/app/ssl/server.key", "--ssl-certfile", "/app/ssl/server.crt"]
