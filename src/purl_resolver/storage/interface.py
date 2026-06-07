@@ -29,6 +29,35 @@ class PurlRow:
     resolver: str = ""
     resolved_at: str = ""
 
+    @classmethod
+    def from_response(cls, r: ResolveResponse) -> PurlRow:
+        return cls(
+            purl=r.purl,
+            repository_url=r.repository_url,
+            repository_type=r.repository_type,
+            repository_kind=r.repository_kind,
+            confidence=r.confidence,
+            evidence=r.evidence,
+            warnings=r.warnings,
+            version_reference=r.version_reference,
+            resolver=r.resolver,
+            resolved_at=r.resolved_at or "",
+        )
+
+    def to_resolve_response(self) -> ResolveResponse:
+        return ResolveResponse(
+            purl=self.purl,
+            repository_url=self.repository_url,
+            repository_type=self.repository_type,
+            repository_kind=self.repository_kind,
+            confidence=self.confidence,
+            evidence=self.evidence,
+            warnings=self.warnings,
+            version_reference=self.version_reference,
+            resolver=self.resolver,
+            resolved_at=self.resolved_at,
+        )
+
 
 @dataclass
 class UpsertRow:

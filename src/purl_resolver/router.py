@@ -12,7 +12,6 @@ from fastapi.templating import Jinja2Templates
 from .config import sbom_settings
 from .schemas import (
     ResolveRequest,
-    ResolveResponse,
     DeleteResponse,
     ImportErrorItem,
     ImportResponse,
@@ -158,21 +157,7 @@ async def list_purls_endpoint(request: Request, params: PurlListParams = Query()
         sort_by=params.sort_by,
         sort_order=params.sort_order,
     )
-    row_responses = [
-        ResolveResponse(
-            purl=r.purl,
-            repository_url=r.repository_url,
-            repository_type=r.repository_type,
-            repository_kind=r.repository_kind,
-            confidence=r.confidence,
-            evidence=r.evidence,
-            warnings=r.warnings,
-            version_reference=r.version_reference,
-            resolver=r.resolver,
-            resolved_at=r.resolved_at,
-        )
-        for r in rows
-    ]
+    row_responses = [r.to_resolve_response() for r in rows]
     return JSONResponse(
         status_code=200,
         content=PurlListResponse(

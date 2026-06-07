@@ -46,7 +46,7 @@ class PostgresCache(Storage):
             )
         if row is None:
             return None
-        return ResolveResponse(
+        return PurlRow(
             purl=row["purl"],
             repository_url=row["repository_url"],
             repository_type=row.get("repository_type"),
@@ -56,7 +56,7 @@ class PostgresCache(Storage):
             warnings=self._decode_jsonb(row.get("warnings")),
             version_reference=row.get("version_reference"),
             resolver=row.get("resolver", ""),
-        )
+        ).to_resolve_response()
 
     async def store(self, result: ResolveResponse) -> None:
         async with self._pool.acquire() as conn:
