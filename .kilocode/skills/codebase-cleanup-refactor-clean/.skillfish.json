@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "codebase-cleanup-refactor-clean",
+  "owner": "sickn33",
+  "repo": "antigravity-awesome-skills",
+  "path": "plugins/antigravity-awesome-skills-claude/skills/codebase-cleanup-refactor-clean",
+  "branch": "main",
+  "sha": "6e1024e577eb5e16fe6cba93b8d438113335f093",
+  "source": "manual"
+}
