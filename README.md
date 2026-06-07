@@ -41,7 +41,7 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 
 ## Stack
 
-**Backend:** FastAPI, Pydantic, purl2repo, libraries.io  
+**Backend:** FastAPI, Pydantic, purl2repo, ecosyste.ms, libraries.io  
 **UI:** Jinja2, vanilla JS  
 **Infrastructure:** Docker, Docker Compose  
 **Python:** 3.11+
@@ -50,7 +50,7 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 
 Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), and database administration (view, edit, filter, import/export via CSV, bulk delete). CSV uses semicolon delimiter with BOM handling.
 
-**Optional resolvers:** libraries.io can be enabled as a fallback resolver after purl2repo, configured via the Settings page (`/settings`). Supports: Cargo, Composer (Packagist), Conda, CPAN, CRAN, Gem (RubyGems), Generic (GitHub), Go, Hackage, Hex, Maven, NPM, NuGet, Pub, PyPI, Swift (SwiftPM).
+**Optional resolvers:** ecosyste.ms is enabled by default as a fallback resolver after purl2repo. libraries.io can be enabled as an additional fallback (requires API key), configured via the Settings page (`/settings`). Supports: Cargo, Composer (Packagist), Conda, CPAN, CRAN, Gem (RubyGems), Generic (GitHub), Go, Hackage, Hex, Maven, NPM, NuGet, Pub, PyPI, Swift (SwiftPM).
 
 See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
 

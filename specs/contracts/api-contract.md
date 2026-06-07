@@ -274,6 +274,7 @@ Return current application settings.
   "validate_db_urls": false,
   "url_validation_timeout": 5,
   "librariesio_enabled": false,
+  "ecosystems_enabled": true,
   "token_set": {
     "github_token": false,
     "librariesio_api_key": false
@@ -284,6 +285,7 @@ Return current application settings.
 - `validate_db_urls`: boolean — enable URL validation for cached repository URLs (default: `false`)
 - `url_validation_timeout`: integer — timeout in seconds for HEAD and git ls-remote checks (1–60, default: `5`)
 - `librariesio_enabled`: boolean — whether the libraries.io resolver is active
+- `ecosystems_enabled`: boolean — whether the ecosyste.ms resolver is active (default: `true`)
 - `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 
@@ -315,6 +317,8 @@ Both fields optional. Only provided fields are updated.
 - `github_token`: optional string — GitHub Personal Access Token. Set to `null` to clear the token. Empty string is ignored. Invalid tokens are rejected with `400 invalid_token`.
 - `librariesio_enabled`: optional bool — enable/disable the libraries.io resolver.
 - `librariesio_api_key`: optional string|null — libraries.io API key. Set to `null` to clear the key. Empty string is ignored. Non-empty values are validated via the libraries.io API and rejected with `400 invalid_token` if invalid.
+- `ecosystems_enabled`: optional bool — enable/disable the ecosyste.ms resolver.
+- `ecosystems_api_key`: optional string|null — ecosyste.ms API key (for higher rate limits). Set to `null` to clear the key. Empty string is ignored.
 
 #### Response (200)
 

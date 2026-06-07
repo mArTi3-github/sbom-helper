@@ -2,7 +2,7 @@
 
 ## Description
 
-Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with confidence, evidence, and metadata. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo first, then optionally libraries.io as fallback), storing successful results for future lookups.
+Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with confidence, evidence, and metadata. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → ecosyste.ms → libraries.io), storing successful results for future lookups.
 
 ## Key Files
 
@@ -10,7 +10,8 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/service.py` — Orchestration: validation → normalization → storage lookup → URL validation → resolver → storage store; also `resolve_batch()` for concurrent resolution and `store_preexisting_references()` for SBOM pre-existing refs
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
-- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions) and purl2repo wrapper
+- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, ecosyste.ms wrapper, and libraries.io wrapper
+- `src/purl_resolver/resolver/ecosystems.py` — `EcosystemsResolver`: fallback resolver using ecosyste.ms Packages API, enabled by default (settings-controlled), no API key required (optional for higher rate limits)
 - `src/purl_resolver/resolver/librariesio.py` — `LibrariesIoResolver`: fallback resolver using libraries.io API, optional (settings-controlled), supports: cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
@@ -133,7 +134,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationResult`, never raises exceptions
-- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
+- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **SBOM enrichment uses resolver="import-sbom"**: both `resolve_batch()` and `store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
 - **CSV import uses resolver="import-csv"**: when the `resolver` column is absent from the imported CSV, the value `"import-csv"` is used as default
 - **SBOM enrichment enriches before removing**: `enrich_sbom()` is called before `remove_unresolved_components()` to avoid stale component paths after in-place removal

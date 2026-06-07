@@ -9,3 +9,5 @@ __pycache__/
 openspec/specs/
 .misc/addictional_materials/
 data/
+.misc/\[old]/
+

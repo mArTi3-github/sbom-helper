@@ -45,6 +45,7 @@ decisions/0001-purl2repo-as-primary-resolver.md
 docs/adr/0002-postgres-for-resolution-storage.md
 docs/adr/0003-purl-validation-and-normalization.md
 docs/adr/0004-librariesio-as-fallback-resolver.md
+docs/adr/0005-ecosyste-ms-as-fallback-resolver.md
 ```
 
 The API contract depends on the purl-resolution domain definition. The web UI depends on the API contract. Architecture layers provide the structural constraints for all domains. Decisions document the rationale behind architectural choices.
@@ -71,4 +72,5 @@ Related decisions outside specs/:
 docs/adr/0002-postgres-for-resolution-storage.md
 docs/adr/0003-purl-validation-and-normalization.md
 docs/adr/0004-librariesio-as-fallback-resolver.md
+docs/adr/0005-ecosyste-ms-as-fallback-resolver.md
 ```

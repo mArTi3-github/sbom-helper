@@ -23,6 +23,8 @@ specs/
 Related decisions outside specs/:
 docs/adr/0002-postgres-for-resolution-storage.md
 docs/adr/0003-purl-validation-and-normalization.md
+docs/adr/0004-librariesio-as-fallback-resolver.md
+docs/adr/0005-ecosyste-ms-as-fallback-resolver.md
 ```
 
 ## How to Use
