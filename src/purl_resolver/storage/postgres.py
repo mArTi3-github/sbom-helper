@@ -56,6 +56,7 @@ class PostgresCache(Storage):
             warnings=self._decode_jsonb(row.get("warnings")),
             version_reference=row.get("version_reference"),
             resolver=row.get("resolver", ""),
+            resolved_at=str(row.get("resolved_at", "")),
         ).to_resolve_response()
 
     async def store(self, result: ResolveResponse) -> None:

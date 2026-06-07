@@ -28,18 +28,7 @@ class InMemoryCache(Storage):
             r = self._store[key]
             if not self._matches_filters(r, filters):
                 continue
-            rows.append(PurlRow(
-                purl=r.purl,
-                repository_url=r.repository_url or "",
-                repository_type=r.repository_type,
-                repository_kind=r.repository_kind,
-                confidence=r.confidence,
-                evidence=r.evidence,
-                warnings=r.warnings,
-                version_reference=r.version_reference,
-                resolver=r.resolver or "",
-                resolved_at="",
-            ))
+            rows.append(PurlRow.from_response(r))
 
         reverse = sort_order == "desc"
         sort_keys = {
