@@ -162,7 +162,7 @@ class TestSettingsAPI:
 
     def test_patch_settings_with_valid_token(self, client: TestClient, tmp_path) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings3.json")
-        with patch("purl_resolver.router.validate_github_token", new_callable=AsyncMock, return_value=True):
+        with patch("purl_resolver.routes.settings.validate_github_token", new_callable=AsyncMock, return_value=True):
             response = client.patch(
                 "/api/v1/settings",
                 json={"github_token": "ghp_valid"},
@@ -173,7 +173,7 @@ class TestSettingsAPI:
 
     def test_patch_settings_with_invalid_token(self, client: TestClient, tmp_path) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings4.json")
-        with patch("purl_resolver.router.validate_github_token", new_callable=AsyncMock, return_value=False):
+        with patch("purl_resolver.routes.settings.validate_github_token", new_callable=AsyncMock, return_value=False):
             response = client.patch(
                 "/api/v1/settings",
                 json={"github_token": "ghp_invalid"},
@@ -225,7 +225,7 @@ class TestLibrariesIoSettings:
 
     def test_patch_settings_with_valid_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
-        with patch("purl_resolver.router.validate_librariesio_key", return_value=True):
+        with patch("purl_resolver.routes.settings.validate_librariesio_key", return_value=True):
             response = client.patch("/api/v1/settings", json={
                 "librariesio_api_key": "lib_test_key",
             })
@@ -235,7 +235,7 @@ class TestLibrariesIoSettings:
 
     def test_patch_settings_with_invalid_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
-        with patch("purl_resolver.router.validate_librariesio_key", return_value=False):
+        with patch("purl_resolver.routes.settings.validate_librariesio_key", return_value=False):
             response = client.patch("/api/v1/settings", json={
                 "librariesio_api_key": "invalid_key",
             })
