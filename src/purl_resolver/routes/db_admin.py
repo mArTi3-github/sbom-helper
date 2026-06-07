@@ -6,7 +6,6 @@ from fastapi import APIRouter, File, Form, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from ..schemas import (
-    DeleteResponse,
     ImportErrorItem,
     ImportResponse,
     ImportStrategy,

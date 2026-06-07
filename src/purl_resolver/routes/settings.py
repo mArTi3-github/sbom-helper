@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ..settings_store import SettingsStore, AppSettings
+from ..settings_store import SettingsStore
 from ..url_validator import validate_github_token
 
 logger = logging.getLogger(__name__)
