@@ -32,7 +32,7 @@ Resolve a single PURL to its repository URL.
   "purl": "pkg:pypi/requests",
   "repository_url": "https://github.com/psf/requests",
   "repository_type": "github",
-  "repository_kind": "source_code",
+  "repository_kind": "vcs",
   "confidence": "high",
   "evidence": ["homepage from PyPI metadata"],
   "warnings": [],
@@ -42,7 +42,7 @@ Resolve a single PURL to its repository URL.
 }
 ```
 
-Note: `purl` field contains the normalized form (version, qualifiers, subpath stripped). The original PURL is only used internally for resolver processing.
+Note: `purl` field contains the normalized form (version, qualifiers, subpath stripped). The original PURL is only used internally for resolver processing. `repository_kind` uses canonical values: `"vcs"` for VCS repository URLs, `"source-distribution"` for source distribution/tarball URLs.
 
 #### Success Response (200) — unresolved
 

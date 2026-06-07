@@ -87,7 +87,7 @@ class LibrariesIoResolver(Resolver):
             purl=purl,
             repository_url=repo_url,
             repository_type=None,
-            repository_kind="source",
+            repository_kind="vcs",
             confidence="medium",
             evidence=[f"libraries.io:{platform}/{name}"],
         )

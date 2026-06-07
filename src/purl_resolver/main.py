@@ -8,9 +8,8 @@ import uvicorn
 from fastapi import FastAPI
 
 from .config import settings, storage_settings
-from .resolver.librariesio import LibrariesIoResolver
+from .resolver.factory import build_resolvers
 from .settings_store import SettingsStore
-from .resolver.purl2repo import Purl2RepoResolver
 from .router import router
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
@@ -32,21 +31,8 @@ async def lifespan(app: FastAPI):
         app.state.storage = InMemoryCache()
     app.state.settings_store = SettingsStore()
 
-    app.state.resolvers = [
-        Purl2RepoResolver(
-            timeout=settings.timeout,
-            use_cache=settings.use_cache,
-            strict=settings.strict,
-            no_network=settings.no_network,
-            cache_dir=settings.cache_dir,
-        ),
-    ]
-
     app_settings = app.state.settings_store.load()
-    if app_settings.librariesio_enabled and app_settings.librariesio_api_key:
-        app.state.resolvers.append(
-            LibrariesIoResolver(api_key=app_settings.librariesio_api_key)
-        )
+    app.state.resolvers = build_resolvers(settings, app_settings)
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
     yield

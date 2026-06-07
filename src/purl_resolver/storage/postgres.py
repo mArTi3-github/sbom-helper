@@ -97,17 +97,14 @@ class PostgresCache(Storage):
         "purl", "repository_url", "resolver", "confidence", "resolved_at",
     })
 
-    async def list_purls(
-        self,
-        offset: int,
-        limit: int,
+    @staticmethod
+    def _build_filter_sql(
         filters: PurlFilters,
-        sort_by: str = "resolved_at",
-        sort_order: str = "desc",
-    ) -> list[PurlRow]:
+        start_idx: int = 1,
+    ) -> tuple[str, list[object], int]:
         clauses: list[str] = []
         params: list[object] = []
-        idx = 1
+        idx = start_idx
 
         if filters.search is not None:
             clauses.append(f"purl ILIKE ${idx}")
@@ -131,6 +128,17 @@ class PostgresCache(Storage):
             idx += 1
 
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        return where, params, idx
+
+    async def list_purls(
+        self,
+        offset: int,
+        limit: int,
+        filters: PurlFilters,
+        sort_by: str = "resolved_at",
+        sort_order: str = "desc",
+    ) -> list[PurlRow]:
+        where, params, idx = self._build_filter_sql(filters)
 
         safe_sort = sort_by if sort_by in self._SORTABLE_COLUMNS else "resolved_at"
         safe_order = "DESC" if sort_order == "desc" else "ASC"
@@ -162,32 +170,7 @@ class PostgresCache(Storage):
         ]
 
     async def count_purls(self, filters: PurlFilters) -> int:
-        clauses: list[str] = []
-        params: list[object] = []
-        idx = 1
-
-        if filters.search is not None:
-            clauses.append(f"purl ILIKE ${idx}")
-            params.append(f"%{filters.search}%")
-            idx += 1
-        if filters.resolver is not None:
-            clauses.append(f"resolver = ${idx}")
-            params.append(filters.resolver)
-            idx += 1
-        if filters.confidence is not None:
-            clauses.append(f"confidence = ${idx}")
-            params.append(filters.confidence)
-            idx += 1
-        if filters.date_from is not None:
-            clauses.append(f"resolved_at >= ${idx}")
-            params.append(filters.date_from)
-            idx += 1
-        if filters.date_to is not None:
-            clauses.append(f"resolved_at < ${idx}")
-            params.append(filters.date_to)
-            idx += 1
-
-        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        where, params, _ = self._build_filter_sql(filters)
         query = f"SELECT COUNT(*) as cnt FROM resolved_purls{where}"
 
         async with self._pool.acquire() as conn:

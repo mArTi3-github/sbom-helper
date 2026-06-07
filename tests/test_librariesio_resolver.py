@@ -69,7 +69,7 @@ class TestResolveSuccess:
 
         result = r.resolve("pkg:pypi/requests@2.31.0")
         assert result.repository_url == "https://github.com/psf/requests"
-        assert result.repository_kind == "source"
+        assert result.repository_kind == "vcs"
         assert result.confidence == "medium"
         assert "libraries.io:PyPI/requests" in result.evidence
 

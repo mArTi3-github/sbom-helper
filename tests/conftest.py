@@ -15,7 +15,7 @@ def fake_resolvers() -> list[FakeResolver]:
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
                 repository_type="github",
-                repository_kind="source_code",
+                repository_kind="vcs",
                 confidence="high",
                 evidence=["verified"],
             ),

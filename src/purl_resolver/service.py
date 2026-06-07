@@ -7,6 +7,7 @@ from datetime import datetime
 from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
 from .schemas import ResolveResponse, ResolveResult
+from .settings_store import SettingsStore
 from .storage.interface import Storage
 from .url_validator import UrlValidationResult, validate_url
 
@@ -21,7 +22,7 @@ async def resolve_purl(
     purl: str,
     storage: Storage,
     resolvers: list[Resolver],
-    settings_store=None,
+    settings_store: SettingsStore | None = None,
     resolver: str = "",
 ) -> ResolveResult:
     try:
@@ -135,7 +136,7 @@ async def resolve_batch(
     purls: list[str],
     storage: Storage,
     resolvers: list[Resolver],
-    settings_store=None,
+    settings_store: SettingsStore | None = None,
     resolver: str = "",
 ) -> dict[str, str]:
     semaphore = asyncio.Semaphore(_BATCH_SEMAPHORE_LIMIT)

@@ -11,6 +11,7 @@ from .sbom.parser import CycloneDXParser, SbomParseError
 from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import resolve_batch, store_preexisting_references
+from .settings_store import SettingsStore
 from .storage.interface import Storage
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class SbomEnrichmentPipeline:
         self,
         storage: Storage,
         resolvers: list[Resolver],
-        settings_store=None,
+        settings_store: SettingsStore | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers

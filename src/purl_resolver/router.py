@@ -36,14 +36,14 @@ from .storage.interface import PurlFilters
 logger = logging.getLogger(__name__)
 
 
-def validate_librariesio_key(api_key: str) -> bool:
+async def validate_librariesio_key(api_key: str) -> bool:
     try:
-        response = httpx.get(
-            "https://libraries.io/api/platforms",
-            params={"api_key": api_key},
-            timeout=10.0,
-        )
-        return response.status_code == 200
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://libraries.io/api/platforms",
+                params={"api_key": api_key},
+            )
+            return response.status_code == 200
     except httpx.HTTPError:
         return True
 
@@ -323,29 +323,10 @@ def _rebuild_resolvers(request: Request) -> None:
     store: SettingsStore = request.app.state.settings_store
     app_settings = store.load()
 
-    from .resolver.purl2repo import Purl2RepoResolver
-    from .resolver.ecosystems import EcosystemsResolver
-    from .resolver.librariesio import LibrariesIoResolver
     from .config import settings
+    from .resolver.factory import build_resolvers
 
-    resolvers = [
-        Purl2RepoResolver(
-            timeout=settings.timeout,
-            use_cache=settings.use_cache,
-            strict=settings.strict,
-            no_network=settings.no_network,
-            cache_dir=settings.cache_dir,
-        ),
-    ]
-    if app_settings.ecosystems_enabled:
-        resolvers.append(
-            EcosystemsResolver(api_key=app_settings.ecosystems_api_key)
-        )
-    if app_settings.librariesio_enabled and app_settings.librariesio_api_key:
-        resolvers.append(
-            LibrariesIoResolver(api_key=app_settings.librariesio_api_key)
-        )
-    request.app.state.resolvers = resolvers
+    request.app.state.resolvers = build_resolvers(settings, app_settings)
 
 
 @router.get("/api/v1/settings")
@@ -392,7 +373,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         elif key_value == "":
             del update_data["librariesio_api_key"]
         else:
-            if not validate_librariesio_key(key_value):
+            if not await validate_librariesio_key(key_value):
                 return JSONResponse(
                     status_code=400,
                     content={"error": "invalid_token", "message": "Libraries.io API key is invalid"},
