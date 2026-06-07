@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -9,8 +7,6 @@ from pydantic import BaseModel, Field
 
 from ..settings_store import SettingsStore
 from ..url_validator import validate_github_token
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
-
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 
@@ -11,8 +9,6 @@ from ..schemas import ResolveRequest
 from ..service import resolve_purl
 from ..sbom_enrichment import SbomEnrichmentPipeline
 from ..sbom.parser import SbomParseError
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
