@@ -10,7 +10,7 @@ class DummyResolver(Resolver):
     def name(self) -> str:
         return "dummy"
 
-    def resolve(self, purl: str) -> Resolution:
+    async def resolve(self, purl: str) -> Resolution:
         raise NotImplementedError
 
 
