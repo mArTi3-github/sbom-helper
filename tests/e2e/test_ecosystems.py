@@ -14,22 +14,25 @@ pytestmark = pytest.mark.skipif(
 
 class TestE2EEcosystemsResolver:
 
-    def test_resolve_real_request(self) -> None:
+    @pytest.mark.asyncio
+    async def test_resolve_real_request(self) -> None:
         r = EcosystemsResolver(timeout=15.0)
-        result = r.resolve("pkg:pypi/requests")
+        result = await r.resolve("pkg:pypi/requests")
         assert result.repository_url == "https://github.com/psf/requests"
         assert result.confidence == "medium"
         assert result.repository_kind == "vcs"
         assert len(result.evidence) > 0
 
-    def test_resolve_unknown_package(self) -> None:
+    @pytest.mark.asyncio
+    async def test_resolve_unknown_package(self) -> None:
         r = EcosystemsResolver(timeout=15.0)
-        result = r.resolve("pkg:pypi/nonexistent-pkg-xyz-12345")
+        result = await r.resolve("pkg:pypi/nonexistent-pkg-xyz-12345")
         assert result.repository_url is None
         assert len(result.warnings) > 0
 
-    def test_resolve_npm_package(self) -> None:
+    @pytest.mark.asyncio
+    async def test_resolve_npm_package(self) -> None:
         r = EcosystemsResolver(timeout=15.0)
-        result = r.resolve("pkg:npm/express")
+        result = await r.resolve("pkg:npm/express")
         assert result.repository_url is not None
         assert "github.com" in result.repository_url

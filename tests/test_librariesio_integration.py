@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -17,10 +17,10 @@ class TestResolverChain:
     async def test_purl2repo_fails_librariesio_succeeds(self) -> None:
         purl2repo = MagicMock(spec=Purl2RepoResolver)
         purl2repo.name = "purl2repo"
-        purl2repo.resolve.return_value = Resolution(
+        purl2repo.resolve = AsyncMock(return_value=Resolution(
             purl="pkg:pypi/requests",
             warnings=["Unsupported ecosystem"],
-        )
+        ))
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -30,8 +30,8 @@ class TestResolverChain:
         }
         mock_response.raise_for_status = MagicMock()
 
-        mock_client = MagicMock(spec=httpx.Client)
-        mock_client.get.return_value = mock_response
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get = AsyncMock(return_value=mock_response)
 
         lio = LibrariesIoResolver(api_key="test_key")
         lio._client = mock_client
@@ -53,17 +53,17 @@ class TestResolverChain:
     async def test_both_fail_returns_warnings(self) -> None:
         purl2repo = MagicMock(spec=Purl2RepoResolver)
         purl2repo.name = "purl2repo"
-        purl2repo.resolve.return_value = Resolution(
+        purl2repo.resolve = AsyncMock(return_value=Resolution(
             purl="pkg:deb/debian/libssl",
             warnings=["Unsupported ecosystem"],
-        )
+        ))
 
         lio = MagicMock(spec=LibrariesIoResolver)
         lio.name = "libraries.io"
-        lio.resolve.return_value = Resolution(
+        lio.resolve = AsyncMock(return_value=Resolution(
             purl="pkg:deb/debian/libssl",
             warnings=["Unsupported package type 'deb' for libraries.io"],
-        )
+        ))
 
         storage = InMemoryCache()
         resolvers = [purl2repo, lio]
@@ -82,17 +82,17 @@ class TestResolverChain:
     async def test_librariesio_error_does_not_interrupt_chain(self) -> None:
         purl2repo = MagicMock(spec=Purl2RepoResolver)
         purl2repo.name = "purl2repo"
-        purl2repo.resolve.return_value = Resolution(
+        purl2repo.resolve = AsyncMock(return_value=Resolution(
             purl="pkg:pypi/requests",
             warnings=["Could not resolve"],
-        )
+        ))
 
         lio = MagicMock(spec=LibrariesIoResolver)
         lio.name = "libraries.io"
-        lio.resolve.return_value = Resolution(
+        lio.resolve = AsyncMock(return_value=Resolution(
             purl="pkg:pypi/requests",
             warnings=["libraries.io timeout for PyPI/requests"],
-        )
+        ))
 
         storage = InMemoryCache()
         resolvers = [purl2repo, lio]
