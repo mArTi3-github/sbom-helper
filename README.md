@@ -14,10 +14,18 @@ curl -X POST http://localhost:8000/api/v1/resolve \
   -d '{"purl":"pkg:pypi/requests@2.31.0"}'
 ```
 
-For development with hot-reload:
+For development with hot-reload (src/ is mounted as a volume, changes apply on save):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.override.yml up
+docker compose up -d
+```
+
+Docker Compose automatically merges `docker-compose.override.yml`, switching the build target to `dev` with `--reload` and source code mounting. No `--build` needed for `src/` changes — uvicorn reloads automatically. Rebuild only when `pyproject.toml` (dependencies) changes.
+
+For production, exclude the override file:
+
+```bash
+docker compose -f docker-compose.yml up -d
 ```
 
 ## API
