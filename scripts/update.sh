@@ -14,10 +14,9 @@ cd "$SCRIPT_DIR"
 # ------------------------------------------------------------------
 BRANCH="${1:-main}"
 COMPOSE_FILES=("-f" "docker-compose.yml")
-LOG_PREFIX="[deploy $(date '+%Y-%m-%d %H:%M:%S')]"
-
-log()  { printf "%s %s\n" "$LOG_PREFIX" "$*"; }
-error(){ printf "%s ERROR: %s\n" "$LOG_PREFIX" "$*"; }
+ts()  { date '+%Y-%m-%d %H:%M:%S'; }
+log()  { printf "[deploy %s] %s\n" "$(ts)" "$*"; }
+error(){ printf "[deploy %s] ERROR: %s\n" "$(ts)" "$*"; }
 
 cleanup() {
   local exit_code=$?
@@ -58,41 +57,24 @@ log "Pulling base images..."
 docker compose "${COMPOSE_FILES[@]}" pull --quiet 2>/dev/null || true
 
 # ------------------------------------------------------------------
-# 4. Rebuild and restart
+# 4. Rebuild, restart, and wait for health checks
 # ------------------------------------------------------------------
 log "Rebuilding and restarting containers..."
-docker compose "${COMPOSE_FILES[@]}" up -d --build --remove-orphans
-
-# ------------------------------------------------------------------
-# 5. Wait for health check
-# ------------------------------------------------------------------
-log "Waiting for app container to become healthy..."
-if ! docker compose "${COMPOSE_FILES[@]}" exec -T app \
-     sh -c 'for i in $(seq 1 30); do
-              python -c "
-import urllib.request, ssl
-ctx=ssl.create_default_context()
-ctx.check_hostname=False
-ctx.verify_mode=ssl.CERT_NONE
-try:
-  urllib.request.urlopen(\"https://localhost:8443/health\", context=ctx)
-  exit(0)
-except: exit(1)
-" 2>/dev/null && exit 0; sleep 2; done; exit 1'; then
-  error "App health check timed out after 60s."
+if ! docker compose "${COMPOSE_FILES[@]}" up -d --build --remove-orphans --wait --wait-timeout 120; then
+  error "Containers failed to become healthy within 120s."
   exit 1
 fi
 
-log "App is healthy."
+log "All containers healthy."
 
 # ------------------------------------------------------------------
-# 6. Cleanup stale images
+# 5. Cleanup stale images
 # ------------------------------------------------------------------
 log "Cleaning up dangling images..."
 docker image prune -f 2>/dev/null || true
 
 # ------------------------------------------------------------------
-# 7. Restore stashed changes (if any)
+# 6. Restore stashed changes (if any)
 # ------------------------------------------------------------------
 if [ "$STASHED" = true ]; then
   log "Restoring stashed changes..."
