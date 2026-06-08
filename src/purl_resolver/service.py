@@ -105,7 +105,7 @@ async def resolve_purl(
 
     for r in resolvers:
         try:
-            resolution = r.resolve(purl)
+            resolution = await r.resolve(purl)
         except InvalidPurlError as e:
             return ResolveResult.err(400, "invalid_purl", str(e))
         except UpstreamError as e:

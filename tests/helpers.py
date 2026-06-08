@@ -16,7 +16,7 @@ class FakeResolver(Resolver):
     def name(self) -> str:
         return "fake"
 
-    def resolve(self, purl: str) -> Resolution:
+    async def resolve(self, purl: str) -> Resolution:
         self.call_count += 1
         if self._error:
             raise self._error
