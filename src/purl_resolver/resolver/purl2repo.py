@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from purl2repo import resolve as purl2repo_resolve
@@ -39,9 +40,10 @@ class Purl2RepoResolver(Resolver):
         self._no_network = no_network
         self._cache_dir = cache_dir
 
-    def resolve(self, purl: str) -> Resolution:
+    async def resolve(self, purl: str) -> Resolution:
         try:
-            result = purl2repo_resolve(
+            result = await asyncio.to_thread(
+                purl2repo_resolve,
                 purl,
                 timeout=self._timeout,
                 use_cache=self._use_cache,

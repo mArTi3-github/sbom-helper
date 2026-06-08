@@ -13,15 +13,18 @@ def resolver() -> Purl2RepoResolver:
 
 class TestPurl2RepoUnsupportedType:
 
-    def test_unsupported_type_returns_no_result(self, resolver: Purl2RepoResolver):
-        result = resolver.resolve("pkg:apk/alpine/nginx")
+    @pytest.mark.asyncio
+    async def test_unsupported_type_returns_no_result(self, resolver: Purl2RepoResolver):
+        result = await resolver.resolve("pkg:apk/alpine/nginx")
         assert result.repository_url is None
         assert any("unsupported" in w.lower() or "apk" in w.lower() for w in result.warnings)
 
-    def test_unsupported_type_does_not_raise(self, resolver: Purl2RepoResolver):
-        result = resolver.resolve("pkg:deb/debian/libc6")
+    @pytest.mark.asyncio
+    async def test_unsupported_type_does_not_raise(self, resolver: Purl2RepoResolver):
+        result = await resolver.resolve("pkg:deb/debian/libc6")
         assert isinstance(result, Resolution)
 
-    def test_still_raises_for_truly_invalid_purl(self, resolver: Purl2RepoResolver):
+    @pytest.mark.asyncio
+    async def test_still_raises_for_truly_invalid_purl(self, resolver: Purl2RepoResolver):
         with pytest.raises(InvalidPurlError):
-            resolver.resolve("not-a-purl")
+            await resolver.resolve("not-a-purl")
