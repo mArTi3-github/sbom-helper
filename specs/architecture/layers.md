@@ -262,3 +262,25 @@
 - Storing state in the API Layer (the service is stateless by design)
 - Changing the canonical response format without updating contracts/api-contract.md
 - Running outside Docker for production deployment (development-only bare uvicorn)
+
+## Container Deployment
+
+### Base Image
+`python:3.12-slim` — glibc compatibility for purl2repo's native dependencies. Alpine (musl) is rejected due to incompatibility risk; distroless is premature for the current stage.
+
+### Build Strategy
+Multi-stage Dockerfile:
+- **dev stage**: editable install (`pip install -e .`), `--reload` for hot-reload development
+- **prod stage**: non-editable install, `app` user (UID 1001), HEALTHCHECK configured
+
+### Docker Compose
+- `docker-compose.yml` defines app service with `${VAR:-default}` pattern for deployment-specific overrides
+- `docker-compose.override.yml` (auto-merged by Compose) mounts `./src` as a volume for dev hot-reload
+- Environment variables are the sole configuration mechanism (twelve-factor app). No `.env` is baked into the image.
+
+### Security
+- Production container runs as non-root user (UID 1001)
+- HEALTHCHECK monitors service availability — container marked unhealthy on repeated failure
+
+### Build Context
+`.dockerignore` excludes `.git`, `.venv`, `__pycache__`, `.pytest_cache`, `.env` files to keep build context minimal. `pyproject.toml` and `src/` are copied separately to optimize Docker layer caching.

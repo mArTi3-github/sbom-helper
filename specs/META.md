@@ -16,15 +16,14 @@ specs/
 │   └── web-ui.md                    # Browser-based web interface
 ├── contracts/
 │   └── api-contract.md              # HTTP API contract between client and service
-├── decisions/
-│   ├── _template.md                 # ADR template
-│   └── 0001-purl2repo-as-primary-resolver.md
-
-Related decisions outside specs/:
-docs/adr/0002-postgres-for-resolution-storage.md
-docs/adr/0003-purl-validation-and-normalization.md
-docs/adr/0004-librariesio-as-fallback-resolver.md
-docs/adr/0005-ecosyste-ms-as-fallback-resolver.md
+└── decisions/
+    ├── _template.md                              # ADR template
+    ├── 0001-purl2repo-as-primary-resolver.md     # purl2repo as primary resolver
+    ├── 0002-postgres-for-resolution-storage.md   # PostgreSQL for resolution caching
+    ├── 0003-purl-validation-and-normalization.md # Application-level PURL validation
+    ├── 0004-librariesio-as-fallback-resolver.md  # libraries.io as fallback resolver
+    ├── 0005-ecosyste-ms-as-fallback-resolver.md  # ecosyste.ms as fallback resolver
+    └── 0006-async-first-resolver-architecture.md # Async-first resolver architecture
 ```
 
 ## How to Use

@@ -170,3 +170,22 @@ Client                    API Layer (router)         Service Layer             p
 | `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
 | `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
 | `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
+
+## Database Schema
+
+The `resolved_purls` table stores resolution results:
+
+| Column | Type | Constraints |
+|---|---|---|
+| `purl` | `TEXT` | `PRIMARY KEY` |
+| `repository_url` | `TEXT` | `NOT NULL` |
+| `repository_type` | `TEXT` | nullable |
+| `repository_kind` | `TEXT` | nullable |
+| `confidence` | `TEXT` | nullable |
+| `evidence` | `JSONB` | `DEFAULT '[]'` |
+| `warnings` | `JSONB` | `DEFAULT '[]'` |
+| `version_reference` | `TEXT` | nullable |
+| `resolver` | `TEXT` | `NOT NULL DEFAULT 'purl2repo'` |
+| `resolved_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` |
+
+Created on startup via `CREATE TABLE IF NOT EXISTS`. All new columns must be nullable or have a DEFAULT value to ensure backward compatibility.

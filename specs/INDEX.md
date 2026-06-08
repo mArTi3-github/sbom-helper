@@ -42,10 +42,11 @@ architecture/layers.md
         |
         v
 decisions/0001-purl2repo-as-primary-resolver.md
-docs/adr/0002-postgres-for-resolution-storage.md
-docs/adr/0003-purl-validation-and-normalization.md
-docs/adr/0004-librariesio-as-fallback-resolver.md
-docs/adr/0005-ecosyste-ms-as-fallback-resolver.md
+decisions/0002-postgres-for-resolution-storage.md
+decisions/0003-purl-validation-and-normalization.md
+decisions/0004-librariesio-as-fallback-resolver.md
+decisions/0005-ecosyste-ms-as-fallback-resolver.md
+decisions/0006-async-first-resolver-architecture.md
 ```
 
 The API contract depends on the purl-resolution domain definition. The web UI depends on the API contract. Architecture layers provide the structural constraints for all domains. Decisions document the rationale behind architectural choices.
@@ -65,12 +66,11 @@ specs/
 ├── contracts/
 │   └── api-contract.md              — HTTP API contract (including db-admin and settings endpoints)
 └── decisions/
-    ├── _template.md                 — ADR template
-    └── 0001-purl2repo-as-primary-resolver.md
-
-Related decisions outside specs/:
-docs/adr/0002-postgres-for-resolution-storage.md
-docs/adr/0003-purl-validation-and-normalization.md
-docs/adr/0004-librariesio-as-fallback-resolver.md
-docs/adr/0005-ecosyste-ms-as-fallback-resolver.md
+    ├── _template.md                              — ADR template
+    ├── 0001-purl2repo-as-primary-resolver.md     — purl2repo as primary resolver
+    ├── 0002-postgres-for-resolution-storage.md   — PostgreSQL for resolution caching
+    ├── 0003-purl-validation-and-normalization.md — Application-level PURL validation
+    ├── 0004-librariesio-as-fallback-resolver.md  — libraries.io as fallback resolver
+    ├── 0005-ecosyste-ms-as-fallback-resolver.md  — ecosyste.ms as fallback resolver
+    └── 0006-async-first-resolver-architecture.md — Async-first resolver architecture
 ```
