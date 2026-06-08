@@ -39,6 +39,36 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up
 | `GET /db-admin` | Web UI — Database administration |
 | `GET /settings` | Web UI — Application settings |
 
+## Supported PURL Types
+
+| PURL Type | purl2repo | ecosyste.ms | libraries.io |
+|---|:---:|:---:|:---:|
+| `bitbucket` | ✓ | | |
+| `cargo` | ✓ | ✓ | ✓ |
+| `composer` | | ✓ | ✓ |
+| `conda` | | ✓ | ✓ |
+| `cpan` | | ✓ | ✓ |
+| `cran` | | ✓ | ✓ |
+| `gem` | | ✓ | ✓ |
+| `generic` | ✓ | | ✓ |
+| `github` | ✓ | | |
+| `golang` | ✓ | ✓ | ✓ |
+| `hackage` | | ✓ | ✓ |
+| `hex` | | ✓ | ✓ |
+| `huggingface` | ✓ | | |
+| `maven` | ✓ | ✓ | ✓ |
+| `mlflow` | ✓ | | |
+| `npm` | ✓ | ✓ | ✓ |
+| `nuget` | ✓ | ✓ | ✓ |
+| `pub` | | ✓ | ✓ |
+| `pypi` | ✓ | ✓ | ✓ |
+| `swift` | | ✓ | ✓ |
+
+**Notes:**
+- **purl2repo** is the primary resolver (always enabled)
+- **ecosyste.ms** is enabled by default as a fallback and accepts any valid PURL via its lookup API
+- **libraries.io** is an optional fallback (requires API key, configured via Settings)
+
 ## Stack
 
 **Backend:** FastAPI, Pydantic, purl2repo, ecosyste.ms, libraries.io  
