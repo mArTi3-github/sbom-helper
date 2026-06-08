@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from urllib.parse import quote
@@ -40,13 +41,13 @@ class LibrariesIoResolver(Resolver):
         self._timeout = timeout
         self._min_interval = 1.0
         self._last_request_time = 0.0
-        self._client = httpx.Client(timeout=timeout)
+        self._client = httpx.AsyncClient(timeout=timeout)
 
     @property
     def name(self) -> str:
         return "libraries.io"
 
-    def resolve(self, purl: str) -> Resolution:
+    async def resolve(self, purl: str) -> Resolution:
         try:
             components = validate(purl)
         except PurlValidationError as e:
@@ -60,12 +61,12 @@ class LibrariesIoResolver(Resolver):
             )
 
         name = components.name
-        self._rate_limit_wait()
+        await self._rate_limit_wait()
 
         encoded_name = quote(name, safe="")
         url = f"{_API_BASE}/{platform}/{encoded_name}"
         try:
-            response = self._client.get(url, params={"api_key": self._api_key})
+            response = await self._client.get(url, params={"api_key": self._api_key})
             response.raise_for_status()
         except httpx.TimeoutException:
             logger.warning("libraries.io request timed out for %s/%s", platform, name)
@@ -92,9 +93,9 @@ class LibrariesIoResolver(Resolver):
             evidence=[f"libraries.io:{platform}/{name}"],
         )
 
-    def _rate_limit_wait(self) -> None:
+    async def _rate_limit_wait(self) -> None:
         now = time.monotonic()
         elapsed = now - self._last_request_time
         if elapsed < self._min_interval:
-            time.sleep(self._min_interval - elapsed)
+            await asyncio.sleep(self._min_interval - elapsed)
         self._last_request_time = time.monotonic()

@@ -36,13 +36,13 @@ class EcosystemsResolver(Resolver):
     def __init__(self, api_key: str | None = None, timeout: float = 15.0) -> None:
         self._api_key = api_key
         self._timeout = timeout
-        self._client = httpx.Client(timeout=timeout)
+        self._client = httpx.AsyncClient(timeout=timeout)
 
     @property
     def name(self) -> str:
         return "ecosyste.ms"
 
-    def resolve(self, purl: str) -> Resolution:
+    async def resolve(self, purl: str) -> Resolution:
         try:
             validate(purl)
         except PurlValidationError as e:
@@ -53,7 +53,7 @@ class EcosystemsResolver(Resolver):
             params["api_key"] = self._api_key
 
         try:
-            response = self._client.get(_API_URL, params=params)
+            response = await self._client.get(_API_URL, params=params)
             response.raise_for_status()
         except httpx.TimeoutException:
             logger.warning("ecosyste.ms request timed out for %s", purl)

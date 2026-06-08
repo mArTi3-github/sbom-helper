@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -45,7 +45,8 @@ class TestResolverName:
 
 
 class TestResolveSuccess:
-    def test_successful_resolution(self) -> None:
+    @pytest.mark.asyncio
+    async def test_successful_resolution(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
@@ -59,13 +60,13 @@ class TestResolveSuccess:
         ]
         mock_response.raise_for_status = MagicMock()
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/requests@2.31.0")
+        result = await r.resolve("pkg:pypi/requests@2.31.0")
         assert result.repository_url == "https://github.com/psf/requests"
         assert result.repository_kind == "vcs"
         assert result.confidence == "medium"
@@ -73,25 +74,27 @@ class TestResolveSuccess:
 
 
 class TestResolveNoPackage:
-    def test_empty_array_returns_warning(self) -> None:
+    @pytest.mark.asyncio
+    async def test_empty_array_returns_warning(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = []
         mock_response.raise_for_status = MagicMock()
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/nonexistent")
+        result = await r.resolve("pkg:pypi/nonexistent")
         assert result.repository_url is None
         assert any("no package" in w.lower() for w in result.warnings)
 
 
 class TestResolveNoRepositoryUrl:
-    def test_no_repository_url_in_response(self) -> None:
+    @pytest.mark.asyncio
+    async def test_no_repository_url_in_response(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [
@@ -105,112 +108,119 @@ class TestResolveNoRepositoryUrl:
         ]
         mock_response.raise_for_status = MagicMock()
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/some-pkg")
+        result = await r.resolve("pkg:pypi/some-pkg")
         assert result.repository_url is None
         assert any("no repository" in w.lower() for w in result.warnings)
 
 
 class TestResolveErrors:
-    def test_timeout_returns_warning(self) -> None:
-        mock_client = MagicMock(spec=httpx.Client)
+    @pytest.mark.asyncio
+    async def test_timeout_returns_warning(self) -> None:
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/requests")
+        result = await r.resolve("pkg:pypi/requests")
         assert result.repository_url is None
         assert any("timeout" in w.lower() for w in result.warnings)
 
-    def test_5xx_returns_warning(self) -> None:
+    @pytest.mark.asyncio
+    async def test_5xx_returns_warning(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "server error", request=MagicMock(), response=mock_response
         )
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/requests")
+        result = await r.resolve("pkg:pypi/requests")
         assert result.repository_url is None
         assert any("500" in w or "error" in w.lower() for w in result.warnings)
 
-    def test_4xx_returns_warning(self) -> None:
+    @pytest.mark.asyncio
+    async def test_4xx_returns_warning(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "not found", request=MagicMock(), response=mock_response
         )
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/requests")
+        result = await r.resolve("pkg:pypi/requests")
         assert result.repository_url is None
         assert any("404" in w or "error" in w.lower() for w in result.warnings)
 
-    def test_network_error_returns_warning(self) -> None:
-        mock_client = MagicMock(spec=httpx.Client)
+    @pytest.mark.asyncio
+    async def test_network_error_returns_warning(self) -> None:
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.side_effect = httpx.ConnectError("connection refused")
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        result = r.resolve("pkg:pypi/requests")
+        result = await r.resolve("pkg:pypi/requests")
         assert result.repository_url is None
         assert len(result.warnings) > 0
 
 
 class TestApiKey:
-    def test_api_key_passed_in_params(self) -> None:
+    @pytest.mark.asyncio
+    async def test_api_key_passed_in_params(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [{"name": "pkg", "ecosystem": "pypi", "repository_url": "https://github.com/a/b"}]
         mock_response.raise_for_status = MagicMock()
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver(api_key="test_key_123")
         r._client = mock_client
 
-        r.resolve("pkg:pypi/pkg")
+        await r.resolve("pkg:pypi/pkg")
         call_kwargs = mock_client.get.call_args
         assert call_kwargs[1]["params"]["api_key"] == "test_key_123"
 
-    def test_no_key_no_api_key_param(self) -> None:
+    @pytest.mark.asyncio
+    async def test_no_key_no_api_key_param(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = [{"name": "pkg", "ecosystem": "pypi", "repository_url": "https://github.com/a/b"}]
         mock_response.raise_for_status = MagicMock()
 
-        mock_client = MagicMock(spec=httpx.Client)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
         r = EcosystemsResolver()
         r._client = mock_client
 
-        r.resolve("pkg:pypi/pkg")
+        await r.resolve("pkg:pypi/pkg")
         call_kwargs = mock_client.get.call_args
         assert "api_key" not in call_kwargs[1]["params"]
 
 
 class TestInvalidPurl:
-    def test_invalid_purl_returns_warning(self) -> None:
+    @pytest.mark.asyncio
+    async def test_invalid_purl_returns_warning(self) -> None:
         r = EcosystemsResolver()
-        result = r.resolve("not-a-valid-purl")
+        result = await r.resolve("not-a-valid-purl")
         assert result.repository_url is None
         assert any("invalid" in w.lower() for w in result.warnings)
