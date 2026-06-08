@@ -33,9 +33,6 @@ openspec/
     archive/                    — Completed change archives
 
 src/                            — Source code
-
-.misc/
-  plans/                        — Design plans (may be already implemented)
 ```
 
 ## Virtual Environment

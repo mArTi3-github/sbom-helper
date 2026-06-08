@@ -188,7 +188,7 @@
                 </div>
                 <div style="text-align:right;">
                     <input type="password" id="ecosystems-key-input"
-                           placeholder="eCosyste.ms API key (optional)" style="width:240px;padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;">
+                           placeholder="ecosyste.ms API key (optional)" style="width:240px;padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;">
                 </div>
             </div>
         </div>
@@ -331,7 +331,7 @@
                     body: JSON.stringify({ ecosystems_api_key: null }),
                 });
                 if (res.ok) {
-                    showMessage("eCosyste.ms key cleared", false);
+                    showMessage("ecosyste.ms key cleared", false);
                     loadSettings();
                 } else {
                     const data = await res.json();
