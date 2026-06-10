@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -10,6 +10,9 @@ from fastapi.testclient import TestClient
 from purl_resolver.resolver.purl2repo import Purl2RepoResolver
 from purl_resolver.router import router
 from purl_resolver.sbom_enrichment import SbomEnrichmentPipeline
+from purl_resolver.schemas import ResolveResponse
+from purl_resolver.service import resolve_batch
+from purl_resolver.settings_store import AppSettings
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.url_validator import UrlValidationResult
 
@@ -362,3 +365,82 @@ class TestValidateExistingRefs:
             result = await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs == original_refs
+
+
+class TestFileUrlInvalidation:
+    """Verify that file:// URLs in cache are invalidated and deleted during SBOM pipeline."""
+
+    @pytest.fixture
+    def storage_with_file_url(self) -> InMemoryCache:
+        cache = InMemoryCache()
+        cache._store["pkg:pypi/ptaf-task-manager"] = ResolveResponse(
+            purl="pkg:pypi/ptaf-task-manager",
+            repository_url="file:///usr/src/app/ptaf-task-mgr",
+            resolver="import-sbom",
+        )
+        return cache
+
+    @pytest.fixture
+    def settings_store_with_validation(self) -> MagicMock:
+        store = MagicMock()
+        store.load.return_value = AppSettings(
+            validate_db_urls=True,
+            url_validation_timeout=5,
+            revalidation_cooldown_hours=24,
+        )
+        return store
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_deletes_file_url_entry(
+        self,
+        storage_with_file_url,
+        settings_store_with_validation,
+        fake_empty_resolvers,
+    ):
+        """resolve_batch deletes invalid file:// entries from cache."""
+        result = await resolve_batch(
+            ["pkg:pypi/ptaf-task-manager"],
+            storage_with_file_url,
+            fake_empty_resolvers,
+            settings_store=settings_store_with_validation,
+            resolver="import-sbom",
+        )
+        # Entry should be absent from storage (deleted by _validate_cached_url)
+        remaining = await storage_with_file_url.lookup("pkg:pypi/ptaf-task-manager")
+        assert remaining is None, "file:// entry should have been deleted from storage"
+        # Batch result should be empty (no resolver found a valid URL)
+        assert "pkg:pypi/ptaf-task-manager" not in result
+
+    @pytest.mark.asyncio
+    async def test_sbom_pipeline_deletes_file_url_entry(
+        self,
+        storage_with_file_url,
+        settings_store_with_validation,
+        fake_empty_resolvers,
+    ):
+        """SbomEnrichmentPipeline.process cleans up file:// entries during enrichment."""
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "ptaf-task-manager",
+                    "version": "1.0",
+                    "purl": "pkg:pypi/ptaf-task-manager",
+                }
+            ],
+        }
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage_with_file_url,
+            resolvers=fake_empty_resolvers,
+            settings_store=settings_store_with_validation,
+        )
+        result = await pipeline.process(sbom, validate_existing_refs=False)
+        # DB entry should be deleted after processing
+        remaining = await storage_with_file_url.lookup("pkg:pypi/ptaf-task-manager")
+        assert remaining is None, "file:// entry should have been deleted from storage after pipeline run"
+        # Report should show not_found (resolvers can't find this package)
+        summary = result.report["summary"]
+        assert summary["not_found"] >= 1, "Component with file:// URL should show as not_found"

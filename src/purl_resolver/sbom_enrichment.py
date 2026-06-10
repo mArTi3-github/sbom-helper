@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from .purl_utils import safe_normalize
+from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import Resolver
 from .sbom.collector import _SOURCE_REF_TYPES, collect_components
 from .url_validator import UrlValidationResult, validate_url
@@ -70,8 +70,9 @@ class SbomEnrichmentPipeline:
         unique_purls: list[str] = []
         skipped = 0
         for comp in purls_to_resolve:
-            n = safe_normalize(comp.purl)
-            if n == comp.purl:
+            try:
+                n = normalize(validate(comp.purl))
+            except Exception:
                 skipped += 1
                 continue
             if n not in seen:
