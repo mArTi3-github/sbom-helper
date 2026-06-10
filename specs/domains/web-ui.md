@@ -79,6 +79,7 @@ User                   Browser                    API Layer
 - Upload area supports drag-and-drop and file picker
 - Process button is disabled until a file is selected
 - Checkbox "Удалять ненайденные компоненты без подкомпонентов" controls `remove_unresolved_no_subcomponents` form parameter
+- Checkbox "Проверять существующие VCS-ссылки в SBOM" controls `validate_existing_refs` form parameter; when checked, existing VCS externalReferences in the SBOM are validated via HEAD + git ls-remote — invalid URLs trigger re-resolution
 - Loading spinner is shown during server-side processing
 - Results table displays: PURL (normalized), status (Found/Not found/Removed), repository URL (clickable)
 - Summary cards show: total PURLs, found, not found, skipped, removed
@@ -101,9 +102,9 @@ User                   Browser                    API Layer
 ### Settings Page
 
 - Settings page is accessible at `/settings` with a nav-bar link on all pages
-- URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds)
+- URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds), number input controls `revalidation_cooldown_hours` (0–720, default 24; 0 disables cooldown)
 - GitHub API Token card: password input for GitHub PAT, status badge (set/not set), clear button, link to token generation
-- ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits)
+- ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits), status badge (set/not set), clear button
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
 - Settings are loaded from `GET /api/v1/settings` on page load
 - Settings are saved via `PATCH /api/v1/settings` on button click
