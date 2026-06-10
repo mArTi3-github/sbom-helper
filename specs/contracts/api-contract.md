@@ -125,6 +125,7 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 - File must be valid JSON with `bomFormat: "CycloneDX"` and `specVersion: "1.6"`
 - JSON is parsed, the root dict is validated for required CycloneDX fields, then mutated in-place during enrichment
 - Optional field `remove_unresolved_no_subcomponents` (boolean, default: `false`) — when `true`, removes components that were not resolved and have no nested subcomponents
+- Optional field `validate_existing_refs` (boolean, default: `false`) — when `true`, existing VCS externalReferences in the SBOM are validated; invalid URLs trigger re-resolution
 
 #### Success Response (200)
 
@@ -273,21 +274,25 @@ Return current application settings.
 {
   "validate_db_urls": false,
   "url_validation_timeout": 5,
+  "revalidation_cooldown_hours": 24,
   "librariesio_enabled": false,
   "ecosystems_enabled": true,
   "token_set": {
     "github_token": false,
-    "librariesio_api_key": false
+    "librariesio_api_key": false,
+    "ecosystems_api_key": false
   }
 }
 ```
 
 - `validate_db_urls`: boolean — enable URL validation for cached repository URLs (default: `false`)
 - `url_validation_timeout`: integer — timeout in seconds for HEAD and git ls-remote checks (1–60, default: `5`)
+- `revalidation_cooldown_hours`: integer — cooldown in hours for trusted resolver entries (0–720, default: `24`; `0` disables cooldown)
 - `librariesio_enabled`: boolean — whether the libraries.io resolver is active
 - `ecosystems_enabled`: boolean — whether the ecosyste.ms resolver is active (default: `true`)
 - `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
+- `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
 
 ---
 
@@ -314,6 +319,9 @@ Partially update application settings.
 
 Both fields optional. Only provided fields are updated.
 
+- `validate_db_urls`: optional bool — enable/disable URL validation for cached repository URLs.
+- `url_validation_timeout`: optional int — timeout in seconds for HEAD and git ls-remote checks (1–60).
+- `revalidation_cooldown_hours`: optional int — cooldown in hours for trusted resolver entries (0–720, 0 disables cooldown).
 - `github_token`: optional string — GitHub Personal Access Token. Set to `null` to clear the token. Empty string is ignored. Invalid tokens are rejected with `400 invalid_token`.
 - `librariesio_enabled`: optional bool — enable/disable the libraries.io resolver.
 - `librariesio_api_key`: optional string|null — libraries.io API key. Set to `null` to clear the key. Empty string is ignored. Non-empty values are validated via the libraries.io API and rejected with `400 invalid_token` if invalid.
@@ -339,12 +347,14 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 
 1. Recursively walk all `components[]` arrays (including nested `components` inside components)
 2. For each component that has a `purl` AND (has no `externalReferences` OR has no `vcs`/`source-distribution` type in `externalReferences`): mark as needing enrichment
-3. Normalize each PURL to `scheme:type/namespace/name`; deduplicate across the entire SBOM
-4. For each unique normalized PURL: call `service.resolve_purl()` (cache → resolver flow) with `resolver="import-sbom"`
-5. Store pre-existing references: for components with `needs_enrichment=False`, store their PURL and VCS repository URL in the database via `store_preexisting_references()` with `resolver="import-sbom"`
-6. For each component matching a resolved PURL: append `{"type": "vcs", "url": "..."}` to its `externalReferences` array; preserve all existing references
-7. Increment `version` field by 1
-8. If `remove_unresolved_no_subcomponents=true`: remove components from the SBOM where `needs_enrichment=True`, `has_subcomponents=False`, and PURL was not resolved; removed components are reported with `status: "removed"` and excluded from `status: "not_found"` counts
+3. If `validate_existing_refs=true`: for components with `vcs`/`source-distribution` externalReferences, validate the URL via HEAD + git ls-remote; `INVALID` results mark the component for re-resolution (clear `existing_references`, set `needs_enrichment=True`); `NETWORK_ERROR` and `RATE_LIMITED` leave the component unchanged
+4. For each component needing enrichment: validate and normalize the PURL explicitly via `validate()` + `normalize()`; invalid PURLs increment the `skipped` count and are excluded from resolution; valid unversioned PURLs are correctly normalized and included
+5. Normalize each PURL to `scheme:type/namespace/name`; deduplicate across the entire SBOM
+6. For each unique normalized PURL: call `service.resolve_purl()` (cache → resolver flow) with `resolver="import-sbom"`
+7. Store pre-existing references: for components with `needs_enrichment=False`, store their PURL and VCS repository URL in the database via `store_preexisting_references()` with `resolver="import-sbom"`
+8. For each component matching a resolved PURL: append `{"type": "vcs", "url": "..."}` to its `externalReferences` array; preserve all existing references
+9. Increment `version` field by 1
+10. If `remove_unresolved_no_subcomponents=true`: remove components from the SBOM where `needs_enrichment=True`, `has_subcomponents=False`, and PURL was not resolved; removed components are reported with `status: "removed"` and excluded from `status: "not_found"` counts
 
 ## Error Handling Rules
 

@@ -33,7 +33,7 @@ docker compose -f docker-compose.yml up -d
 | Endpoint | Description |
 |---|---|
 | `POST /api/v1/resolve` | Resolve a PURL to its repository URL |
-| `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references (optional: remove unresolved components) |
+| `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references (optional: remove unresolved components, validate existing VCS references) |
 | `GET /api/v1/db/purls` | List PURLs with pagination and filtering |
 | `PATCH /api/v1/db/purls/{purl}` | Edit a PURL row |
 | `DELETE /api/v1/db/purls` | Bulk delete PURL rows |
@@ -89,6 +89,8 @@ docker compose -f docker-compose.yml up -d
 Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), and database administration (view, edit, filter, import/export via CSV, bulk delete). CSV uses semicolon delimiter with BOM handling.
 
 **Optional resolvers:** ecosyste.ms is enabled by default as a fallback resolver after purl2repo. libraries.io can be enabled as an additional fallback (requires API key), configured via the Settings page (`/settings`). Supports: Cargo, Composer (Packagist), Conda, CPAN, CRAN, Gem (RubyGems), Generic (GitHub), Go, Hackage, Hex, Maven, NPM, NuGet, Pub, PyPI, Swift (SwiftPM).
+
+**URL validation:** cached repository URLs can be validated via HTTP HEAD + git ls-remote (enabled via `validate_db_urls` setting in Settings). Invalid URLs are deleted from the cache and re-resolved via the resolver chain. Non-http/https URLs are rejected immediately. Validation respects resolver-based cooldown (configurable via `revalidation_cooldown_hours`). The SBOM Updater optionally validates existing VCS references in uploaded SBOMs.
 
 See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
 

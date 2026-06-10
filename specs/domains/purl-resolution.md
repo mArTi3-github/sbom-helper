@@ -21,7 +21,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom/enricher.py` — Inserts VCS external references into SBOM components
 - `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
-- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout)
+- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + git ls-remote with rate limit mitigation
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
@@ -126,7 +126,7 @@ Client                    API Layer (router)         Service Layer             p
 - `version_reference` is a URL string (not the purl2repo ReleaseLink object)
 - **Normalized cache keys**: storage uses `scheme:type/namespace/name` form — version/qualifiers/subpath are stripped
 - **Resolver receives original PURL**: the full string (with version, qualifiers, subpath) is passed unmodified to resolvers
-- **DB cache hit**: if a result is found in PostgreSQL, the resolver is NOT called (unless URL validation is enabled and `resolved_at` is not today)
+- **DB cache hit**: if a result is found in PostgreSQL, the resolver is NOT called (unless URL validation is enabled and the entry is outside the cooldown window — for trusted resolvers, cooldown is `revalidation_cooldown_hours`; for untrusted resolvers, cooldown is always bypassed)
 - **Only successful results are stored**: `repository_url = null` results are never persisted
 - **Graceful degradation**: if PostgreSQL is unavailable, the resolver still works (without caching)
 - **Store is best-effort**: a failure to store does not break the response to the client
@@ -138,10 +138,12 @@ Client                    API Layer (router)         Service Layer             p
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds, returning `RATE_LIMITED`
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationResult`, never raises exceptions
+- **Non-http/https URLs are invalid immediately**: `validate_url()` returns `INVALID` for any URL that does not start with `http://` or `https://` without making any network request
 - **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
 - **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **Canonical repository_kind values**: `repository_kind` uses `"vcs"` for VCS repository URLs (GitHub, GitLab, etc.) and `"source-distribution"` for source distribution/tarball URLs; the `REPOSITORY_KINDS` constant in `schemas.py` defines the valid set; `collector.py` uses the same values to identify existing source references
 - **SBOM enrichment uses resolver="import-sbom"**: both `resolve_batch()` and `store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
+- **SBOM deduplication validates each PURL explicitly**: the deduplication loop calls `validate()` then `normalize()` on every component PURL; unversioned valid PURLs (e.g. `pkg:pypi/ptaf-task-manager`) are correctly normalized and added to the resolution queue — only truly invalid PURLs are counted as skipped
 - **CSV import uses resolver="import-csv"**: when the `resolver` column is absent from the imported CSV, the value `"import-csv"` is used as default
 - **SBOM enrichment enriches before removing**: `enrich_sbom()` is called before `remove_unresolved_components()` to avoid stale component paths after in-place removal
 - **Removed components excluded from not_found**: components with `status: "removed"` do not appear as `status: "not_found"` in the report
