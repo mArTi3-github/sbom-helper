@@ -44,3 +44,8 @@ async def settings_page(request: Request) -> HTMLResponse:
 @router.get("/db-admin", response_class=HTMLResponse)
 async def db_admin_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request=request, name="db-admin.html")
+
+
+@router.get("/images-list-converter", response_class=HTMLResponse)
+async def images_list_converter_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="images-list-converter.html")

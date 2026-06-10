@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SBOM-updater — sbom-helper</title>
+    <title>Images List Converter — sbom-helper</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -30,31 +30,21 @@
         }
         button:hover { background: #1d4ed8; }
         button:disabled { background: #93c5fd; cursor: not-allowed; }
-        .toolbar { margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; }
-        .summary {
+        .status-card {
             background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
-            padding: 1rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-top: 1.5rem;
         }
-        .summary-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
-        .summary-item { text-align: center; }
-        .summary-value { font-size: 1.5rem; font-weight: 700; }
-        .summary-label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
-        .summary-value.found { color: #166534; }
-        .summary-value.not-found { color: #991b1b; }
-        .summary-value.skipped { color: #854d0e; }
+        .status-ok { border-left: 4px solid #166534; }
+        .status-transformed { border-left: 4px solid #b45309; }
         table {
             width: 100%; border-collapse: collapse; margin-top: 1rem;
             background: #fff; border-radius: 8px; overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
-        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
         th { background: #f9fafb; font-size: 0.8rem; text-transform: uppercase; color: #888; }
-        .status-found { color: #166534; font-weight: 500; }
-        .status-not-found { color: #991b1b; font-weight: 500; }
-        .status-removed { color: #b45309; font-weight: 500; }
-        .repo-url-cell { word-break: break-all; }
-        .repo-url-cell a { color: #2563eb; text-decoration: none; }
-        .repo-url-cell a:hover { text-decoration: underline; }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .flag-present { color: #991b1b; font-weight: 500; }
         .spinner {
             display: inline-block; width: 1.25rem; height: 1.25rem;
             border: 2px solid #e5e7eb; border-top-color: #2563eb;
@@ -72,15 +62,16 @@
 </head>
 <body>
     <div class="container">
-        <div style="margin-bottom:1rem;display:flex;gap:1rem;">
+        <div style="margin-bottom:1rem;display:flex;gap:1rem;flex-wrap:wrap;">
             <a href="/" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">PURL Resolver</a>
-            <a href="/sbom-updater" style="text-decoration:none;color:inherit;font-weight:600;font-size:0.9rem;">SBOM Updater</a>
+            <a href="/sbom-updater" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">SBOM Updater</a>
             <a href="/db-admin" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">Database Admin</a>
             <a href="/settings" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">Settings</a>
-            <a href="/images-list-converter" style="color:#2563eb;text-decoration:none;font-size:0.9rem;">Images List Converter</a>
+            <a href="/images-list-converter" style="text-decoration:none;color:inherit;font-weight:600;font-size:0.9rem;">Images List Converter</a>
         </div>
-        <h1>SBOM-updater</h1>
-        <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы обогатить компоненты ссылками на репозитории исходных текстов</p>
+
+        <h1>Images List Converter</h1>
+        <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы сформировать машиночитаемый список docker-образов продукта</p>
 
         <div id="upload-area" class="upload-area">
             <input type="file" id="file-input" accept=".json">
@@ -91,59 +82,55 @@
             <div id="file-name" class="file-name"></div>
         </div>
 
-        <div class="toolbar">
-            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;color:#555;cursor:pointer;">
-                <input type="checkbox" id="remove-unresolved">
-                Удалять ненайденные компоненты без подкомпонентов
-            </label>
-            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;color:#555;cursor:pointer;margin-top:0.5rem;">
-                <input type="checkbox" id="validate-refs">
-                Проверять существующие VCS-ссылки в SBOM
-            </label>
-            <button id="process-btn" disabled>Обработать</button>
+        <div class="toolbar" style="margin-top:1rem;display:flex;gap:0.5rem;align-items:center;">
+            <button id="convert-btn" disabled>Конвертировать</button>
         </div>
 
-        <div id="loading" class="loading" style="display:none;">
-            <span class="spinner"></span> Обработка SBOM...
+        <div id="loading" class="loading" style="display:none;display:flex;align-items:center;gap:0.5rem;margin-top:1rem;color:#666;">
+            <span class="spinner" style="display:inline-block;width:1.25rem;height:1.25rem;border:2px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.6s linear infinite;"></span>
+            Обработка SBOM...
         </div>
 
         <div id="error" class="error-msg" style="display:none;"></div>
 
         <div id="results" style="display:none;">
-            <div class="summary" id="summary-box"></div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>PURL</th>
-                        <th>Статус</th>
-                        <th>Repository URL</th>
-                        <th>Found by</th>
-                        <th>Resolver</th>
-                    </tr>
-                </thead>
-                <tbody id="results-body"></tbody>
-            </table>
-            <div class="toolbar">
-                <button id="download-btn">Скачать обогащённый SBOM</button>
+            <div id="status-card" class="status-card"></div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Имя образа</th>
+                            <th>Версия</th>
+                            <th>Отсутствуют компоненты</th>
+                            <th>Не заполнено поле name</th>
+                            <th>Не заполнено поле version</th>
+                            <th>Не заполнено поле properties</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                </table>
+            </div>
+            <div class="toolbar" style="margin-top:1rem;display:flex;gap:0.5rem;align-items:center;">
+                <button id="download-btn">Скачать список образов</button>
             </div>
         </div>
     </div>
 
-    <footer>Powered by purl2repo</footer>
+    <footer>Powered by sbom-helper</footer>
 
     <script>
         const uploadArea = document.getElementById("upload-area");
         const fileInput = document.getElementById("file-input");
         const fileNameDisplay = document.getElementById("file-name");
-        const processBtn = document.getElementById("process-btn");
+        const convertBtn = document.getElementById("convert-btn");
         const loading = document.getElementById("loading");
         const errorDiv = document.getElementById("error");
         const resultsDiv = document.getElementById("results");
-        const summaryBox = document.getElementById("summary-box");
+        const statusCard = document.getElementById("status-card");
         const resultsBody = document.getElementById("results-body");
         const downloadBtn = document.getElementById("download-btn");
 
-        let enrichedSbom = null;
+        let imagesListData = null;
         let currentFileName = "";
 
         ["dragenter", "dragover", "dragleave", "drop"].forEach(event => {
@@ -167,7 +154,7 @@
         function handleFile(file) {
             currentFileName = file.name;
             fileNameDisplay.textContent = "File: " + file.name + " (" + formatSize(file.size) + ")";
-            processBtn.disabled = false;
+            convertBtn.disabled = false;
         }
 
         function formatSize(bytes) {
@@ -176,30 +163,20 @@
             return (bytes / 1048576).toFixed(1) + " MB";
         }
 
-        processBtn.addEventListener("click", async () => {
+        convertBtn.addEventListener("click", async () => {
             const file = fileInput.files[0];
             if (!file) return;
 
             errorDiv.style.display = "none";
             resultsDiv.style.display = "none";
             loading.style.display = "flex";
-            processBtn.disabled = true;
+            convertBtn.disabled = true;
 
             const formData = new FormData();
             formData.append("file", file);
 
-            const removeCheckbox = document.getElementById("remove-unresolved");
-            if (removeCheckbox.checked) {
-                formData.append("remove_unresolved_no_subcomponents", "true");
-            }
-
-            const validateRefsCheckbox = document.getElementById("validate-refs");
-            if (validateRefsCheckbox.checked) {
-                formData.append("validate_existing_refs", "true");
-            }
-
             try {
-                const res = await fetch("/api/v1/resolve/sbom", {
+                const res = await fetch("/api/v1/convert/images-list", {
                     method: "POST",
                     body: formData,
                 });
@@ -210,13 +187,13 @@
                     return;
                 }
 
-                enrichedSbom = data.enriched_sbom;
+                imagesListData = data.images_list;
                 renderResults(data);
             } catch {
                 showError("Network error: could not reach the server.");
             } finally {
                 loading.style.display = "none";
-                processBtn.disabled = false;
+                convertBtn.disabled = false;
             }
         });
 
@@ -226,39 +203,22 @@
         }
 
         function renderResults(data) {
-            const s = data.summary;
-            summaryBox.innerHTML = `
-                <h3 style="margin-bottom:0.5rem;">Результаты</h3>
-                <div class="summary-grid">
-                    <div class="summary-item">
-                        <div class="summary-value">${s.total_purls}</div>
-                        <div class="summary-label">Всего обработанных PURL</div>
-                    </div>
-                    <div class="summary-item">
-                        <div class="summary-value found">${s.found}</div>
-                        <div class="summary-label">Найдено</div>
-                    </div>
-                    <div class="summary-item">
-                        <div class="summary-value not-found">${s.not_found}</div>
-                        <div class="summary-label">Не найдено</div>
-                    </div>
-                    ${s.skipped > 0 ? `<div class="summary-item"><div class="summary-value skipped">${s.skipped}</div><div class="summary-label">Пропущено</div></div>` : ""}
-                    ${s.removed > 0 ? `<div class="summary-item"><div class="summary-value" style="color:#b45309;">${s.removed}</div><div class="summary-label">Удалено</div></div>` : ""}
-                </div>
-            `;
+            if (data.was_transformed) {
+                statusCard.className = "status-card status-transformed";
+                statusCard.innerHTML = `<span class="status-icon" style="font-size:1.2rem;margin-right:0.5rem;">&#9888;</span> <strong>Выполнено преобразование</strong> &mdash; исходный SBOM был преобразован в список образов контейнеров.`;
+            } else {
+                statusCard.className = "status-card status-ok";
+                statusCard.innerHTML = `<span class="status-icon" style="font-size:1.2rem;margin-right:0.5rem;">&#10003;</span> <strong>Преобразований не требуется</strong> &mdash; переданный файл уже является корректным списком образов.`;
+            }
 
-            resultsBody.innerHTML = data.results.map(r => {
-                const statusClass = r.status === "found" ? "status-found" : r.status === "removed" ? "status-removed" : "status-not-found";
-                const statusText = r.status === "found" ? "Found" : r.status === "removed" ? "Removed" : "Not found";
-                const urlHtml = r.repository_url
-                    ? `<a href="${escapeHtml(r.repository_url)}" target="_blank">${escapeHtml(r.repository_url)}</a>`
-                    : "&mdash;";
+            resultsBody.innerHTML = data.images.map(img => {
                 return `<tr>
-                    <td><code>${escapeHtml(r.purl)}</code></td>
-                    <td class="${statusClass}">${statusText}</td>
-                    <td class="repo-url-cell">${urlHtml}</td>
-                    <td>${escapeHtml(r.found_by || "")}</td>
-                    <td>${escapeHtml(r.resolver || "")}</td>
+                    <td>${escapeHtml(img.name || "&mdash;")}</td>
+                    <td>${escapeHtml(img.version || "&mdash;")}</td>
+                    <td>${img.missing_components ? '<span class="flag-present">&#10007;</span>' : ""}</td>
+                    <td>${img.missing_name ? '<span class="flag-present">&#10007;</span>' : ""}</td>
+                    <td>${img.missing_version ? '<span class="flag-present">&#10007;</span>' : ""}</td>
+                    <td>${img.missing_properties ? '<span class="flag-present">&#10007;</span>' : ""}</td>
                 </tr>`;
             }).join("");
 
@@ -266,12 +226,12 @@
         }
 
         downloadBtn.addEventListener("click", () => {
-            if (!enrichedSbom) return;
-            const blob = new Blob([JSON.stringify(enrichedSbom, null, 2)], { type: "application/json" });
+            if (!imagesListData) return;
+            const blob = new Blob([JSON.stringify(imagesListData, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = currentFileName.replace(/\.json$/, "") + "_enriched.json";
+            a.download = currentFileName.replace(/\.json$/, "") + "_images_list.json";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

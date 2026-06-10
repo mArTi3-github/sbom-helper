@@ -22,7 +22,9 @@ async def convert_images_list(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "error": "file_too_large",
-                "message": f"File size exceeds maximum of {sbom_settings.max_file_size // (1024*1024)} MB",
+                "message": (
+                    f"File size exceeds maximum of {sbom_settings.max_file_size // (1024*1024)} MB"
+                ),
             },
         )
 
