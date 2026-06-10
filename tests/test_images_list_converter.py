@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-import pytest
+import json
 
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from purl_resolver.router import router
 from purl_resolver.sbom.images_list_converter import ImagesListConverter
 from purl_resolver.sbom.parser import SbomParseError
 
@@ -294,3 +299,83 @@ class TestImagesListConverter:
         }
         result = ImagesListConverter.convert(sbom)
         assert result.images[0].missing_properties is True
+
+
+class TestImagesListConverterAPI:
+    @pytest.fixture
+    def client(self) -> TestClient:
+        app = FastAPI()
+        app.include_router(router)
+        with TestClient(app) as c:
+            yield c
+
+    def test_convert_valid_sbom(self, client: TestClient) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {"type": "container", "name": "web", "version": "1.0",
+                 "properties": [{"name": "GOST:attack_surface", "value": "no"},
+                                {"name": "GOST:security_function", "value": "no"}]}
+            ],
+        }
+        response = client.post(
+            "/api/v1/convert/images-list",
+            files={"file": ("test.json", json.dumps(sbom), "application/json")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "was_transformed" in data
+        assert "images" in data
+        assert "images_list" in data
+
+    def test_convert_without_file_returns_422(self, client: TestClient) -> None:
+        response = client.post("/api/v1/convert/images-list")
+        assert response.status_code == 422
+
+    def test_convert_invalid_json_returns_400(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/convert/images-list",
+            files={"file": ("bad.json", b"not json", "application/json")},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "invalid_json"
+
+    def test_convert_non_cyclonedx_returns_400(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/convert/images-list",
+            files={"file": ("test.json", json.dumps({"foo": "bar"}), "application/json")},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "invalid_sbom"
+
+    def test_convert_response_shape(self, client: TestClient) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {"type": "container", "name": "web", "version": "1.0",
+                 "properties": [{"name": "GOST:attack_surface", "value": "no"},
+                                {"name": "GOST:security_function", "value": "no"}]}
+            ],
+        }
+        response = client.post(
+            "/api/v1/convert/images-list",
+            files={"file": ("test.json", json.dumps(sbom), "application/json")},
+        )
+        data = response.json()
+        assert isinstance(data["was_transformed"], bool)
+        assert isinstance(data["images"], list)
+        assert isinstance(data["images_list"], dict)
+        if data["images"]:
+            img = data["images"][0]
+            assert "name" in img
+            assert "version" in img
+            assert "missing_components" in img
+            assert "missing_name" in img
+            assert "missing_version" in img
+            assert "missing_properties" in img
