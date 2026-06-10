@@ -1,6 +1,6 @@
 # Spec Workflow
 
-This document defines how AI agents and human developers use and maintain the specification system for the sbom-helper project. The project's development workflow is defined in `.misc/WORKFLOW.md` at the repository root — this file covers spec-specific processes.
+This document defines how AI agents and human developers use and maintain the specification system for the sbom-helper project. The project's development workflow is defined in `.misc/PROJECT_WORKFLOW.md` at the repository root — this file covers spec-specific processes.
 
 ## When to Read Specs
 
