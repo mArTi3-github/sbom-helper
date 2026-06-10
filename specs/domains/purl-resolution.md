@@ -131,10 +131,14 @@ Client                    API Layer (router)         Service Layer             p
 - **Graceful degradation**: if PostgreSQL is unavailable, the resolver still works (without caching)
 - **Store is best-effort**: a failure to store does not break the response to the client
 - **URL validation is optional**: controlled by `validate_db_urls` setting (default: off)
-- **Validation cooldown**: URL validation is skipped if `resolved_at` is today (same calendar date)
+- **Resolver-based cooldown**: Trusted resolvers (`purl2repo`, `ecosyste.ms`, `libraries.io`) respect `revalidation_cooldown_hours` setting; entries from other resolvers (e.g. `import-sbom`, `import-csv`) always trigger validation regardless of cooldown
+- **Cooldown disabled at zero**: Setting `revalidation_cooldown_hours=0` disables cooldown entirely — every cached entry triggers validation when `validate_db_urls=true`
+- **Rate-limit cooldown no longer masks invalid URLs**: During rate-limit cooldown, `validate_url()` returns `RATE_LIMITED` instead of `VALID` — cache is preserved but `resolved_at` is not updated, so the next request after cooldown performs real validation
+- **SBOM existing-ref validation**: Optional checkbox `validate_existing_refs` in SBOM Updater validates existing VCS references via HEAD + git ls-remote; `INVALID` results mark the component for re-resolution (`needs_enrichment=True`)
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
-- **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds
+- **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds, returning `RATE_LIMITED`
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationResult`, never raises exceptions
+- **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
 - **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **Canonical repository_kind values**: `repository_kind` uses `"vcs"` for VCS repository URLs (GitHub, GitLab, etc.) and `"source-distribution"` for source distribution/tarball URLs; the `REPOSITORY_KINDS` constant in `schemas.py` defines the valid set; `collector.py` uses the same values to identify existing source references
 - **SBOM enrichment uses resolver="import-sbom"**: both `resolve_batch()` and `store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
@@ -168,6 +172,7 @@ Client                    API Layer (router)         Service Layer             p
 | `github_token` | `null` | GitHub Personal Access Token for authenticated requests (git ls-remote, HTTP HEAD) |
 | `librariesio_enabled` | `false` | Enable libraries.io as a fallback resolver after purl2repo |
 | `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
+| `revalidation_cooldown_hours` | `24` | Re-validation cooldown in hours for trusted resolvers (0 = no cooldown, max 720) |
 | `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
 | `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
 
