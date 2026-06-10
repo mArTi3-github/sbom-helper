@@ -95,6 +95,10 @@
                 <input type="checkbox" id="remove-unresolved">
                 Удалять ненайденные компоненты без подкомпонентов
             </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.9rem;color:#555;cursor:pointer;margin-top:0.5rem;">
+                <input type="checkbox" id="validate-refs">
+                Проверять существующие VCS-ссылки в SBOM
+            </label>
             <button id="process-btn" disabled>Обработать</button>
         </div>
 
@@ -186,6 +190,11 @@
             const removeCheckbox = document.getElementById("remove-unresolved");
             if (removeCheckbox.checked) {
                 formData.append("remove_unresolved_no_subcomponents", "true");
+            }
+
+            const validateRefsCheckbox = document.getElementById("validate-refs");
+            if (validateRefsCheckbox.checked) {
+                formData.append("validate_existing_refs", "true");
             }
 
             try {

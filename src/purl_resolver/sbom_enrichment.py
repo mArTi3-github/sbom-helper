@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from .purl_utils import safe_normalize
 from .resolver.interface import Resolver
-from .sbom.collector import collect_components
+from .sbom.collector import _SOURCE_REF_TYPES, collect_components
+from .url_validator import UrlValidationResult, validate_url
 from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser, SbomParseError
 from .sbom.remover import remove_unresolved_components
@@ -40,11 +41,29 @@ class SbomEnrichmentPipeline:
         self,
         sbom_data: dict,
         remove_unresolved_no_subcomponents: bool = False,
+        validate_existing_refs: bool = False,
     ) -> SbomEnrichmentResult:
         """Parse, collect, deduplicate, resolve, enrich, and report."""
         CycloneDXParser.parse(sbom_data)
 
         components = collect_components(sbom_data)
+
+        if validate_existing_refs:
+            for comp in components:
+                if comp.needs_enrichment:
+                    continue
+                for ref in comp.existing_references:
+                    if ref.get("type") in _SOURCE_REF_TYPES and ref.get("url"):
+                        vresult = await validate_url(
+                            ref["url"],
+                            timeout=5,
+                            github_token=None,
+                        )
+                        if vresult == UrlValidationResult.INVALID:
+                            comp.needs_enrichment = True
+                            comp.existing_references = []
+                        break
+
         purls_to_resolve = [c for c in components if c.needs_enrichment]
 
         seen: set[str] = set()

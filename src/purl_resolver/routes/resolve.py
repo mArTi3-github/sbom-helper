@@ -35,6 +35,7 @@ async def resolve_sbom_endpoint(
     request: Request,
     file: UploadFile = File(...),
     remove_unresolved_no_subcomponents: bool = Form(False),
+    validate_existing_refs: bool = Form(False),
 ) -> JSONResponse:
     raw = await file.read()
     if len(raw) > sbom_settings.max_file_size:
@@ -61,7 +62,7 @@ async def resolve_sbom_endpoint(
     )
 
     try:
-        result = await pipeline.process(data, remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents)
+        result = await pipeline.process(data, remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents, validate_existing_refs=validate_existing_refs)
     except SbomParseError as e:
         return JSONResponse(
             status_code=400,

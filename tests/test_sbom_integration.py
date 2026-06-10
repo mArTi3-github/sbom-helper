@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -8,7 +9,9 @@ from fastapi.testclient import TestClient
 
 from purl_resolver.resolver.purl2repo import Purl2RepoResolver
 from purl_resolver.router import router
+from purl_resolver.sbom_enrichment import SbomEnrichmentPipeline
 from purl_resolver.storage.inmemory import InMemoryCache
+from purl_resolver.url_validator import UrlValidationResult
 
 
 @pytest.fixture
@@ -222,3 +225,140 @@ class TestSbomResolveE2E:
             assert child.get("externalReferences"), (
                 f"resolved child {child['name']} should have externalReferences"
             )
+
+
+class TestValidateExistingRefs:
+
+    @pytest.mark.asyncio
+    async def test_invalid_url_triggers_reresolution(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests-invalid"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+        )
+        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
+            result = await pipeline.process(sbom, validate_existing_refs=True)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        found_new_ref = any(
+            r.get("type") == "vcs" and "github.com" in (r.get("url") or "")
+            for r in enriched_refs
+        )
+        assert found_new_ref, "Expected a new VCS ref from resolution, got: %s" % enriched_refs
+
+    @pytest.mark.asyncio
+    async def test_valid_url_skips_reresolution(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests"},
+                    ],
+                }
+            ],
+        }
+        original_refs = list(sbom["components"][0].get("externalReferences", []))
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+        )
+        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
+            result = await pipeline.process(sbom, validate_existing_refs=True)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        assert len(enriched_refs) == len(original_refs)
+        assert enriched_refs[0]["url"] == original_refs[0]["url"]
+
+    @pytest.mark.asyncio
+    async def test_default_off(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests-invalid"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+        )
+        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock) as mock_validate:
+            result = await pipeline.process(sbom, validate_existing_refs=False)
+        mock_validate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_network_error_leaves_component(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests"},
+                    ],
+                }
+            ],
+        }
+        original_refs = list(sbom["components"][0].get("externalReferences", []))
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+        )
+        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
+            result = await pipeline.process(sbom, validate_existing_refs=True)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        assert enriched_refs == original_refs
