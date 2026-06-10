@@ -93,6 +93,18 @@
                 </div>
                 <input type="number" id="timeout-input" min="1" max="60" value="5">
             </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Re-validation cooldown (hours)</div>
+                    <div class="setting-desc">
+                        When set to 24 (default), URLs cached by trusted resolvers
+                        (purl2repo, ecosyste.ms, libraries.io) are re-validated at most once per day.
+                        Entries from imports or manual edits are always re-validated regardless of cooldown.
+                        Set to 0 to disable cooldown and always validate.
+                    </div>
+                </div>
+                <input type="number" id="cooldown-input" min="0" max="720" value="24">
+            </div>
         </div>
 
         <div class="card" style="margin-top:1rem;">
@@ -202,6 +214,7 @@
     <script>
         const toggle = document.getElementById("validate-toggle");
         const timeoutInput = document.getElementById("timeout-input");
+        const cooldownInput = document.getElementById("cooldown-input");
         const saveBtn = document.getElementById("save-btn");
         const msgDiv = document.getElementById("msg");
         const clearTokenBtn = document.getElementById("clear-token-btn");
@@ -220,6 +233,7 @@
                 const data = await res.json();
                 toggle.checked = data.validate_db_urls;
                 timeoutInput.value = data.url_validation_timeout;
+                cooldownInput.value = data.revalidation_cooldown_hours;
                 const badge = document.getElementById("token-badge");
                 badge.textContent = data.token_set.github_token ? "set" : "not set";
                 badge.style.color = data.token_set.github_token ? "#166534" : "#991b1b";
@@ -243,6 +257,7 @@
                 const body = {
                     validate_db_urls: toggle.checked,
                     url_validation_timeout: parseInt(timeoutInput.value, 10),
+                    revalidation_cooldown_hours: parseInt(cooldownInput.value, 10),
                 };
                 const tokenInput = document.getElementById("token-input");
                 if (tokenInput.value.trim() !== "") {

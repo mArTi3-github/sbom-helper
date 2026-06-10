@@ -31,6 +31,7 @@ class SettingsUpdate(BaseModel):
     librariesio_api_key: str | None = None
     ecosystems_enabled: bool | None = None
     ecosystems_api_key: str | None = None
+    revalidation_cooldown_hours: int | None = Field(None, ge=0, le=720)
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -50,6 +51,7 @@ async def get_settings(request: Request) -> JSONResponse:
     return JSONResponse(content={
         "validate_db_urls": settings.validate_db_urls,
         "url_validation_timeout": settings.url_validation_timeout,
+        "revalidation_cooldown_hours": settings.revalidation_cooldown_hours,
         "librariesio_enabled": settings.librariesio_enabled,
         "ecosystems_enabled": settings.ecosystems_enabled,
         "token_set": {
@@ -104,6 +106,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
     return JSONResponse(content={
         "validate_db_urls": updated.validate_db_urls,
         "url_validation_timeout": updated.url_validation_timeout,
+        "revalidation_cooldown_hours": updated.revalidation_cooldown_hours,
         "librariesio_enabled": updated.librariesio_enabled,
         "ecosystems_enabled": updated.ecosystems_enabled,
         "token_set": {
