@@ -145,7 +145,7 @@
             const confidenceClass = "badge-" + (data.confidence || "low");
 
             let detailsHtml = "";
-            if (data.evidence?.length || data.warnings?.length || data.repository_type || data.repository_kind || data.version_reference) {
+            if (data.evidence?.length || data.warnings?.length || data.repository_type || data.repository_kind || data.version_reference || data.found_by || data.resolver) {
                 let evidenceItems = "";
                 if (data.evidence?.length) {
                     evidenceItems = data.evidence.map(e => "<li>" + escapeHtml(e) + "</li>").join("");
@@ -163,6 +163,8 @@
                             ${evidenceItems ? "<dt>Evidence</dt><dd><ul>" + evidenceItems + "</ul></dd>" : ""}
                             ${warningItems ? '<dt class="warning">Warnings</dt><dd><ul>' + warningItems + "</ul></dd>" : ""}
                             ${data.version_reference ? "<dt>Version Reference</dt><dd><a href=\"" + escapeHtml(data.version_reference) + "\" target=\"_blank\">" + escapeHtml(data.version_reference) + "</a></dd>" : ""}
+                            ${data.found_by ? "<dt>Found by</dt><dd>" + escapeHtml(data.found_by) + "</dd>" : ""}
+                            ${data.resolver ? "<dt>Resolver</dt><dd>" + escapeHtml(data.resolver) + "</dd>" : ""}
                         </dl>
                     </div>
                 `;
