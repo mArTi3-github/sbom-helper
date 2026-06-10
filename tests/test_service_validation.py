@@ -63,7 +63,7 @@ def mock_storage():
 @pytest.fixture
 def mock_settings_store():
     store = MagicMock()
-    store.load = MagicMock(return_value=MagicMock(validate_db_urls=True, url_validation_timeout=5))
+    store.load = MagicMock(return_value=MagicMock(validate_db_urls=True, url_validation_timeout=5, revalidation_cooldown_hours=24))
     return store
 
 
@@ -143,8 +143,13 @@ class TestValidationIntegration:
             mock_validate.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_resolved_at_today_skips_validation(self, mock_storage, mock_settings_store):
-        mock_storage.lookup.return_value = _cached_response(days_ago=0)
+    async def test_trusted_resolver_within_cooldown_integration(self, mock_storage, mock_settings_store):
+        mock_storage.lookup.return_value = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
+            resolved_at=datetime.now().isoformat(),
+        )
         with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
             result = await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
@@ -169,6 +174,7 @@ async def test_resolve_purl_passes_token_to_validate_url():
     settings_store.load.return_value = AppSettings(
         validate_db_urls=True,
         github_token="ghp_test123",
+        revalidation_cooldown_hours=24,
     )
     with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID) as mock_validate:
         await resolve_purl(
@@ -192,6 +198,7 @@ async def test_resolve_purl_handles_token_invalid():
     settings_store.load.return_value = AppSettings(
         validate_db_urls=True,
         github_token="ghp_invalid",
+        revalidation_cooldown_hours=24,
     )
     with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate, \
          patch.object(settings_store, "save") as mock_save:
@@ -236,10 +243,11 @@ class TestValidateCachedUrl:
         cached = ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
             resolved_at=datetime.now().isoformat(),
         )
         settings_store = MagicMock()
-        settings_store.load.return_value = MagicMock(validate_db_urls=True)
+        settings_store.load.return_value = MagicMock(validate_db_urls=True, revalidation_cooldown_hours=24)
         result = await _validate_cached_url(cached, settings_store, "pkg:pypi/requests", AsyncMock())
         assert result == cached
 
@@ -255,6 +263,7 @@ class TestValidateCachedUrl:
             validate_db_urls=True,
             github_token=None,
             url_validation_timeout=5,
+            revalidation_cooldown_hours=24,
         )
         storage = AsyncMock()
         with patch("purl_resolver.service.validate_url", return_value=UrlValidationResult.VALID):
@@ -274,6 +283,7 @@ class TestValidateCachedUrl:
             validate_db_urls=True,
             github_token=None,
             url_validation_timeout=5,
+            revalidation_cooldown_hours=24,
         )
         storage = AsyncMock()
         with patch("purl_resolver.service.validate_url", return_value=UrlValidationResult.INVALID):
@@ -293,6 +303,7 @@ class TestValidateCachedUrl:
             validate_db_urls=True,
             github_token="ghp_invalid",
             url_validation_timeout=5,
+            revalidation_cooldown_hours=24,
         )
         settings_store.load.return_value = app_settings
         storage = AsyncMock()
@@ -314,8 +325,162 @@ class TestValidateCachedUrl:
             validate_db_urls=True,
             github_token=None,
             url_validation_timeout=5,
+            revalidation_cooldown_hours=24,
         )
         storage = AsyncMock()
         with patch("purl_resolver.service.validate_url", return_value=UrlValidationResult.NETWORK_ERROR):
             result = await _validate_cached_url(cached, settings_store, "pkg:pypi/requests", storage)
         assert result == cached
+
+    @pytest.mark.asyncio
+    async def test_rate_limited_does_not_update_resolved_at(self):
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
+            resolved_at="2020-01-01T00:00:00",
+        )
+        settings_store = MagicMock()
+        settings_store.load.return_value = MagicMock(
+            validate_db_urls=True,
+            revalidation_cooldown_hours=24,
+            github_token=None,
+            url_validation_timeout=5,
+        )
+        storage = AsyncMock()
+        with patch(
+            "purl_resolver.service.validate_url",
+            return_value=UrlValidationResult.RATE_LIMITED,
+        ):
+            result = await _validate_cached_url(
+                cached, settings_store, "pkg:pypi/requests", storage
+            )
+        assert result == cached
+        storage.store.assert_not_called()
+        storage.delete_purls.assert_not_called()
+
+
+class TestResolverBasedCooldown:
+    """_validate_cached_url cooldown depends on resolver field."""
+
+    @pytest.mark.asyncio
+    async def test_trusted_resolver_within_cooldown_skips_validation(self):
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
+            resolved_at=(datetime.now() - timedelta(hours=2)).isoformat(),
+        )
+        settings_store = MagicMock()
+        settings_store.load.return_value = MagicMock(
+            validate_db_urls=True,
+            revalidation_cooldown_hours=24,
+            github_token=None,
+            url_validation_timeout=5,
+        )
+        with patch("purl_resolver.service.validate_url") as mock_validate:
+            result = await _validate_cached_url(
+                cached, settings_store, "pkg:pypi/requests", AsyncMock()
+            )
+        assert result == cached
+        mock_validate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_trusted_resolver_outside_cooldown_runs_validation(self):
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
+            resolved_at=(datetime.now() - timedelta(hours=48)).isoformat(),
+        )
+        settings_store = MagicMock()
+        settings_store.load.return_value = MagicMock(
+            validate_db_urls=True,
+            revalidation_cooldown_hours=24,
+            github_token=None,
+            url_validation_timeout=5,
+        )
+        with patch(
+            "purl_resolver.service.validate_url",
+            return_value=UrlValidationResult.VALID,
+        ) as mock_validate:
+            result = await _validate_cached_url(
+                cached, settings_store, "pkg:pypi/requests", AsyncMock()
+            )
+        assert result == cached
+        mock_validate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_untrusted_resolver_always_validates(self):
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="import-sbom",
+            resolved_at=(datetime.now() - timedelta(hours=1)).isoformat(),
+        )
+        settings_store = MagicMock()
+        settings_store.load.return_value = MagicMock(
+            validate_db_urls=True,
+            revalidation_cooldown_hours=24,
+            github_token=None,
+            url_validation_timeout=5,
+        )
+        with patch(
+            "purl_resolver.service.validate_url",
+            return_value=UrlValidationResult.VALID,
+        ) as mock_validate:
+            result = await _validate_cached_url(
+                cached, settings_store, "pkg:pypi/requests", AsyncMock()
+            )
+        assert result == cached
+        mock_validate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_empty_resolver_always_validates(self):
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="",
+            resolved_at=(datetime.now() - timedelta(hours=1)).isoformat(),
+        )
+        settings_store = MagicMock()
+        settings_store.load.return_value = MagicMock(
+            validate_db_urls=True,
+            revalidation_cooldown_hours=24,
+            github_token=None,
+            url_validation_timeout=5,
+        )
+        with patch(
+            "purl_resolver.service.validate_url",
+            return_value=UrlValidationResult.VALID,
+        ) as mock_validate:
+            result = await _validate_cached_url(
+                cached, settings_store, "pkg:pypi/requests", AsyncMock()
+            )
+        assert result == cached
+        mock_validate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cooldown_hours_zero_disables_cooldown(self):
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
+            resolved_at=(datetime.now() - timedelta(hours=1)).isoformat(),
+        )
+        settings_store = MagicMock()
+        settings_store.load.return_value = MagicMock(
+            validate_db_urls=True,
+            revalidation_cooldown_hours=0,
+            github_token=None,
+            url_validation_timeout=5,
+        )
+        with patch(
+            "purl_resolver.service.validate_url",
+            return_value=UrlValidationResult.VALID,
+        ) as mock_validate:
+            result = await _validate_cached_url(
+                cached, settings_store, "pkg:pypi/requests", AsyncMock()
+            )
+        assert result == cached
+        mock_validate.assert_called_once()

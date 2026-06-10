@@ -24,6 +24,7 @@ class AppSettings(BaseModel):
     librariesio_api_key: str | None = None
     ecosystems_enabled: bool = True
     ecosystems_api_key: str | None = None
+    revalidation_cooldown_hours: int = Field(default=24, ge=0)
 
     def service_tokens(self) -> ServiceTokens:
         return ServiceTokens(github_token=self.github_token)

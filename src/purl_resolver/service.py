@@ -15,6 +15,8 @@ from .sbom.collector import SbomComponent
 
 logger = logging.getLogger(__name__)
 
+TRUSTED_RESOLVERS: frozenset[str] = frozenset({"purl2repo", "ecosyste.ms", "libraries.io"})
+
 _BATCH_SEMAPHORE_LIMIT = 10
 
 
@@ -31,15 +33,17 @@ async def _validate_cached_url(
     if not app_settings.validate_db_urls:
         return cached
 
-    resolved_date = None
-    if cached.resolved_at:
+    # Resolver-based cooldown: trusted resolvers respect cooldown_hours,
+    # untrusted/empty resolvers always trigger validation
+    cooldown_hours = app_settings.revalidation_cooldown_hours
+    if cooldown_hours > 0 and cached.resolver in TRUSTED_RESOLVERS and cached.resolved_at:
         try:
-            resolved_date = datetime.fromisoformat(cached.resolved_at).date()
+            resolved_date = datetime.fromisoformat(cached.resolved_at)
+            elapsed = datetime.now() - resolved_date
+            if elapsed.total_seconds() < cooldown_hours * 3600:
+                return cached
         except (ValueError, TypeError):
             pass
-
-    if resolved_date == datetime.now().date():
-        return cached
 
     github_token = app_settings.github_token
     vresult = await validate_url(
