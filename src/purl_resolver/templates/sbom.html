@@ -112,6 +112,8 @@
                         <th>PURL</th>
                         <th>Статус</th>
                         <th>Repository URL</th>
+                        <th>Found by</th>
+                        <th>Resolver</th>
                     </tr>
                 </thead>
                 <tbody id="results-body"></tbody>
@@ -245,6 +247,8 @@
                     <td><code>${escapeHtml(r.purl)}</code></td>
                     <td class="${statusClass}">${statusText}</td>
                     <td class="repo-url-cell">${urlHtml}</td>
+                    <td>${escapeHtml(r.found_by || "")}</td>
+                    <td>${escapeHtml(r.resolver || "")}</td>
                 </tr>`;
             }).join("");
 
