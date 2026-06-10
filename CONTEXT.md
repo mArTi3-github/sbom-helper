@@ -9,10 +9,10 @@ Package URL — стандартизированная строка, идент�
 _Avoid_: Package URL целиком, purl-строка
 
 **Primary Resolver**:
-Библиотека `purl2repo`, которая преобразует PURL в repository URL, confidence, evidence и repository_kind. Основной резолвер в MVP.
+Библиотека `purl2repo`, которая преобразует PURL в repository URL, confidence, evidence и repository_kind. Основной резолвер, первый в цепочке резолверов (Resolver Chain).
 
 **Fallback Resolver**:
-Библиотека `purl2src`, преобразующая PURL в download URL (тарбол/архив). Не входит в MVP; зарезервирована для будущего использования как резервный резолвер.
+Резолверы, вызываемые после Primary Resolver, если он не нашёл repository URL. Включают EcosystemsResolver (ecosyste.ms, fallback #1, включён по умолчанию) и LibrariesIoResolver (libraries.io, fallback #2, опционально, требует API key). Резолверы опрашиваются последовательно; первый успешный возвращает результат.
 
 **Repository URL**:
 Ссылка на VCS-репозиторий с исходным кодом (напр. `https://github.com/psf/requests`).
@@ -53,7 +53,7 @@ PURL, приведённый к минимальной форме `scheme:type/n
 Модуль `purl_utils/`, отвечающий за парсинг, валидацию и нормализацию PURL перед передачей резолверам. Использует библиотеку `packageurl-python`. Не зависит от какого-либо конкретного резолвера.
 
 **PurlValidationError**:
-Исключение, выбрасываемое `purl_utils` при невалидном PURL. Отличается от `InvalidPurlError` (который выбрасывается purl2repo) — это resolver-agnostic ошибка валидации на уровне приложения. Приводит к HTTP 400.
+Исключение, выбрасываемое `purl_utils` при невалидном PURL. Отличается от `InvalidPurlError` (определён в `resolver/interface.py`, выбрасывается резолверами) — это resolver-agnostic ошибка валидации на уровне приложения. Приводит к HTTP 400.
 
 **PurlComponents**:
 Структура данных, представляющая разобранный PURL на составные части: scheme, type, namespace, name, version, qualifiers, subpath.
@@ -62,10 +62,28 @@ PURL, приведённый к минимальной форме `scheme:type/n
 Функция `safe_normalize(purl) → str` в `purl_utils`. Оборачивает `validate()` + `normalize()` с обработкой исключений — при ошибке парсинга возвращает оригинальный PURL как есть. Устраняет дублирование логики нормализации в различных модулях.
 
 **SBOM Module**:
-Группа модулей `sbom/`, реализующих обработку CycloneDX SBOM: `parser.py` (валидация JSON-формата), `collector.py` (рекурсивный обход компонентов и выявление нуждающихся в обогащении), `enricher.py` (вставка VCS-ссылок в `externalReferences`), `reporter.py` (построение отчёта о результатах). Модуль импортирует `purl_utils` для нормализации PURL; не зависит от Storage или Resolver напрямую.
+Группа модулей `sbom/`, реализующих обработку CycloneDX SBOM: `parser.py` (валидация JSON-формата), `collector.py` (рекурсивный обход компонентов и выявление нуждающихся в обогащении), `enricher.py` (вставка VCS-ссылок в `externalReferences`), `remover.py` (удаление неразрешимых компонентов из SBOM), `reporter.py` (построение отчёта о результатах). Модуль импортирует `purl_utils` для нормализации PURL; не зависит от Storage или Resolver напрямую.
 
 **SBOM Enrichment**:
 Процесс обогащения CycloneDX SBOM-файла. Принимает на вход JSON-файл, находит компоненты без VCS/source-distribution ссылок в `externalReferences`, резолвит их PURL через существующий Service Layer, вставляет найденные ссылки и возвращает обогащённый SBOM вместе с отчётом (summary + results table).
 
 **Batch Resolution**:
 Функция `resolve_batch(purls, storage, resolvers) → dict` в Service Layer. Параллельно резолвит список PURL через `asyncio.gather()` с ограничением конкурентности (semaphore=10). Возвращает словарь `normalized_purl → repository_url` только для успешных резолвингов.
+
+**EcosystemsResolver**:
+Резолвер, использующий API `packages.ecosyste.ms` для поиска repository URL по PURL. Включён по умолчанию в настройках. Первый fallback-резолвер в цепочке. Возвращает `confidence: "medium"`.
+
+**LibrariesIoResolver**:
+Резолвер, использующий API `libraries.io` для поиска repository URL по PURL. Опциональный, требует API key в настройках. Второй fallback-резолвер в цепочке. Возвращает `confidence: "medium"`.
+
+**Resolver Chain**:
+Цепочка резолверов, реализованная в `resolver/factory.py`: `Purl2RepoResolver → EcosystemsResolver → LibrariesIoResolver`. Резолверы вызываются последовательно (через `for r in resolvers` в `service.py`). Первый резолвер, вернувший `repository_url`, считается успешным; остальные не вызываются.
+
+**URL Validator**:
+Модуль `url_validator.py`, реализующий валидацию repository URL с помощью HTTP HEAD-запроса и `git ls-remote`. Используется сервисным слоем для проверки актуальности кэшированных URL (настройка `validate_db_urls`).
+
+**SbomRemover**:
+Модуль `sbom/remover.py`, содержащий функцию `remove_unresolved_components()`. Удаляет из SBOM компоненты, для которых не удалось найти repository URL, за исключением компонентов, имеющих вложенные подкомпоненты (`has_subcomponents`). Вызывается из `SbomEnrichmentPipeline` в рамках опционального флага `remove_unresolved`.
+
+**SbomEnrichmentPipeline**:
+Класс-оркестратор в `sbom_enrichment.py`, управляющий полным циклом обогащения SBOM: парсинг → сбор компонентов → сохранение pre-existing references → batch-резолвинг → удаление неразрешённых (опционально) → enrichment → отчёт. Инкапсулирует взаимодействие между `sbom/*`, `service.py` и `storage`.

@@ -120,6 +120,8 @@
 |  |             PURL collection |                   |
 |  |  enricher.py — insert VCS  |                   |
 |  |             refs            |                   |
+|  |  remover.py — remove       |                   |
+|  |             unresolved     |                   |
 |  |  reporter.py — result table|                   |
 |  +-----------------------------+                   |
 |                                                    |
@@ -211,11 +213,12 @@
 - Has zero dependency on any resolver implementation
 
 ### SBOM Module (`sbom/`)
-- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `build_report`
+- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `remove_unresolved_components`, `build_report`
 - **`parser.py`** — `CycloneDXParser.parse(data) → dict` validates `bomFormat: CycloneDX` and `specVersion: 1.6`; raises `SbomParseError` on violation
 - **`collector.py`** — `collect_components(sbom) → list[SbomComponent]` recursively walks `components[]` arrays; `SbomComponent` dataclass tracks purl, path tuple, needs_enrichment flag, and existing references; components with `vcs` or `source-distribution` external references are marked as not needing enrichment
 - **`enricher.py`** — `enrich_sbom(sbom, components, resolved)` inserts `{"type": "vcs", "url": "..."}` into component `externalReferences` arrays at the correct paths; preserves existing references; increments `version` field by 1
-- **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL
+- **`remover.py`** — `remove_unresolved_components(sbom, components, resolved) → list[dict]` removes components that need enrichment, have no subcomponents, and were not resolved; returns list of removed component dicts
+- **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL; removed components are excluded from `not_found` counts
 - Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly
 
 ### Config Layer (`config.py`)

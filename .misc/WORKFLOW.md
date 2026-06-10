@@ -37,7 +37,8 @@ Dependencies are managed in `.venv/` (Python virtual environment). Always instal
 .venv/bin/pip install <package>
 ```
 
-Do NOT use `pip install --break-system-packages` or install outside `.venv`.
+Do NOT use `pip install --break-system-packages` or install outside `.venv`. 
+Instructions on how to use a virtual environment also should be given to subagents when using a subagent-drivendevelopment approach.
 
 ---
 

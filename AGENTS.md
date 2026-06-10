@@ -1,6 +1,7 @@
-## Specifications
+Общее описание назначения и структуры проекта sbom-helper доступно в specs/INDEX.md (и в файлах, на которые есть ссылки в INDEX.md). specs/META.md определяет формат и правила обновления спецификаций. Для исследования архитектуры проекта используй MCP-сервер codebase-memory-mcp (название проекта: "home-administrator-Desktop-projects-sbom-helper").
 
-Detailed system specs live in `specs/`. Before making structural changes, read the relevant spec:
+Общие правила работы описаны в .misc/WORKFLOW.md.
 
-- Start with `specs/INDEX.md` to find the right document for your task.
-- `specs/META.md` defines spec formats and update rules.
+Для планирования, внедрения и тестирования изменений используй скиллы из набора "superpowers". Для начала работы со скиллами используй скилл "superpowers:superpowers_using-superpowers". Если нужный скилл не находится — используй MCP-сервер superpowers-mcp.
+
+Перед структурными изменениями сначала читай соответствующий spec из specs/.
