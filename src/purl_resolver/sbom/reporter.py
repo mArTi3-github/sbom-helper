@@ -32,16 +32,30 @@ def build_report(
         repo_url = resp.repository_url if resp is not None else None
         if repo_url is not None:
             found_count += 1
-            results.append({"purl": key, "status": "found", "repository_url": repo_url})
+            results.append({
+                "purl": key,
+                "status": "found",
+                "repository_url": repo_url,
+                "found_by": resp.found_by if resp else "",
+                "resolver": resp.resolver if resp else "",
+            })
         else:
             not_found_count += 1
-            results.append({"purl": key, "status": "not_found", "repository_url": None})
+            results.append({
+                "purl": key,
+                "status": "not_found",
+                "repository_url": None,
+                "found_by": "",
+                "resolver": "",
+            })
 
     for r in removed:
         results.append({
             "purl": r["purl"],
             "status": "removed",
             "repository_url": None,
+            "found_by": "",
+            "resolver": "",
             "name": r["name"],
             "version": r["version"],
         })

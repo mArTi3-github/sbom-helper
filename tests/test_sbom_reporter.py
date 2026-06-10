@@ -104,6 +104,35 @@ class TestBuildReport:
         assert report["summary"]["removed"] == 0
         assert all(r["status"] != "removed" for r in report["results"])
 
+    def test_found_result_includes_found_by_and_resolver(self) -> None:
+        from purl_resolver.schemas import ResolveResponse
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+        ]
+        resolved = {
+            "pkg:pypi/a": ResolveResponse(
+                purl="pkg:pypi/a",
+                repository_url="https://example.com/a",
+                found_by="resolver",
+                resolver="ecosyste.ms",
+            )
+        }
+        report = build_report(components, resolved, skipped=0)
+        item = report["results"][0]
+        assert item["found_by"] == "resolver"
+        assert item["resolver"] == "ecosyste.ms"
+
+    def test_not_found_result_has_empty_found_by(self) -> None:
+        from purl_resolver.schemas import ResolveResponse
+        components = [
+            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+        ]
+        resolved: dict[str, ResolveResponse] = {}
+        report = build_report(components, resolved, skipped=0)
+        item = report["results"][0]
+        assert item["found_by"] == ""
+        assert item["resolver"] == ""
+
     def test_no_removed_when_parameter_omitted(self) -> None:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
