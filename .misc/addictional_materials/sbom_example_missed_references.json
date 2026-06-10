@@ -181,6 +181,24 @@
         },
         {
           "type": "library",
+          "bom-ref": "5533181c-0721-11f1-b717-0242ac110031",
+          "name": "ptaf-task-manager",
+          "version": "1.0",
+          "purl": "pkg:pypi/ptaf-task-manager",
+          "scope": "required",
+          "properties": [
+            {
+              "name": "GOST:attack_surface",
+              "value": "no"
+            },
+            {
+              "name": "GOST:security_function",
+              "value": "no"
+            }
+          ]
+        },
+        {
+          "type": "library",
           "bom-ref": "55331a92-0721-11f1-b717-0242ac110002",
           "name": "certifi",
           "version": "2026.1.4",
