@@ -99,7 +99,7 @@ Serve the web UI HTML page (PURL resolver).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns the Jinja2-rendered index page with a navigation bar linking to PURL Resolver, SBOM Updater, Database Admin, and Settings pages.
+Content-Type: `text/html`. Returns the Jinja2-rendered index page with a navigation bar linking to PURL Resolver, SBOM Updater, Database Admin, Settings, and Images List Converter pages.
 
 ---
 
@@ -264,6 +264,14 @@ Response (200): `Content-Type: text/html`. Jinja2-rendered `settings.html`.
 
 ---
 
+### `GET /images-list-converter`
+
+Serve the Images List Converter web UI page.
+
+Response (200): `Content-Type: text/html`. Jinja2-rendered `images-list-converter.html` with a file upload form for CycloneDX JSON SBOM files. The page handles file selection, upload, result display, and images list download via JavaScript.
+
+---
+
 ### `GET /api/v1/settings`
 
 Return current application settings.
@@ -343,6 +351,74 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 
 ---
 
+### `POST /api/v1/convert/images-list`
+
+Convert a CycloneDX SBOM file into a machine-readable list of Docker container images in CycloneDX format.
+
+#### Request
+
+`multipart/form-data` with field `file` containing a CycloneDX JSON file.
+
+- Maximum file size: 200 MB (configurable via `SBOM_MAX_FILE_SIZE`)
+- File must be valid JSON with `bomFormat: "CycloneDX"`
+- JSON is parsed and validated for required CycloneDX fields
+
+#### Success Response (200)
+
+```json
+{
+  "was_transformed": true,
+  "images": [
+    {
+      "name": "manager",
+      "version": "3.0.0",
+      "missing_components": false,
+      "missing_name": false,
+      "missing_version": false,
+      "missing_properties": false
+    }
+  ],
+  "images_list": { "bomFormat": "CycloneDX", "...": "..." }
+}
+```
+
+- `was_transformed` — boolean, whether the SBOM needed transformation (true = containers were promoted from nested levels, non-containers removed)
+- `images` — array of ImageInfo objects with completeness flags: `missing_components` (no nested components), `missing_name` (name empty/absent), `missing_version` (version empty/absent), `missing_properties` (properties empty/absent)
+- `images_list` — the resulting CycloneDX document with only `type=container` components at the top level
+
+#### Error Response (400) — invalid JSON
+
+```json
+{
+  "error": "invalid_json",
+  "message": "Invalid JSON: Expecting value: line 1 column 1"
+}
+```
+
+#### Error Response (400) — invalid SBOM format
+
+```json
+{
+  "error": "invalid_sbom",
+  "message": "Missing required field: bomFormat"
+}
+```
+
+#### Error Response (413) — file too large
+
+```json
+{
+  "error": "file_too_large",
+  "message": "File size exceeds maximum of 200 MB"
+}
+```
+
+#### Validation Error (422) — missing file field
+
+Standard FastAPI/Pydantic 422 response.
+
+---
+
 ## Enrichment Algorithm
 
 1. Recursively walk all `components[]` arrays (including nested `components` inside components)
@@ -370,6 +446,10 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 | CSV too large | 413 | `file_too_large` |
 | Invalid GitHub token on settings save | 400 | `invalid_token` |
 | Invalid libraries.io API key on settings save | 400 | `invalid_token` |
+| Images list conversion: invalid JSON | 400 | `invalid_json` |
+| Images list conversion: invalid SBOM format | 400 | `invalid_sbom` |
+| Images list conversion: file too large | 413 | `file_too_large` |
+| Images list conversion: missing file field | 422 | (Pydantic validation) |
 
 ## Breaking Change Checklist
 

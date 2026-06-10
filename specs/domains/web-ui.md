@@ -2,7 +2,7 @@
 
 ## Description
 
-Four browser interfaces: a single-page PURL resolver, an SBOM-updater page for enriching CycloneDX SBOM files, a database administration page for managing the `resolved_purls` table, and a settings page for application configuration.
+Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for enriching CycloneDX SBOM files, a database administration page for managing the `resolved_purls` table, a settings page for application configuration, and an Images List Converter page for transforming CycloneDX SBOM files into machine-readable lists of Docker container images.
 
 ## Key Files
 
@@ -10,7 +10,8 @@ Four browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `src/purl_resolver/templates/sbom.html` — SBOM-updater page: file upload form, results table, download button
 - `src/purl_resolver/templates/db-admin.html` — database administration page: filterable table with pagination, inline editing, CSV import/export, bulk delete
 - `src/purl_resolver/templates/settings.html` — settings page: URL validation toggle and timeout, GitHub token management (set/clear), ecosyste.ms resolver card (enable toggle, API key input), Libraries.io resolver card (enable toggle, API key input, status badge, clear button)
-- `src/purl_resolver/router.py` — Serves templates at `GET /`, `GET /sbom-updater`, `GET /db-admin`, and `GET /settings`
+- `src/purl_resolver/templates/images-list-converter.html` — Images List Converter page: file upload form, conversion status card, images table with completeness flags, download button
+- `src/purl_resolver/router.py` — Serves templates at `GET /`, `GET /sbom-updater`, `GET /db-admin`, `GET /settings`, and `GET /images-list-converter`
 
 ## Flows
 
@@ -58,6 +59,32 @@ User                   Browser                    API Layer
   | Sees results table    |                           |
   | with summary cards    |                           |
   | (including removed)   |                           |
+  | and download button   |                           |
+  |<----------------------|                           |
+```
+
+### Images List Conversion
+
+```
+User                   Browser                    API Layer
+  |                       |                           |
+  | Navigate to /images-list-converter               |
+  |---------------------->|                           |
+  |                       | 200 images-list-converter.html
+  |                       |<--------------------------|
+  |                       |                           |
+  | Selects .json file,   |                           |
+  | clicks "Конвертировать"                           |
+  |---------------------->|                           |
+  |                       | POST /api/v1/convert/images-list
+  |                       | (multipart/form-data)     |
+  |                       |-------------------------->|
+  |                       | 200 {was_transformed,     |
+  |                       |      images, images_list} |
+  |                       |<--------------------------|
+  | Sees status card,     |                           |
+  | images table with     |                           |
+  | completeness flags,   |                           |
   | and download button   |                           |
   |<----------------------|                           |
 ```
@@ -110,3 +137,17 @@ User                   Browser                    API Layer
 - Settings are saved via `PATCH /api/v1/settings` on button click
 - Success/error feedback is shown after save attempt
 - Nav-bar is consistent with all other pages
+
+### Images List Converter Page
+
+- The page never reloads during conversion (single-page behaviour via `fetch()`)
+- Upload area supports drag-and-drop and file picker
+- Convert button is disabled until a file is selected
+- Loading spinner is shown during server-side processing
+- Status card displays: "Преобразований не требуется" (green) if `was_transformed=false`, or "Выполнено преобразование" (yellow) if `was_transformed=true`
+- Results table displays columns: Имя образа, Версия, Заполнены компоненты, Заполнено поле name, Заполнено поле Properties
+- Completeness flags use ✅ (green) when condition is met, ❌ (red) when not; empty cells only when condition is met and flag is positive
+- Version cell shows ❌ inline when version is missing
+- "Скачать список образов" button triggers JSON file download
+- All states (empty, loading, success, error, network failure) have distinct visual representations
+- All pages include a navigation link to the Images List Converter page

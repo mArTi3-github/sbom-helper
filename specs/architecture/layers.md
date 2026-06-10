@@ -22,6 +22,7 @@
 |  |  GET / (HTML page)         |                   |
 |  |  GET /sbom-updater         |                   |
 |  |  GET /db-admin             |                   |
+|  |  GET /images-list-converter |
 |  |  GET /settings             |                   |
 |  |  GET /api/v1/db/purls      |                   |
 |  |  PATCH /api/v1/db/purls/   |                   |
@@ -123,6 +124,9 @@
 |  |  remover.py — remove       |                   |
 |  |             unresolved     |                   |
 |  |  reporter.py — result table|                   |
+|  |  images_list_converter.py  |                   |
+|  |             — container     |                   |
+|  |               promotion     |                   |
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
@@ -141,6 +145,9 @@
 |  |  templates/index.html       |                   |
 |  |  templates/sbom.html        |                   |
 |  |  templates/settings.html    |                   |
+|  |  templates/images-list-     |                   |
+|  |    converter.html            |                   |
+|  |  templates/db-admin.html    |                   |
 |  |                             |                   |
 |  |  Jinja2 templates           |                   |
 |  |  Vanilla JS + fetch()       |                   |
@@ -153,6 +160,7 @@
 - **API Layer** imports **Service Layer** (`service.py`) and **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) — but not vice versa
 - **API Layer** imports **csv_io** module for CSV parsing/rendering
 - **API Layer** imports **Config Layer** (settings)
+- **API Layer** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
 - **API Layer** imports **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use; accepts optional `settings_store` parameter for URL validation; accepts optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`service.py`), **SBOM Module** (`sbom/`), **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`); receives dependencies via constructor injection
@@ -175,6 +183,7 @@
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
 - Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
+- Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, returns conversion result with completeness flags
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`
 - Handle error responses from Service Layer and Pipeline
 - Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`, `db-admin.html`, `settings.html`)
@@ -213,12 +222,13 @@
 - Has zero dependency on any resolver implementation
 
 ### SBOM Module (`sbom/`)
-- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `remove_unresolved_components`, `build_report`
+- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `remove_unresolved_components`, `build_report`, `ImagesListConverter`, `ImageInfo`, `ImagesListConversionResult`
 - **`parser.py`** — `CycloneDXParser.parse(data) → dict` validates `bomFormat: CycloneDX` and `specVersion: 1.6`; raises `SbomParseError` on violation
 - **`collector.py`** — `collect_components(sbom) → list[SbomComponent]` recursively walks `components[]` arrays; `SbomComponent` dataclass tracks purl, path tuple, needs_enrichment flag, and existing references; components with `vcs` or `source-distribution` external references are marked as not needing enrichment
 - **`enricher.py`** — `enrich_sbom(sbom, components, resolved)` inserts `{"type": "vcs", "url": "..."}` into component `externalReferences` arrays at the correct paths; preserves existing references; increments `version` field by 1
 - **`remover.py`** — `remove_unresolved_components(sbom, components, resolved) → list[dict]` removes components that need enrichment, have no subcomponents, and were not resolved; returns list of removed component dicts
 - **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL; removed components are excluded from `not_found` counts
+- **`images_list_converter.py`** — `ImagesListConverter.convert(data) → ImagesListConversionResult` validates SBOM format via `CycloneDXParser`, checks if all top-level components are `type=container`, recursively collects container components from all nesting levels, promotes them to top-level, removes non-container components; returns `ImagesListConversionResult` with `was_transformed` flag, `images` list (with completeness flags), and the resulting `images_list` dict
 - Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly
 
 ### Config Layer (`config.py`)
@@ -242,6 +252,7 @@
 - `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download; navigation link to PURL resolver, DB-admin, and Settings pages
 - `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export (semicolon delimiter, BOM handling), bulk delete; column visibility controls; navigation link to PURL resolver, SBOM-updater, and Settings pages
 - `settings.html` — settings page: URL validation toggle, timeout configuration, GitHub token management (set/clear), Libraries.io resolver card (enable toggle, API key input, status badge, clear button); loads settings via `GET /api/v1/settings`, saves via `PATCH /api/v1/settings`; navigation link to all other pages
+- `images-list-converter.html` — Images List Converter page: file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/convert/images-list` (multipart); display status card (was_transformed), images table with completeness flags (✅/❌ for components, name, version, properties), "Скачать список образов" triggers JSON file download; navigation link to all other pages
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence

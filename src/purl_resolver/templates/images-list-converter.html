@@ -45,6 +45,7 @@
         th { background: #f9fafb; font-size: 0.8rem; text-transform: uppercase; color: #888; }
         th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
         .flag-present { color: #991b1b; font-weight: 500; }
+        .flag-ok { color: #166534; font-weight: 500; }
         .spinner {
             display: inline-block; width: 1.25rem; height: 1.25rem;
             border: 2px solid #e5e7eb; border-top-color: #2563eb;
@@ -86,7 +87,7 @@
             <button id="convert-btn" disabled>Конвертировать</button>
         </div>
 
-        <div id="loading" class="loading" style="display:none;display:flex;align-items:center;gap:0.5rem;margin-top:1rem;color:#666;">
+        <div id="loading" class="loading" style="display:none;">
             <span class="spinner" style="display:inline-block;width:1.25rem;height:1.25rem;border:2px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 0.6s linear infinite;"></span>
             Обработка SBOM...
         </div>
@@ -101,10 +102,9 @@
                         <tr>
                             <th>Имя образа</th>
                             <th>Версия</th>
-                            <th>Отсутствуют компоненты</th>
-                            <th>Не заполнено поле name</th>
-                            <th>Не заполнено поле version</th>
-                            <th>Не заполнено поле properties</th>
+                            <th>Заполнены компоненты</th>
+                            <th>Заполнено поле name</th>
+                            <th>Заполнено поле Properties</th>
                         </tr>
                     </thead>
                     <tbody id="results-body"></tbody>
@@ -212,13 +212,16 @@
             }
 
             resultsBody.innerHTML = data.images.map(img => {
+                const versionText = img.version ? escapeHtml(img.version) : "&mdash;";
+                const versionIcon = img.missing_version
+                    ? ' <span class="flag-present">&#10007;</span>'
+                    : ' <span class="flag-ok">&#10003;</span>';
                 return `<tr>
                     <td>${escapeHtml(img.name || "&mdash;")}</td>
-                    <td>${escapeHtml(img.version || "&mdash;")}</td>
-                    <td>${img.missing_components ? '<span class="flag-present">&#10007;</span>' : ""}</td>
-                    <td>${img.missing_name ? '<span class="flag-present">&#10007;</span>' : ""}</td>
-                    <td>${img.missing_version ? '<span class="flag-present">&#10007;</span>' : ""}</td>
-                    <td>${img.missing_properties ? '<span class="flag-present">&#10007;</span>' : ""}</td>
+                    <td>${versionText}${versionIcon}</td>
+                    <td>${img.missing_components ? '<span class="flag-present">&#10007;</span>' : '<span class="flag-ok">&#10003;</span>'}</td>
+                    <td>${img.missing_name ? '<span class="flag-present">&#10007;</span>' : '<span class="flag-ok">&#10003;</span>'}</td>
+                    <td>${img.missing_properties ? '<span class="flag-present">&#10007;</span>' : '<span class="flag-ok">&#10003;</span>'}</td>
                 </tr>`;
             }).join("");
 

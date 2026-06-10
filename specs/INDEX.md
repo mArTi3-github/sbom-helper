@@ -28,6 +28,7 @@
 | Add URL validation for cached URLs | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Change resolver error handling | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Remove unresolved SBOM components | `contracts/api-contract.md`, `domains/purl-resolution.md`, `domains/web-ui.md` |
+| Convert SBOM to images list (container list) | `contracts/api-contract.md`, `domains/web-ui.md`, `architecture/layers.md` |
 
 ## Dependency Graph
 
