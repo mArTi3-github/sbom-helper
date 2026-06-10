@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from purl_resolver.sbom.collector import SbomComponent
 from purl_resolver.sbom.reporter import build_report
+from purl_resolver.schemas import ResolveResponse
 
 
 class TestBuildReport:
@@ -10,7 +11,7 @@ class TestBuildReport:
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
             SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a", "pkg:pypi/b": "https://example.com/b"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a"), "pkg:pypi/b": ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b")}
         report = build_report(components, resolved, skipped=0)
         assert report["summary"]["total_purls"] == 2
         assert report["summary"]["found"] == 2
@@ -22,7 +23,7 @@ class TestBuildReport:
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
             SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, skipped=1)
         assert report["summary"]["total_purls"] == 2
         assert report["summary"]["found"] == 1
@@ -33,7 +34,7 @@ class TestBuildReport:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, skipped=0)
         item = report["results"][0]
         assert item["purl"] == "pkg:pypi/a"
@@ -44,7 +45,7 @@ class TestBuildReport:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]
-        resolved: dict[str, str] = {}
+        resolved: dict[str, ResolveResponse] = {}
         report = build_report(components, resolved, skipped=0)
         item = report["results"][0]
         assert item["status"] == "not_found"
@@ -55,7 +56,7 @@ class TestBuildReport:
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
             SbomComponent(name="a", version="2", purl="pkg:pypi/a@2", path=("components", 1), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, skipped=0)
         assert len(report["results"]) == 1
 
@@ -64,7 +65,7 @@ class TestBuildReport:
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=False),
             SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/b": "https://example.com/b"}
+        resolved = {"pkg:pypi/b": ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b")}
         report = build_report(components, resolved, skipped=0)
         assert report["summary"]["total_purls"] == 1
         assert report["summary"]["found"] == 1
@@ -75,7 +76,7 @@ class TestBuildReport:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
         report = build_report(components, resolved, skipped=0, removed=removed)
         assert report["summary"]["removed"] == 1
@@ -85,7 +86,7 @@ class TestBuildReport:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
         report = build_report(components, resolved, skipped=0, removed=removed)
         removed_results = [r for r in report["results"] if r["status"] == "removed"]
@@ -98,7 +99,7 @@ class TestBuildReport:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, skipped=0, removed=[])
         assert report["summary"]["removed"] == 0
         assert all(r["status"] != "removed" for r in report["results"])
@@ -107,6 +108,6 @@ class TestBuildReport:
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": "https://example.com/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, skipped=0)
         assert report["summary"]["removed"] == 0

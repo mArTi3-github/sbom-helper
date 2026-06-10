@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from purl_resolver.sbom.collector import collect_components
 from purl_resolver.sbom.enricher import enrich_sbom
+from purl_resolver.schemas import ResolveResponse
 
 
 class TestEnrichSbom:
@@ -18,7 +19,7 @@ class TestEnrichSbom:
                 }
             ],
         }
-        resolved = {"pkg:pypi/lib-a": "https://github.com/example/lib-a"}
+        resolved = {"pkg:pypi/lib-a": ResolveResponse(purl="pkg:pypi/lib-a", repository_url="https://github.com/example/lib-a")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
         comp = sbom["components"][0]
@@ -42,7 +43,7 @@ class TestEnrichSbom:
                 }
             ],
         }
-        resolved = {"pkg:pypi/lib-a": "https://github.com/example/lib-a"}
+        resolved = {"pkg:pypi/lib-a": ResolveResponse(purl="pkg:pypi/lib-a", repository_url="https://github.com/example/lib-a")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
         comp = sbom["components"][0]
@@ -63,7 +64,7 @@ class TestEnrichSbom:
                 }
             ],
         }
-        resolved: dict[str, str] = {}
+        resolved: dict[str, ResolveResponse] = {}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
         assert "externalReferences" not in sbom["components"][0]
@@ -84,7 +85,7 @@ class TestEnrichSbom:
                 }
             ],
         }
-        resolved = {"pkg:pypi/lib-a": "https://github.com/example/lib-a"}
+        resolved = {"pkg:pypi/lib-a": ResolveResponse(purl="pkg:pypi/lib-a", repository_url="https://github.com/example/lib-a")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
         comp = sbom["components"][0]
@@ -104,7 +105,7 @@ class TestEnrichSbom:
                 }
             ],
         }
-        resolved = {"pkg:pypi/lib-a": "https://github.com/example/lib-a"}
+        resolved = {"pkg:pypi/lib-a": ResolveResponse(purl="pkg:pypi/lib-a", repository_url="https://github.com/example/lib-a")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
         assert sbom["version"] == 3
@@ -130,7 +131,7 @@ class TestEnrichSbom:
                 }
             ],
         }
-        resolved = {"pkg:pypi/sub": "https://github.com/example/sub"}
+        resolved = {"pkg:pypi/sub": ResolveResponse(purl="pkg:pypi/sub", repository_url="https://github.com/example/sub")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
         sub = sbom["components"][0]["components"][0]
@@ -159,11 +160,11 @@ class TestEnrichSbom:
                 },
             ],
         }
-        resolved = {"pkg:pypi/lib-a": "https://github.com/example/lib-a"}
+        resolved = {"pkg:pypi/lib-a": ResolveResponse(purl="pkg:pypi/lib-a", repository_url="https://github.com/example/lib-a")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
-        assert sbom["components"][0]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"]
-        assert sbom["components"][1]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"]
+        assert sbom["components"][0]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"].repository_url
+        assert sbom["components"][1]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"].repository_url
 
     def test_build_report_includes_removed(self) -> None:
         from purl_resolver.sbom.reporter import build_report
@@ -175,7 +176,7 @@ class TestEnrichSbom:
             ],
         }
         components = collect_components(sbom)
-        resolved = {"pkg:pypi/a": "https://github.com/example/a"}
+        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://github.com/example/a")}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
         report = build_report(components, resolved, skipped=0, removed=removed)
         assert report["summary"]["removed"] == 1

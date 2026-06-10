@@ -95,6 +95,7 @@ async def resolve_purl(
             logger.info("Cache hit for %s", purl_key)
             cached = await _validate_cached_url(cached, settings_store, purl_key, storage)
         if cached is not None:
+            cached.found_by = "local_db"
             return ResolveResult.ok(cached)
     except Exception:
         logger.warning(
@@ -124,6 +125,7 @@ async def resolve_purl(
             warnings=list(resolution.warnings),
             version_reference=resolution.version_reference,
             resolver=r.name,
+            found_by="resolver",
         )
 
         try:
@@ -148,15 +150,15 @@ async def resolve_batch(
     resolvers: list[Resolver],
     settings_store: SettingsStore | None = None,
     resolver: str = "",
-) -> dict[str, str]:
+) -> dict[str, ResolveResponse]:
     semaphore = asyncio.Semaphore(_BATCH_SEMAPHORE_LIMIT)
 
-    async def _resolve_one(original: str) -> tuple[str, str | None]:
+    async def _resolve_one(original: str) -> tuple[str, ResolveResponse | None]:
         async with semaphore:
             result = await resolve_purl(original, storage, resolvers, settings_store=settings_store, resolver=resolver)
             key = safe_normalize(original)
             if result.response and result.response.repository_url:
-                return (key, result.response.repository_url)
+                return (key, result.response)
             return (key, None)
 
     tasks = [_resolve_one(p) for p in purls]

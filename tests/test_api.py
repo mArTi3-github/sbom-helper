@@ -141,6 +141,32 @@ class TestResolve:
         data = response.json()
         assert data["error"] == "invalid_purl"
 
+    def test_resolve_response_includes_found_by(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/resolve",
+            json={"purl": "pkg:pypi/requests@2.31.0"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "found_by" in data
+        assert data["found_by"] == "resolver"
+
+    def test_cached_response_includes_found_by_local_db(self, client: TestClient) -> None:
+        first = client.post(
+            "/api/v1/resolve",
+            json={"purl": "pkg:pypi/requests@2.31.0"},
+        )
+        assert first.status_code == 200
+        cached_data = first.json()
+        second = client.post(
+            "/api/v1/resolve",
+            json={"purl": "pkg:pypi/requests@2.31.0"},
+        )
+        assert second.status_code == 200
+        data = second.json()
+        assert data["found_by"] == "local_db"
+        assert data["resolver"] == cached_data["resolver"]
+
 
 class TestSettingsAPI:
     def test_get_settings_masks_github_token(self, client: TestClient, tmp_path) -> None:

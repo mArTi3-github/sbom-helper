@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from .collector import SbomComponent
 from ..purl_utils import safe_normalize
+from ..schemas import ResolveResponse
 
 
 def remove_unresolved_components(
     sbom: dict,
     components: list[SbomComponent],
-    resolved: dict[str, str],
+    resolved: dict[str, ResolveResponse],
 ) -> list[dict]:
     to_remove = [
         c for c in components

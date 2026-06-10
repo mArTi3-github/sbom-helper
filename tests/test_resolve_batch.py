@@ -34,8 +34,8 @@ class TestResolveBatch:
         ]
         result = await resolve_batch(purls, storage, [resolver])
         assert len(result) == 3
-        for key, url in result.items():
-            assert url == "https://github.com/psf/requests"
+        for key, resp in result.items():
+            assert resp.repository_url == "https://github.com/psf/requests"
 
     @pytest.mark.asyncio
     async def test_skips_purls_with_no_repository_url(self, storage: InMemoryCache) -> None:
@@ -82,3 +82,19 @@ class TestResolveBatch:
         cached = await storage.lookup("pkg:pypi/requests")
         assert cached is not None
         assert cached.repository_url == "https://github.com/psf/requests"
+
+    @pytest.mark.asyncio
+    async def test_resolved_entries_have_found_by_and_resolver(self, storage: InMemoryCache) -> None:
+        resolver = FakeResolver(
+            resolution=Resolution(
+                purl="pkg:pypi/requests@2.31.0",
+                repository_url="https://github.com/psf/requests",
+                confidence="high",
+            )
+        )
+        purls = ["pkg:pypi/requests@2.31.0"]
+        result = await resolve_batch(purls, storage, [resolver])
+        assert len(result) == 1
+        resp = result["pkg:pypi/requests"]
+        assert resp.found_by == "resolver"
+        assert resp.resolver == "fake"

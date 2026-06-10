@@ -11,6 +11,37 @@ from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.url_validator import UrlValidationResult
 
 
+class TestFoundBy:
+    @pytest.mark.asyncio
+    async def test_found_by_local_db_when_cached(self, mock_storage, mock_settings_store, resolver):
+        from datetime import datetime
+        cached = ResolveResponse(
+            purl="pkg:pypi/requests",
+            repository_url="https://github.com/psf/requests",
+            resolver="purl2repo",
+            resolved_at=datetime.now().isoformat(),
+        )
+        mock_storage.lookup = AsyncMock(return_value=cached)
+        with patch("purl_resolver.service._validate_cached_url", new_callable=AsyncMock, return_value=cached):
+            result = await resolve_purl(
+                "pkg:pypi/requests@2.31.0", mock_storage, [resolver], mock_settings_store
+            )
+        assert result.response is not None
+        assert result.response.found_by == "local_db"
+        assert result.response.resolver == "purl2repo"
+
+    @pytest.mark.asyncio
+    async def test_found_by_resolver_when_fresh(self, mock_storage, mock_settings_store, resolver):
+        mock_storage.lookup = AsyncMock(return_value=None)
+        resolver.name = "fake_resolver"
+        result = await resolve_purl(
+            "pkg:pypi/requests@2.31.0", mock_storage, [resolver], mock_settings_store
+        )
+        assert result.response is not None
+        assert result.response.found_by == "resolver"
+        assert result.response.resolver == "fake_resolver"
+
+
 def _cached_response(purl: str = "pkg:pypi/requests", days_ago: int = 0) -> ResolveResponse:
     resolved_at = (datetime.now() - timedelta(days=days_ago)).isoformat()
     return ResolveResponse(

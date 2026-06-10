@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from .collector import SbomComponent
 from ..purl_utils import safe_normalize
+from ..schemas import ResolveResponse
 
 
 def build_report(
     components: list[SbomComponent],
-    resolved: dict[str, str],
+    resolved: dict[str, ResolveResponse],
     skipped: int = 0,
     removed: list[dict] | None = None,
 ) -> dict:
@@ -27,7 +28,8 @@ def build_report(
         seen.add(key)
         if key in removed_keys:
             continue
-        repo_url = resolved.get(key)
+        resp = resolved.get(key)
+        repo_url = resp.repository_url if resp is not None else None
         if repo_url is not None:
             found_count += 1
             results.append({"purl": key, "status": "found", "repository_url": repo_url})
