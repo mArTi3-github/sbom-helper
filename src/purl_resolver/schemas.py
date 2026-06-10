@@ -23,6 +23,7 @@ class ResolveResponse(BaseModel):
     warnings: list[str] = []
     version_reference: str | None = None
     resolver: str = ""
+    found_by: str = ""
     resolved_at: str = ""
 
 
