@@ -111,8 +111,7 @@ class TestValidateUrl:
         _RateLimitTracker._count = 5
         _RateLimitTracker._cooldown_until = time.time() + 60
         result = await validate_url("https://github.com/psf/requests", timeout=5)
-        assert result == UrlValidationResult.VALID
-
+        assert result == UrlValidationResult.RATE_LIMITED
 
 class TestValidateUrlWithToken:
     @pytest.mark.asyncio

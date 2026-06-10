@@ -130,7 +130,7 @@ async def validate_github_token(token: str) -> bool:
 
 async def validate_url(url: str, timeout: int, github_token: str | None = None) -> UrlValidationResult:
     if _RateLimitTracker.is_in_cooldown():
-        return UrlValidationResult.VALID
+        return UrlValidationResult.RATE_LIMITED
 
     try:
         github_ok = await _check_connectivity(github_token=github_token)
