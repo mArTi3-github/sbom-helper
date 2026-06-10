@@ -82,6 +82,11 @@ class TestValidateUrl:
             assert result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
+    async def test_file_url_returns_invalid(self):
+        result = await validate_url("file:///usr/src/app/ptaf-task-mgr", timeout=5)
+        assert result == UrlValidationResult.INVALID
+
+    @pytest.mark.asyncio
     async def test_connectivity_probe_fails_returns_network_error(self):
         with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
             result = await validate_url("https://github.com/psf/requests", timeout=5)

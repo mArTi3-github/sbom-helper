@@ -129,6 +129,9 @@ async def validate_github_token(token: str) -> bool:
 
 
 async def validate_url(url: str, timeout: int, github_token: str | None = None) -> UrlValidationResult:
+    if not url.startswith(("http://", "https://")):
+        return UrlValidationResult.INVALID
+
     if _RateLimitTracker.is_in_cooldown():
         return UrlValidationResult.RATE_LIMITED
 
