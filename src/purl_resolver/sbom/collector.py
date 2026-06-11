@@ -16,6 +16,7 @@ class SbomComponent:
     needs_enrichment: bool
     has_subcomponents: bool = False
     existing_references: list[dict] = field(default_factory=list)
+    ignored: bool = False
 
 
 def _has_source_reference(component: dict) -> bool:
