@@ -64,7 +64,6 @@ def test_ignore_patterns_no_false_positives(sbom_data):
 def test_ignore_patterns_reporter_integration(sbom_data):
     """Verify that running full enrichment pipeline end-to-end with ignore patterns 
     produces correct report including ignored status."""
-    from purl_resolver.sbom_enrichment import _component_matches_any_pattern
 
     ignore_patterns = [{"field": "purl", "pattern": "test"}]
     components = collect_components(sbom_data)
