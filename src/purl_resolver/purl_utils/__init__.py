@@ -37,9 +37,12 @@ def validate(purl: str) -> PurlComponents:
 
 
 def normalize(components: PurlComponents) -> str:
-    if components.namespace:
-        return f"{components.scheme}:{components.type}/{components.namespace}/{components.name}"
-    return f"{components.scheme}:{components.type}/{components.name}"
+    purl_obj = PackageURL(
+        type=components.type,
+        namespace=components.namespace,
+        name=components.name,
+    )
+    return purl_obj.to_string()
 
 
 def safe_normalize(purl: str) -> str:

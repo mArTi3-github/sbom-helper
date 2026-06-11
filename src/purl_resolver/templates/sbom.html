@@ -80,6 +80,11 @@
         }
         .ignore-row input[type="text"]:focus { outline: none; border-color: #2563eb; }
         .ignore-sep { color: #6b7280; font-size: 0.85rem; font-style: italic; margin: 0.15rem 0 0.15rem 0.5rem; }
+        .ignore-row .delete-btn {
+            padding: 0.2rem 0.5rem; background: transparent; color: #ef4444;
+            border: 1px solid #ef4444; border-radius: 4px; font-size: 0.85rem; cursor: pointer; line-height: 1;
+        }
+        .ignore-row .delete-btn:hover { background: #fef2f2; }
         .status-ignored { color: #6b7280; font-weight: 500; }
     </style>
 </head>
@@ -119,7 +124,10 @@
         <div class="ignore-section">
             <h3>Игнорировать компоненты с перечисленными признаками:</h3>
             <div id="patterns-list"></div>
-            <button id="save-patterns-btn" style="margin-top:0.75rem;">Сохранить</button>
+            <div style="margin-top:0.5rem;display:flex;gap:0.5rem;">
+                <button id="add-row-btn">Добавить строку</button>
+                <button id="save-patterns-btn">Сохранить</button>
+            </div>
         </div>
 
         <div id="loading" class="loading" style="display:none;">
@@ -154,8 +162,9 @@
         // --- Ignore patterns UI ---
         const patternsList = document.getElementById("patterns-list");
         const savePatternsBtn = document.getElementById("save-patterns-btn");
+        const addRowBtn = document.getElementById("add-row-btn");
 
-        function createPatternRow(fieldVal, patternVal, isLast) {
+        function createPatternRow(fieldVal, patternVal) {
             const container = document.createElement("div");
             const row = document.createElement("div");
             row.className = "ignore-row";
@@ -175,17 +184,19 @@
             patternInput.value = patternVal || "";
             patternInput.dataset.role = "pattern";
 
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "delete-btn";
+            deleteBtn.textContent = "✕";
+            deleteBtn.type = "button";
+            deleteBtn.addEventListener("click", function () {
+                container.remove();
+            });
+
             row.appendChild(fieldInput);
             row.appendChild(containsLabel);
             row.appendChild(patternInput);
+            row.appendChild(deleteBtn);
             container.appendChild(row);
-
-            if (!isLast) {
-                const sep = document.createElement("div");
-                sep.className = "ignore-sep";
-                sep.textContent = "или";
-                container.appendChild(sep);
-            }
             return container;
         }
 
@@ -205,39 +216,20 @@
         function renderPatterns(patterns) {
             patternsList.innerHTML = "";
             const all = patterns || [];
-            const items = all.length === 0 ? [{field: "", pattern: ""}] : [...all, {field: "", pattern: ""}];
-            for (let i = 0; i < items.length; i++) {
-                const isLast = (i === items.length - 1);
-                const el = createPatternRow(items[i].field, items[i].pattern, isLast);
-                patternsList.appendChild(el);
-            }
-            attachAutoAdd();
-        }
-
-        function attachAutoAdd() {
-            const lastRow = patternsList.querySelector(".ignore-row:last-child");
-            if (!lastRow) return;
-            const inputs = lastRow.querySelectorAll('input[type="text"]');
-            inputs.forEach(inp => {
-                inp.removeEventListener("input", onLastRowInput);
-                inp.addEventListener("input", onLastRowInput);
-            });
-        }
-
-        let autoAddHandler = null;
-        function onLastRowInput() {
-            const rows = patternsList.querySelectorAll(".ignore-row");
-            const lastRow = rows[rows.length - 1];
-            if (!lastRow) return;
-            const fields = lastRow.querySelectorAll('input[type="text"]');
-            let hasValue = false;
-            fields.forEach(f => { if (f.value.trim()) hasValue = true; });
-            if (hasValue) {
-                const container = createPatternRow("", "", true);
-                patternsList.appendChild(container);
-                attachAutoAdd();
+            if (all.length === 0) {
+                patternsList.appendChild(createPatternRow("", ""));
+            } else {
+                all.forEach(p => {
+                    patternsList.appendChild(createPatternRow(p.field, p.pattern));
+                });
             }
         }
+
+        function addPatternRow() {
+            patternsList.appendChild(createPatternRow("", ""));
+        }
+
+        addRowBtn.addEventListener("click", addPatternRow);
 
         const uploadArea = document.getElementById("upload-area");
         const fileInput = document.getElementById("file-input");

@@ -102,4 +102,4 @@ class TestValidateAndNormalizeRoundtrip:
         components = validate("pkg:npm/%40angular/animation@12.3.1")
         assert components.namespace == "@angular"
         assert components.name == "animation"
-        assert normalize(components) == "pkg:npm/@angular/animation"
+        assert normalize(components) == "pkg:npm/%40angular/animation"
