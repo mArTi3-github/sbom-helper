@@ -68,6 +68,19 @@
         }
         .file-name { font-size: 0.9rem; color: #555; margin-top: 0.5rem; }
         footer { text-align: center; padding: 1rem; color: #999; font-size: 0.8rem; }
+        .ignore-section {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            padding: 1rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .ignore-section h3 { font-size: 1rem; margin-bottom: 0.75rem; }
+        .ignore-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+        .ignore-row input[type="text"] {
+            padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 4px;
+            font-size: 0.9rem; width: 180px;
+        }
+        .ignore-row input[type="text"]:focus { outline: none; border-color: #2563eb; }
+        .ignore-sep { color: #6b7280; font-size: 0.85rem; font-style: italic; margin: 0.15rem 0 0.15rem 0.5rem; }
+        .status-ignored { color: #6b7280; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -103,6 +116,12 @@
             <button id="process-btn" disabled>Обработать</button>
         </div>
 
+        <div class="ignore-section">
+            <h3>Игнорировать компоненты с перечисленными признаками:</h3>
+            <div id="patterns-list"></div>
+            <button id="save-patterns-btn" style="margin-top:0.75rem;">Сохранить</button>
+        </div>
+
         <div id="loading" class="loading" style="display:none;">
             <span class="spinner"></span> Обработка SBOM...
         </div>
@@ -132,6 +151,94 @@
     <footer>Powered by purl2repo</footer>
 
     <script>
+        // --- Ignore patterns UI ---
+        const patternsList = document.getElementById("patterns-list");
+        const savePatternsBtn = document.getElementById("save-patterns-btn");
+
+        function createPatternRow(fieldVal, patternVal, isLast) {
+            const container = document.createElement("div");
+            const row = document.createElement("div");
+            row.className = "ignore-row";
+
+            const fieldInput = document.createElement("input");
+            fieldInput.type = "text";
+            fieldInput.placeholder = "поле";
+            fieldInput.value = fieldVal || "";
+            fieldInput.dataset.role = "field";
+
+            const containsLabel = document.createElement("span");
+            containsLabel.textContent = "содержит";
+
+            const patternInput = document.createElement("input");
+            patternInput.type = "text";
+            patternInput.placeholder = "значение";
+            patternInput.value = patternVal || "";
+            patternInput.dataset.role = "pattern";
+
+            row.appendChild(fieldInput);
+            row.appendChild(containsLabel);
+            row.appendChild(patternInput);
+            container.appendChild(row);
+
+            if (!isLast) {
+                const sep = document.createElement("div");
+                sep.className = "ignore-sep";
+                sep.textContent = "или";
+                container.appendChild(sep);
+            }
+            return container;
+        }
+
+        function collectPatterns() {
+            const rows = patternsList.querySelectorAll(".ignore-row");
+            const patterns = [];
+            rows.forEach(row => {
+                const field = row.querySelector('[data-role="field"]').value.trim();
+                const pattern = row.querySelector('[data-role="pattern"]').value.trim();
+                if (field && pattern) {
+                    patterns.push({field, pattern});
+                }
+            });
+            return patterns;
+        }
+
+        function renderPatterns(patterns) {
+            patternsList.innerHTML = "";
+            const all = patterns || [];
+            const items = all.length === 0 ? [{field: "", pattern: ""}] : [...all, {field: "", pattern: ""}];
+            for (let i = 0; i < items.length; i++) {
+                const isLast = (i === items.length - 1);
+                const el = createPatternRow(items[i].field, items[i].pattern, isLast);
+                patternsList.appendChild(el);
+            }
+            attachAutoAdd();
+        }
+
+        function attachAutoAdd() {
+            const lastRow = patternsList.querySelector(".ignore-row:last-child");
+            if (!lastRow) return;
+            const inputs = lastRow.querySelectorAll('input[type="text"]');
+            inputs.forEach(inp => {
+                inp.removeEventListener("input", onLastRowInput);
+                inp.addEventListener("input", onLastRowInput);
+            });
+        }
+
+        let autoAddHandler = null;
+        function onLastRowInput() {
+            const rows = patternsList.querySelectorAll(".ignore-row");
+            const lastRow = rows[rows.length - 1];
+            if (!lastRow) return;
+            const fields = lastRow.querySelectorAll('input[type="text"]');
+            let hasValue = false;
+            fields.forEach(f => { if (f.value.trim()) hasValue = true; });
+            if (hasValue) {
+                const container = createPatternRow("", "", true);
+                patternsList.appendChild(container);
+                attachAutoAdd();
+            }
+        }
+
         const uploadArea = document.getElementById("upload-area");
         const fileInput = document.getElementById("file-input");
         const fileNameDisplay = document.getElementById("file-name");
@@ -162,6 +269,28 @@
         uploadArea.addEventListener("click", () => fileInput.click());
         fileInput.addEventListener("change", () => {
             if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        // Load ignore patterns on page load
+        fetch("/api/v1/sbom/ignore-patterns")
+            .then(r => r.json())
+            .then(data => renderPatterns(data.patterns))
+            .catch(() => renderPatterns([]));
+
+        // Save button
+        savePatternsBtn.addEventListener("click", async () => {
+            const patterns = collectPatterns();
+            try {
+                const res = await fetch("/api/v1/sbom/ignore-patterns", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({patterns}),
+                });
+                if (res.ok) {
+                    savePatternsBtn.textContent = "Сохранено";
+                    setTimeout(() => { savePatternsBtn.textContent = "Сохранить"; }, 2000);
+                }
+            } catch {}
         });
 
         function handleFile(file) {
@@ -196,6 +325,11 @@
             const validateRefsCheckbox = document.getElementById("validate-refs");
             if (validateRefsCheckbox.checked) {
                 formData.append("validate_existing_refs", "true");
+            }
+
+            const patterns = collectPatterns();
+            if (patterns.length > 0) {
+                formData.append("ignore_patterns", JSON.stringify(patterns));
             }
 
             try {
@@ -244,12 +378,17 @@
                     </div>
                     ${s.skipped > 0 ? `<div class="summary-item"><div class="summary-value skipped">${s.skipped}</div><div class="summary-label">Пропущено</div></div>` : ""}
                     ${s.removed > 0 ? `<div class="summary-item"><div class="summary-value" style="color:#b45309;">${s.removed}</div><div class="summary-label">Удалено</div></div>` : ""}
+                    ${s.ignored > 0 ? `<div class="summary-item"><div class="summary-value" style="color:#6b7280;">${s.ignored}</div><div class="summary-label">Игнорировано</div></div>` : ""}
                 </div>
             `;
 
             resultsBody.innerHTML = data.results.map(r => {
-                const statusClass = r.status === "found" ? "status-found" : r.status === "removed" ? "status-removed" : "status-not-found";
-                const statusText = r.status === "found" ? "Found" : r.status === "removed" ? "Removed" : "Not found";
+                const statusClass = r.status === "found" ? "status-found" : r.status === "removed" ? "status-removed" : r.status === "ignored" ? "status-ignored" : "status-not-found";
+                let statusText;
+                if (r.status === "found") statusText = "Found";
+                else if (r.status === "removed") statusText = "Removed";
+                else if (r.status === "ignored") statusText = "Ignored";
+                else statusText = "Not found";
                 const urlHtml = r.repository_url
                     ? `<a href="${escapeHtml(r.repository_url)}" target="_blank">${escapeHtml(r.repository_url)}</a>`
                     : "&mdash;";
