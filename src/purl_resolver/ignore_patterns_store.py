@@ -24,7 +24,12 @@ class IgnorePatternsStore:
             data = json.loads(raw)
             if not isinstance(data, list):
                 return []
-            return data
+            result: list[dict[str, str]] = []
+            for item in data:
+                if isinstance(item, dict):
+                    cleaned = {str(k): str(v) for k, v in item.items() if isinstance(v, (str, int, float, bool))}
+                    result.append(cleaned)
+            return result
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Failed to load ignore patterns from %s: %s", self._path, exc)
             return []

@@ -4,8 +4,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from purl_resolver.ignore_patterns_store import IgnorePatternsStore
 
 
@@ -43,3 +41,19 @@ def test_save_overwrites_existing():
         store.save([{"field": "new", "pattern": "new"}])
         saved = json.loads(path.read_text(encoding="utf-8"))
         assert saved == [{"field": "new", "pattern": "new"}]
+
+
+def test_load_returns_empty_list_on_corrupt_json():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "corrupt.json"
+        path.write_text("not valid json", encoding="utf-8")
+        store = IgnorePatternsStore(path)
+        assert store.load() == []
+
+
+def test_load_returns_empty_list_on_non_list_json():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "object.json"
+        path.write_text('{"key": "value"}', encoding="utf-8")
+        store = IgnorePatternsStore(path)
+        assert store.load() == []
