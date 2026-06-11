@@ -54,12 +54,10 @@ class SbomEnrichmentPipeline:
         storage: Storage,
         resolvers: list[Resolver],
         settings_store: SettingsStore | None = None,
-        ignore_patterns_store: IgnorePatternsStore | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers
         self._settings_store = settings_store
-        self._ignore_patterns_store = ignore_patterns_store
 
     async def process(
         self,
