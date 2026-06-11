@@ -11,6 +11,14 @@ chown -R 1001:1001 /app/data 2>/dev/null || true
 if [ "$(id -u)" = "0" ] && id -u app >/dev/null 2>&1; then
     exec python3 -c '
 import os, sys
+
+# HOME defaults to /root when inherited from the root environment.
+# The app user cannot read /root — this breaks asyncpg (it discovers
+# ~/.postgresql/postgresql.key) and any other lib that checks HOME.
+HOME = os.environ.get("HOME", "/nonexistent")
+if HOME == "/root" or HOME == "/nonexistent":
+    os.environ["HOME"] = "/app"
+
 os.setgid(1001)
 os.setuid(1001)
 os.execvp(sys.argv[1], sys.argv[1:])
