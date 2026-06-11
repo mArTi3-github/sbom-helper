@@ -110,7 +110,7 @@ async def _git_ls_remote(url: str, timeout: int, github_token: str | None = None
         return None
     except FileNotFoundError:
         logger.warning("git not found, skipping git ls-remote check")
-        return True
+        return None
     except Exception:
         return None
 
