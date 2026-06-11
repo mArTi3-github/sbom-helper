@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import Resolver
-from .sbom.collector import _SOURCE_REF_TYPES, collect_components
+from .sbom.collector import _SOURCE_REF_TYPES, SbomComponent, collect_components
+from .ignore_patterns_store import IgnorePatternsStore
 from .url_validator import UrlValidationResult, validate_url
 from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser, SbomParseError
@@ -16,6 +17,27 @@ from .settings_store import SettingsStore
 from .storage.interface import Storage
 
 logger = logging.getLogger(__name__)
+
+
+def _component_matches_any_pattern(
+    sbom_data: dict,
+    comp: SbomComponent,
+    ignore_patterns: list[dict[str, str]],
+) -> bool:
+    if not ignore_patterns:
+        return False
+    target: dict = sbom_data
+    for segment in comp.path:
+        target = target[segment]
+    for rule in ignore_patterns:
+        field = rule.get("field", "")
+        pattern = rule.get("pattern", "")
+        if not field or not pattern:
+            continue
+        value = target.get(field)
+        if value is not None and pattern in str(value):
+            return True
+    return False
 
 
 @dataclass
@@ -32,16 +54,19 @@ class SbomEnrichmentPipeline:
         storage: Storage,
         resolvers: list[Resolver],
         settings_store: SettingsStore | None = None,
+        ignore_patterns_store: IgnorePatternsStore | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers
         self._settings_store = settings_store
+        self._ignore_patterns_store = ignore_patterns_store
 
     async def process(
         self,
         sbom_data: dict,
         remove_unresolved_no_subcomponents: bool = False,
         validate_existing_refs: bool = False,
+        ignore_patterns: list[dict[str, str]] | None = None,
     ) -> SbomEnrichmentResult:
         """Parse, collect, deduplicate, resolve, enrich, and report."""
         CycloneDXParser.parse(sbom_data)
@@ -63,6 +88,15 @@ class SbomEnrichmentPipeline:
                             comp.needs_enrichment = True
                             comp.existing_references = []
                         break
+
+        # --- Ignore patterns filtering ---
+        if ignore_patterns:
+            for comp in components:
+                if not comp.needs_enrichment:
+                    continue
+                if _component_matches_any_pattern(sbom_data, comp, ignore_patterns):
+                    comp.ignored = True
+                    comp.needs_enrichment = False
 
         purls_to_resolve = [c for c in components if c.needs_enrichment]
 
