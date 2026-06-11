@@ -119,9 +119,38 @@ async def resolve_purl(
         if resolution.repository_url is None:
             continue
 
+        repo_url = resolution.repository_url
+
+        if settings_store is not None:
+            app_settings = settings_store.load()
+            if app_settings.validate_db_urls:
+                vresult = await validate_url(
+                    repo_url,
+                    app_settings.url_validation_timeout,
+                    github_token=app_settings.github_token,
+                )
+                if vresult == UrlValidationResult.TOKEN_INVALID:
+                    logger.warning("GitHub token invalid, retrying validation without token")
+                    vresult = await validate_url(
+                        repo_url,
+                        app_settings.url_validation_timeout,
+                        github_token=None,
+                    )
+                if vresult == UrlValidationResult.INVALID:
+                    logger.warning(
+                        "Resolver %s returned invalid URL %s for %s, skipping",
+                        r.name, repo_url, purl,
+                    )
+                    continue
+                if vresult in (UrlValidationResult.NETWORK_ERROR, UrlValidationResult.RATE_LIMITED):
+                    logger.warning(
+                        "URL validation inconclusive for %s (resolver=%s, result=%s), accepting anyway",
+                        repo_url, r.name, vresult,
+                    )
+
         response = ResolveResponse(
             purl=purl_key,
-            repository_url=resolution.repository_url,
+            repository_url=repo_url,
             repository_type=resolution.repository_type,
             repository_kind=resolution.repository_kind,
             confidence=resolution.confidence,

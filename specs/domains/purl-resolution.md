@@ -108,6 +108,21 @@ Client                    API Layer (router)         Service Layer             p
   |                          |                          |<------------------------------------------------------|
   |                          |                          |                        |                |                |
   |                          |                          | (если success)         |                |                |
+  |                          |                          | [если validate_db_urls  |                |                |
+  |                          |                          |  включена]              |                |                |
+  |                          |                          | validate_url(url, timeout)              |                |
+  |                          |                          | ------+                |                |                |
+  |                          |                          |        | HEAD + git    |                |                |
+  |                          |                          | <------+                |                |                |
+  |                          |                          |                        |                |                |
+  |                          |                          | VALID → store + return |                |                |
+  |                          |                          | INVALID → continue to  |                |                |
+  |                          |                          |           next resolver|                |                |
+  |                          |                          | NETWORK_ERROR → store  |                |                |
+  |                          |                          |           + return     |                |                |
+  |                          |                          |                        |                |                |
+  |                          |                          | [если validate_db_urls |                |                |
+  |                          |                          |  выключена]            |                |                |
   |                          |                          | storage.store(result)  |                |                |
   |                          |                          |--------------------------------------->|                |
   |                          |                          |                        |                |                |
@@ -130,7 +145,9 @@ Client                    API Layer (router)         Service Layer             p
 - **Only successful results are stored**: `repository_url = null` results are never persisted
 - **Graceful degradation**: if PostgreSQL is unavailable, the resolver still works (without caching)
 - **Store is best-effort**: a failure to store does not break the response to the client
-- **URL validation is optional**: controlled by `validate_db_urls` setting (default: off)
+- **URL validation is optional**: controlled by `validate_db_urls` setting (default: off). When enabled, validation applies to both cached entries and freshly resolved URLs. For cached entries, uses resolver-based cooldown; for fresh entries, validation runs synchronously before storing/returning.
+- **Fresh URL validation skips invalid results**: when `validate_db_urls=true`, a freshly resolved URL returning `INVALID` via `validate_url()` causes the resolver chain to continue to the next resolver. The invalid result is neither stored nor returned. `NETWORK_ERROR` and `RATE_LIMITED` results keep the current resolver's result (store + return) to avoid discarding potentially valid URLs due to transient errors.
+- **Fresh validation with TOKEN_INVALID retries without token**: same retry logic as cached validation — if `TOKEN_INVALID` is returned, the token is cleared and validation retried without authentication.
 - **Resolver-based cooldown**: Trusted resolvers (`purl2repo`, `ecosyste.ms`, `libraries.io`) respect `revalidation_cooldown_hours` setting; entries from other resolvers (e.g. `import-sbom`, `import-csv`) always trigger validation regardless of cooldown
 - **Cooldown disabled at zero**: Setting `revalidation_cooldown_hours=0` disables cooldown entirely — every cached entry triggers validation when `validate_db_urls=true`
 - **Rate-limit cooldown no longer masks invalid URLs**: During rate-limit cooldown, `validate_url()` returns `RATE_LIMITED` instead of `VALID` — cache is preserved but `resolved_at` is not updated, so the next request after cooldown performs real validation

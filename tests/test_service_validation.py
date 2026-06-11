@@ -31,11 +31,11 @@ class TestFoundBy:
         assert result.response.resolver == "purl2repo"
 
     @pytest.mark.asyncio
-    async def test_found_by_resolver_when_fresh(self, mock_storage, mock_settings_store, resolver):
+    async def test_found_by_resolver_when_fresh(self, mock_storage, resolver):
         mock_storage.lookup = AsyncMock(return_value=None)
         resolver.name = "fake_resolver"
         result = await resolve_purl(
-            "pkg:pypi/requests@2.31.0", mock_storage, [resolver], mock_settings_store
+            "pkg:pypi/requests@2.31.0", mock_storage, [resolver], settings_store=None
         )
         assert result.response is not None
         assert result.response.found_by == "resolver"
@@ -484,3 +484,150 @@ class TestResolverBasedCooldown:
             )
         assert result == cached
         mock_validate.assert_called_once()
+
+
+class TestFreshResolverValidation:
+    """Validation of freshly resolved URLs (not cached) when validate_db_urls is enabled."""
+
+    @pytest.mark.asyncio
+    async def test_skips_invalid_fresh_url_to_next_resolver(self, mock_storage, mock_settings_store):
+        first = AsyncMock()
+        first.name = "first_resolver"
+        first.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/not-found/repo",
+            repository_type="git",
+            repository_kind="vcs",
+            confidence="low",
+            evidence=["ecosyste.ms:npm/archy"],
+            warnings=[],
+            version_reference=None,
+        ))
+        second = AsyncMock()
+        second.name = "second_resolver"
+        second.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/valid/repo",
+            repository_type="git",
+            repository_kind="vcs",
+            confidence="high",
+            evidence=["libraries.io:npm/archy"],
+            warnings=[],
+            version_reference=None,
+        ))
+        mock_storage.lookup = AsyncMock(return_value=None)
+
+        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+            mock_validate.side_effect = [
+                UrlValidationResult.INVALID,
+                UrlValidationResult.VALID,
+            ]
+            result = await resolve_purl(
+                "pkg:npm/archy@1.0.0", mock_storage, [first, second], mock_settings_store
+            )
+
+        assert result.response is not None
+        assert result.response.repository_url == "https://github.com/valid/repo"
+        assert result.response.resolver == "second_resolver"
+        assert result.response.found_by == "resolver"
+        mock_storage.store.assert_called_once()
+        assert mock_storage.store.call_args[0][0].repository_url == "https://github.com/valid/repo"
+
+    @pytest.mark.asyncio
+    async def test_accepts_valid_fresh_url(self, mock_storage, mock_settings_store):
+        mock_storage.lookup = AsyncMock(return_value=None)
+        resolver = AsyncMock()
+        resolver.name = "test_resolver"
+        resolver.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/valid/repo",
+            repository_type="git",
+            repository_kind="vcs",
+            confidence="high",
+            evidence=["test"],
+            warnings=[],
+            version_reference=None,
+        ))
+
+        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
+            result = await resolve_purl(
+                "pkg:npm/archy@1.0.0", mock_storage, [resolver], mock_settings_store
+            )
+
+        assert result.response is not None
+        assert result.response.repository_url == "https://github.com/valid/repo"
+        mock_storage.store.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_accepts_fresh_url_on_network_error(self, mock_storage, mock_settings_store):
+        mock_storage.lookup = AsyncMock(return_value=None)
+        resolver = AsyncMock()
+        resolver.name = "test_resolver"
+        resolver.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/some/repo",
+            repository_type="git",
+            repository_kind="vcs",
+            confidence="high",
+            evidence=["test"],
+            warnings=[],
+            version_reference=None,
+        ))
+
+        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
+            result = await resolve_purl(
+                "pkg:npm/archy@1.0.0", mock_storage, [resolver], mock_settings_store
+            )
+
+        assert result.response is not None
+        assert result.response.repository_url == "https://github.com/some/repo"
+        mock_storage.store.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_validation_when_validate_db_urls_false(self, mock_storage):
+        settings_store = MagicMock()
+        settings_store.load = MagicMock(return_value=MagicMock(validate_db_urls=False))
+        mock_storage.lookup = AsyncMock(return_value=None)
+        resolver = AsyncMock()
+        resolver.name = "test_resolver"
+        resolver.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/any/repo",
+            repository_type="git",
+            repository_kind="vcs",
+            confidence="high",
+            evidence=["test"],
+            warnings=[],
+            version_reference=None,
+        ))
+
+        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+            result = await resolve_purl(
+                "pkg:npm/archy@1.0.0", mock_storage, [resolver], settings_store
+            )
+
+        assert result.response is not None
+        mock_validate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_all_resolvers_return_invalid_returns_unresolved(self, mock_storage, mock_settings_store):
+        mock_storage.lookup = AsyncMock(return_value=None)
+        first = AsyncMock()
+        first.name = "first"
+        first.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/gone/repo",
+            repository_type="git", repository_kind="vcs",
+            confidence="low", evidence=["ecosyste.ms"], warnings=[], version_reference=None,
+        ))
+        second = AsyncMock()
+        second.name = "second"
+        second.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/gone2/repo",
+            repository_type="git", repository_kind="vcs",
+            confidence="low", evidence=["libraries.io"], warnings=[], version_reference=None,
+        ))
+
+        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
+            result = await resolve_purl(
+                "pkg:npm/archy@1.0.0", mock_storage, [first, second], mock_settings_store
+            )
+
+        assert result.response is not None
+        assert result.response.repository_url is None
+        assert "No resolver found a repository URL" in result.response.warnings
+        mock_storage.store.assert_not_called()
