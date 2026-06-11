@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from .config import settings, storage_settings
 from .resolver.factory import build_resolvers
+from .ignore_patterns_store import IgnorePatternsStore
 from .settings_store import SettingsStore
 from .router import router
 from .storage.inmemory import InMemoryCache
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
         )
         app.state.storage = InMemoryCache()
     app.state.settings_store = SettingsStore()
+    app.state.ignore_patterns_store = IgnorePatternsStore()
 
     app_settings = app.state.settings_store.load()
     app.state.resolvers = build_resolvers(settings, app_settings)
