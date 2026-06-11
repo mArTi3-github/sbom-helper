@@ -18,8 +18,26 @@ def build_report(
     results: list[dict] = []
     found_count = 0
     not_found_count = 0
+    ignored_count = 0
 
     for comp in components:
+        if comp.ignored:
+            ignored_count += 1
+            key = safe_normalize(comp.purl)
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append({
+                "purl": key,
+                "status": "ignored",
+                "repository_url": None,
+                "found_by": "",
+                "resolver": "",
+                "name": comp.name,
+                "version": comp.version,
+            })
+            continue
+
         if not comp.needs_enrichment:
             continue
         key = safe_normalize(comp.purl)
@@ -67,6 +85,7 @@ def build_report(
             "not_found": not_found_count,
             "skipped": skipped,
             "removed": len(removed),
+            "ignored": ignored_count,
         },
         "results": results,
     }

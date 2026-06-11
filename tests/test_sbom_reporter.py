@@ -140,3 +140,32 @@ class TestBuildReport:
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, skipped=0)
         assert report["summary"]["removed"] == 0
+
+
+def test_build_report_includes_ignored_components():
+    comps = [
+        SbomComponent(name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0", path=("components", 0), needs_enrichment=False, ignored=True),
+        SbomComponent(name="pkg-b", version="2.0", purl="pkg:pypi/pkg-b@2.0", path=("components", 1), needs_enrichment=True, ignored=False),
+    ]
+    resolved = {}
+    report = build_report(comps, resolved)
+    assert report["summary"]["ignored"] == 1
+    assert report["summary"]["total_purls"] == 1
+    statuses = {r["status"] for r in report["results"]}
+    assert "ignored" in statuses
+    assert "not_found" in statuses
+    ignored = [r for r in report["results"] if r["status"] == "ignored"]
+    assert ignored[0]["name"] == "pkg-a"
+    assert ignored[0]["version"] == "1.0"
+
+
+def test_build_report_ignored_not_counted_in_total():
+    comps = [
+        SbomComponent(name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0", path=("components", 0), needs_enrichment=False, ignored=True),
+    ]
+    resolved = {}
+    report = build_report(comps, resolved)
+    assert report["summary"]["ignored"] == 1
+    assert report["summary"]["total_purls"] == 0
+    assert report["summary"]["found"] == 0
+    assert report["summary"]["not_found"] == 0
