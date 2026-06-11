@@ -81,6 +81,7 @@ class SbomEnrichmentPipeline:
                             ref["url"],
                             timeout=5,
                             github_token=None,
+                            skip_connectivity_check=True,
                         )
                         if vresult == UrlValidationResult.INVALID:
                             comp.needs_enrichment = True

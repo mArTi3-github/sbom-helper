@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from purl_resolver.url_validator import UrlValidationResult, validate_url, validate_github_token, _RateLimitTracker, _git_ls_remote
+from purl_resolver.url_validator import UrlValidationResult, validate_url, validate_github_token, _RateLimitTracker, _git_ls_remote, ensure_connectivity
 
 
 @pytest.fixture(autouse=True)
@@ -211,3 +211,45 @@ class TestValidateGithubToken:
             mock_head.side_effect = Exception("Connection refused")
             result = await validate_github_token("ghp_test")
             assert result is False
+
+
+class TestEnsureConnectivity:
+    @pytest.mark.asyncio
+    async def test_success_returns_true(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True):
+            result = await ensure_connectivity()
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_failure_raises_connection_error(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
+            with pytest.raises(ConnectionError, match="Cannot reach"):
+                await ensure_connectivity()
+
+    @pytest.mark.asyncio
+    async def test_failure_raises_with_token(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
+            with pytest.raises(ConnectionError):
+                await ensure_connectivity(github_token="ghp_test")
+
+
+class TestValidateUrlSkipConnectivity:
+    @pytest.mark.asyncio
+    async def test_skip_connectivity_check_skips_probe(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True) as mock_conn, \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            mock_head.return_value = _mock_head(200)
+            result = await validate_url("https://github.com/psf/requests", timeout=5, skip_connectivity_check=True)
+            assert result == UrlValidationResult.VALID
+            mock_conn.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_default_still_checks_connectivity(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True) as mock_conn, \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            mock_head.return_value = _mock_head(200)
+            result = await validate_url("https://github.com/psf/requests", timeout=5)
+            assert result == UrlValidationResult.VALID
+            mock_conn.assert_called_once()

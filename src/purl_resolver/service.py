@@ -50,6 +50,7 @@ async def _validate_cached_url(
         cached.repository_url,
         app_settings.url_validation_timeout,
         github_token=github_token,
+        skip_connectivity_check=True,
     )
 
     if vresult == UrlValidationResult.TOKEN_INVALID:
@@ -62,6 +63,7 @@ async def _validate_cached_url(
             cached.repository_url,
             app_settings.url_validation_timeout,
             github_token=None,
+            skip_connectivity_check=True,
         )
 
     if vresult == UrlValidationResult.VALID:
@@ -128,6 +130,7 @@ async def resolve_purl(
                     repo_url,
                     app_settings.url_validation_timeout,
                     github_token=app_settings.github_token,
+                    skip_connectivity_check=True,
                 )
                 if vresult == UrlValidationResult.TOKEN_INVALID:
                     logger.warning("GitHub token invalid, retrying validation without token")
@@ -135,6 +138,7 @@ async def resolve_purl(
                         repo_url,
                         app_settings.url_validation_timeout,
                         github_token=None,
+                        skip_connectivity_check=True,
                     )
                 if vresult == UrlValidationResult.INVALID:
                     logger.warning(

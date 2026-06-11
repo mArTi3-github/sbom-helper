@@ -9,12 +9,21 @@ from ..schemas import ResolveRequest
 from ..service import resolve_purl
 from ..sbom_enrichment import SbomEnrichmentPipeline
 from ..sbom.parser import SbomParseError
+from ..url_validator import ensure_connectivity
 
 router = APIRouter()
 
 
 @router.post("/api/v1/resolve")
 async def resolve_endpoint(body: ResolveRequest, request: Request) -> JSONResponse:
+    try:
+        await ensure_connectivity()
+    except ConnectionError as e:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "network_unavailable", "message": str(e)},
+        )
+
     result = await resolve_purl(
         purl=body.purl,
         storage=request.app.state.storage,
@@ -64,6 +73,14 @@ async def resolve_sbom_endpoint(
                 parsed_patterns = None
         except json.JSONDecodeError:
             parsed_patterns = None
+
+    try:
+        await ensure_connectivity()
+    except ConnectionError as e:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "network_unavailable", "message": str(e)},
+        )
 
     pipeline = SbomEnrichmentPipeline(
         storage=request.app.state.storage,

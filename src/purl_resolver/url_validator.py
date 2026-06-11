@@ -75,6 +75,14 @@ async def _check_connectivity(github_token: str | None = None) -> bool:
         return False
 
 
+async def ensure_connectivity(github_token: str | None = None) -> bool:
+    """Check connectivity once before batch processing. Raises on failure."""
+    ok = await _check_connectivity(github_token=github_token)
+    if not ok:
+        raise ConnectionError(f"Cannot reach {_CONNECTIVITY_URL}")
+    return True
+
+
 async def _head_request(url: str, timeout: int, github_token: str | None = None):
     import httpx
     headers = {}
@@ -128,20 +136,21 @@ async def validate_github_token(token: str) -> bool:
         return False
 
 
-async def validate_url(url: str, timeout: int, github_token: str | None = None) -> UrlValidationResult:
+async def validate_url(url: str, timeout: int, github_token: str | None = None, skip_connectivity_check: bool = False) -> UrlValidationResult:
     if not url.startswith(("http://", "https://")):
         return UrlValidationResult.INVALID
 
     if _RateLimitTracker.is_in_cooldown():
         return UrlValidationResult.RATE_LIMITED
 
-    try:
-        github_ok = await _check_connectivity(github_token=github_token)
-    except Exception:
-        return UrlValidationResult.NETWORK_ERROR
+    if not skip_connectivity_check:
+        try:
+            github_ok = await _check_connectivity(github_token=github_token)
+        except Exception:
+            return UrlValidationResult.NETWORK_ERROR
 
-    if not github_ok:
-        return UrlValidationResult.NETWORK_ERROR
+        if not github_ok:
+            return UrlValidationResult.NETWORK_ERROR
 
     try:
         resp = await _head_request(url, timeout, github_token=github_token)

@@ -444,3 +444,74 @@ class TestFileUrlInvalidation:
         # Report should show not_found (resolvers can't find this package)
         summary = result.report["summary"]
         assert summary["not_found"] >= 1, "Component with file:// URL should show as not_found"
+
+
+class TestConnectivityPreCheck:
+    """Integration tests: connectivity check happens once per user action."""
+
+    def test_sbom_resolve_fails_when_connectivity_down(self, client: TestClient) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "metadata": {
+                "timestamp": "2024-01-01T00:00:00",
+                "component": {"type": "application", "name": "app", "version": "1.0"},
+            },
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                },
+            ],
+        }
+        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, side_effect=ConnectionError("Cannot reach https://github.com")):
+            response = client.post(
+                "/api/v1/resolve/sbom",
+                files={"file": ("test.json", json.dumps(sbom), "application/json")},
+            )
+        assert response.status_code == 503
+        data = response.json()
+        assert data["error"] == "network_unavailable"
+
+    def test_sbom_resolve_skips_per_url_connectivity_check(self, client: TestClient) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "metadata": {
+                "timestamp": "2024-01-01T00:00:00",
+                "component": {"type": "application", "name": "app", "version": "1.0"},
+            },
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                },
+            ],
+        }
+        settings_store = MagicMock()
+        settings_store.load.return_value = AppSettings(validate_db_urls=True, url_validation_timeout=5)
+        client.app.state.settings_store = settings_store
+        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock) as mock_conn:
+            response = client.post(
+                "/api/v1/resolve/sbom",
+                files={"file": ("test.json", json.dumps(sbom), "application/json")},
+            )
+        assert response.status_code == 200
+        mock_conn.assert_not_called()
+
+    def test_single_resolve_fails_when_connectivity_down(self, client: TestClient) -> None:
+        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, side_effect=ConnectionError("Cannot reach https://github.com")):
+            response = client.post(
+                "/api/v1/resolve",
+                json={"purl": "pkg:pypi/requests@2.31.0"},
+            )
+        assert response.status_code == 503
+        data = response.json()
+        assert data["error"] == "network_unavailable"
