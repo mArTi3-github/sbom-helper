@@ -36,6 +36,7 @@ async def resolve_sbom_endpoint(
     file: UploadFile = File(...),
     remove_unresolved_no_subcomponents: bool = Form(False),
     validate_existing_refs: bool = Form(False),
+    ignore_patterns: str = Form(None),
 ) -> JSONResponse:
     raw = await file.read()
     if len(raw) > sbom_settings.max_file_size:
@@ -55,6 +56,15 @@ async def resolve_sbom_endpoint(
             content={"error": "invalid_json", "message": f"Invalid JSON: {e}"},
         )
 
+    parsed_patterns: list[dict[str, str]] | None = None
+    if ignore_patterns:
+        try:
+            parsed_patterns = json.loads(ignore_patterns)
+            if not isinstance(parsed_patterns, list):
+                parsed_patterns = None
+        except json.JSONDecodeError:
+            parsed_patterns = None
+
     pipeline = SbomEnrichmentPipeline(
         storage=request.app.state.storage,
         resolvers=request.app.state.resolvers,
@@ -62,7 +72,7 @@ async def resolve_sbom_endpoint(
     )
 
     try:
-        result = await pipeline.process(data, remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents, validate_existing_refs=validate_existing_refs)
+        result = await pipeline.process(data, remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents, validate_existing_refs=validate_existing_refs, ignore_patterns=parsed_patterns)
     except SbomParseError as e:
         return JSONResponse(
             status_code=400,
