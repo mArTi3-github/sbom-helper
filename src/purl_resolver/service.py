@@ -10,7 +10,7 @@ from .sbom.collector import SbomComponent
 from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
-from .url_validator import UrlValidationResult, validate_url, validate_url_with_retry
+from .url_validator import UrlValidationResult, validate_url_with_retry
 
 logger = logging.getLogger(__name__)
 

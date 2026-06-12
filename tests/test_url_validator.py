@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -273,7 +273,6 @@ class TestValidateUrlWithRetry:
 
     @pytest.mark.asyncio
     async def test_token_invalid_retries_without_token(self):
-        saved_token = None
 
         class FakeSettingsStore:
             def load(self):

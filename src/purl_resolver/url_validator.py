@@ -139,7 +139,12 @@ async def validate_github_token(token: str) -> bool:
         return False
 
 
-async def validate_url(url: str, timeout: int, github_token: str | None = None, skip_connectivity_check: bool = False) -> UrlValidationResult:
+async def validate_url(
+    url: str,
+    timeout: int,
+    github_token: str | None = None,
+    skip_connectivity_check: bool = False,
+) -> UrlValidationResult:
     if not url.startswith(("http://", "https://")):
         return UrlValidationResult.INVALID
 

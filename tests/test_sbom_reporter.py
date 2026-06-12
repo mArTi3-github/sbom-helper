@@ -11,7 +11,10 @@ class TestBuildReport:
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
             SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
         ]
-        resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a"), "pkg:pypi/b": ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b")}
+        resolved = {
+            "pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a"),
+            "pkg:pypi/b": ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b"),
+        }
         report = build_report(components, resolved, skipped=0)
         assert report["summary"]["total_purls"] == 2
         assert report["summary"]["found"] == 2
@@ -143,8 +146,14 @@ class TestBuildReport:
 
 def test_build_report_includes_ignored_components():
     comps = [
-        SbomComponent(name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0", path=("components", 0), needs_enrichment=False, ignored=True),
-        SbomComponent(name="pkg-b", version="2.0", purl="pkg:pypi/pkg-b@2.0", path=("components", 1), needs_enrichment=True, ignored=False),
+        SbomComponent(
+            name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0",
+            path=("components", 0), needs_enrichment=False, ignored=True,
+        ),
+        SbomComponent(
+            name="pkg-b", version="2.0", purl="pkg:pypi/pkg-b@2.0",
+            path=("components", 1), needs_enrichment=True, ignored=False,
+        ),
     ]
     resolved = {}
     report = build_report(comps, resolved)
@@ -160,7 +169,10 @@ def test_build_report_includes_ignored_components():
 
 def test_build_report_ignored_not_counted_in_total():
     comps = [
-        SbomComponent(name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0", path=("components", 0), needs_enrichment=False, ignored=True),
+        SbomComponent(
+            name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0",
+            path=("components", 0), needs_enrichment=False, ignored=True,
+        ),
     ]
     resolved = {}
     report = build_report(comps, resolved)

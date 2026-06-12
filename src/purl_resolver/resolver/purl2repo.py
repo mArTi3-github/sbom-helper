@@ -52,7 +52,8 @@ class Purl2RepoResolver(Resolver):
                 cache_dir=self._cache_dir,
             )
         except UnsupportedEcosystemError as e:
-            logger.info("purl2repo does not support type %s, skipping", purl.split(":")[1].split("/")[0] if ":" in purl else "?")
+            pkg_type = purl.split(":")[1].split("/")[0] if ":" in purl else "?"
+            logger.info("purl2repo does not support type %s, skipping", pkg_type)
             return Resolution(
                 purl=purl,
                 warnings=[f"Unsupported package type for purl2repo: {e}"],

@@ -264,7 +264,11 @@ class TestValidateExistingRefs:
             settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=UrlValidationResult.INVALID,
+        ):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         found_new_ref = any(
@@ -302,7 +306,11 @@ class TestValidateExistingRefs:
             settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=UrlValidationResult.VALID,
+        ):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert len(enriched_refs) == len(original_refs)
@@ -369,7 +377,11 @@ class TestValidateExistingRefs:
             settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=UrlValidationResult.NETWORK_ERROR,
+        ):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs == original_refs
@@ -446,7 +458,11 @@ class TestFileUrlInvalidation:
             storage=storage_with_file_url,
             resolvers=fake_empty_resolvers,
             settings_store=settings_store_with_validation,
-            resolution_service=PurlResolutionService(storage_with_file_url, fake_empty_resolvers, settings_store_with_validation),
+            resolution_service=PurlResolutionService(
+                storage_with_file_url,
+                fake_empty_resolvers,
+                settings_store_with_validation,
+            ),
         )
         result = await pipeline.process(sbom, validate_existing_refs=False)
         # DB entry should be deleted after processing
@@ -478,7 +494,11 @@ class TestConnectivityPreCheck:
                 },
             ],
         }
-        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, side_effect=ConnectionError("Cannot reach https://github.com")):
+        with patch(
+            "purl_resolver.routes.resolve.ensure_connectivity",
+            new_callable=AsyncMock,
+            side_effect=ConnectionError("Cannot reach https://github.com"),
+        ):
             response = client.post(
                 "/api/v1/resolve/sbom",
                 files={"file": ("test.json", json.dumps(sbom), "application/json")},
@@ -518,7 +538,11 @@ class TestConnectivityPreCheck:
         mock_conn.assert_not_called()
 
     def test_single_resolve_fails_when_connectivity_down(self, client: TestClient) -> None:
-        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, side_effect=ConnectionError("Cannot reach https://github.com")):
+        with patch(
+            "purl_resolver.routes.resolve.ensure_connectivity",
+            new_callable=AsyncMock,
+            side_effect=ConnectionError("Cannot reach https://github.com"),
+        ):
             response = client.post(
                 "/api/v1/resolve",
                 json={"purl": "pkg:pypi/requests@2.31.0"},

@@ -85,7 +85,12 @@ async def resolve_sbom_endpoint(
     )
 
     try:
-        result = await pipeline.process(data, remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents, validate_existing_refs=validate_existing_refs, ignore_patterns=parsed_patterns)
+        result = await pipeline.process(
+            data,
+            remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents,
+            validate_existing_refs=validate_existing_refs,
+            ignore_patterns=parsed_patterns,
+        )
     except SbomParseError as e:
         return JSONResponse(
             status_code=400,
