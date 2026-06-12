@@ -204,6 +204,44 @@
                            placeholder="ecosyste.ms API key (optional)" style="width:240px;padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;">
                 </div>
             </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Max requests per second</div>
+                    <div class="setting-desc">
+                        Rate limit for ecosyste.ms API requests (0.1–100 req/s).
+                        Default: 2.0. Lower values reduce timeout risk under concurrent load.
+                    </div>
+                </div>
+                <input type="number" id="ecosystems-rate-input"
+                       min="0.1" max="100" step="0.1" value="2.0"
+                       style="width:80px;padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;text-align:center;">
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+            <div class="card-title">Resolver Behaviour</div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Max retry attempts</div>
+                    <div class="setting-desc">
+                        Maximum HTTP request attempts per resolver (including the first).
+                        Applied to ecosyste.ms and libraries.io on timeout, rate limit (429), and server errors (5xx).
+                        Default: 3. Range: 1–10.
+                    </div>
+                </div>
+                <input type="number" id="retry-attempts-input" min="1" max="10" value="3">
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Retry cooldown (seconds)</div>
+                    <div class="setting-desc">
+                        Base wait time between retries. Actual wait = cooldown × (attempt − 1).
+                        Example: cooldown=5 → waits 5s before 2nd attempt, 10s before 3rd.
+                        Range: 0.5–120 seconds.
+                    </div>
+                </div>
+                <input type="number" id="retry-cooldown-input" min="0.5" max="120" step="0.5" value="5.0">
+            </div>
         </div>
 
         <button id="save-btn" style="margin-top:1rem;">Save</button>
@@ -227,6 +265,9 @@
         const ecoKeyInput = document.getElementById("ecosystems-key-input");
         const ecoBadge = document.getElementById("ecosystems-key-badge");
         const ecoClearBtn = document.getElementById("clear-ecosystems-key-btn");
+        const ecoRateInput = document.getElementById("ecosystems-rate-input");
+        const retryAttemptsInput = document.getElementById("retry-attempts-input");
+        const retryCooldownInput = document.getElementById("retry-cooldown-input");
 
         async function loadSettings() {
             try {
@@ -247,6 +288,9 @@
                 ecoBadge.textContent = data.token_set.ecosystems_api_key ? "set" : "not set";
                 ecoBadge.style.color = data.token_set.ecosystems_api_key ? "#166534" : "#991b1b";
                 ecoClearBtn.style.display = data.token_set.ecosystems_api_key ? "inline-block" : "none";
+                ecoRateInput.value = data.ecosystems_max_requests_per_second;
+                retryAttemptsInput.value = data.retry_max_attempts;
+                retryCooldownInput.value = data.retry_base_cooldown_seconds;
             } catch {
                 showMessage("Failed to load settings", true);
             }
@@ -272,6 +316,9 @@
                 if (ecoKeyInput.value.trim() !== "") {
                     body.ecosystems_api_key = ecoKeyInput.value.trim();
                 }
+                body.ecosystems_max_requests_per_second = parseFloat(ecoRateInput.value);
+                body.retry_max_attempts = parseInt(retryAttemptsInput.value, 10);
+                body.retry_base_cooldown_seconds = parseFloat(retryCooldownInput.value);
                 const res = await fetch("/api/v1/settings", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
