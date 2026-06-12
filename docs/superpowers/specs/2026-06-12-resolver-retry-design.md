@@ -132,9 +132,12 @@ All retry-related events use `logger.warning()` — consistent with existing err
 
 | Event | Level | Message |
 |---|---|---|
-| Retryable failure, attempt < max (retrying) | `warning` | `"ecosyste.ms request failed for %s (attempt %d/%d), retrying in %.1fs"` |
-| All attempts exhausted | `warning` | `"ecosyste.ms request failed for %s after %d attempts"` |
-| Success after previous failures | — | Not logged (external behaviour unchanged) |
+| Retryable failure, attempt < max (retrying) | `warning` | `"...failed for %s (attempt %d/%d), retrying in %.1fs"` |
+| All attempts exhausted | `warning` | `"...failed for %s after %d attempts"` |
+| Success after retries (attempt > 1) | `info` | `"...succeeded on attempt %d/%d for %s"` |
+| Success on first attempt | `info` | `"...resolved %s successfully"` |
+
+The `info` messages are logged inside the resolver's `resolve()` method, immediately after a successful HTTP response, before processing the response body. This makes all successful HTTP resolutions visible in logs regardless of retry state.
 
 ## Testing
 
