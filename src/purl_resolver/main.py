@@ -8,6 +8,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from .config import settings, storage_settings
+from .db_admin_service import DbAdminService
 from .ignore_patterns_store import IgnorePatternsStore
 from .resolver.factory import build_resolvers
 from .router import router
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     app_settings = app.state.settings_store.load()
     logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
     app.state.resolvers = build_resolvers(settings, app_settings)
+    app.state.db_admin_service = DbAdminService(app.state.storage)
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
     yield

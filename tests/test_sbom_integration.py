@@ -259,7 +259,7 @@ class TestValidateExistingRefs:
             resolvers=fake_resolvers,
             settings_store=None,
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
+        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         found_new_ref = any(
@@ -296,7 +296,7 @@ class TestValidateExistingRefs:
             resolvers=fake_resolvers,
             settings_store=None,
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
+        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert len(enriched_refs) == len(original_refs)
@@ -329,7 +329,7 @@ class TestValidateExistingRefs:
             resolvers=fake_resolvers,
             settings_store=None,
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             await pipeline.process(sbom, validate_existing_refs=False)
         mock_validate.assert_not_called()
 
@@ -361,7 +361,7 @@ class TestValidateExistingRefs:
             resolvers=fake_resolvers,
             settings_store=None,
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
+        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs == original_refs

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-_SOURCE_REF_TYPES = frozenset({"vcs", "source-distribution"})
+SOURCE_REF_TYPES = frozenset({"vcs", "source-distribution"})
 
 _COMPONENT_PATH = tuple[str | int, ...]
 
@@ -23,7 +23,7 @@ def _has_source_reference(component: dict) -> bool:
     refs = component.get("externalReferences")
     if not refs:
         return False
-    return any(r.get("type") in _SOURCE_REF_TYPES for r in refs)
+    return any(r.get("type") in SOURCE_REF_TYPES for r in refs)
 
 
 def _collect(

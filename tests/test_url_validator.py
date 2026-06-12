@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -11,6 +11,7 @@ from purl_resolver.url_validator import (
     ensure_connectivity,
     validate_github_token,
     validate_url,
+    validate_url_with_retry,
 )
 
 
@@ -258,3 +259,54 @@ class TestValidateUrlSkipConnectivity:
             result = await validate_url("https://github.com/psf/requests", timeout=5)
             assert result == UrlValidationResult.VALID
             mock_conn.assert_called_once()
+
+
+class TestValidateUrlWithRetry:
+    @pytest.mark.asyncio
+    async def test_valid_passes_through(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            mock_head.return_value = _mock_head(200)
+            result = await validate_url_with_retry("https://github.com/psf/requests", timeout=5)
+            assert result == UrlValidationResult.VALID
+
+    @pytest.mark.asyncio
+    async def test_token_invalid_retries_without_token(self):
+        saved_token = None
+
+        class FakeSettingsStore:
+            def load(self):
+                from purl_resolver.settings_store import AppSettings
+                return AppSettings()
+
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            first_call = True
+
+            async def side_effect(url, timeout, **kwargs):
+                nonlocal first_call
+                if first_call:
+                    first_call = False
+                    return _mock_response(401, {"x-github-media-type": "v3"})
+                return _mock_response(200)
+
+            mock_head.side_effect = side_effect
+            result = await validate_url_with_retry(
+                "https://github.com/psf/requests", timeout=5,
+                github_token="ghp_invalid",
+                settings_store=FakeSettingsStore(),
+            )
+            assert result == UrlValidationResult.VALID
+
+    @pytest.mark.asyncio
+    async def test_token_invalid_without_settings_store_does_not_retry(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+            mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
+            result = await validate_url_with_retry(
+                "https://github.com/psf/requests", timeout=5,
+                github_token="ghp_invalid",
+            )
+            assert result == UrlValidationResult.TOKEN_INVALID

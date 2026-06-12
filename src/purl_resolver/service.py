@@ -10,7 +10,7 @@ from .sbom.collector import SbomComponent
 from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
-from .url_validator import UrlValidationResult, validate_url
+from .url_validator import UrlValidationResult, validate_url, validate_url_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -45,25 +45,13 @@ async def _validate_cached_url(
             pass
 
     github_token = app_settings.github_token
-    vresult = await validate_url(
+    vresult = await validate_url_with_retry(
         cached.repository_url,
         app_settings.url_validation_timeout,
         github_token=github_token,
+        settings_store=settings_store,
         skip_connectivity_check=True,
     )
-
-    if vresult == UrlValidationResult.TOKEN_INVALID:
-        logger.warning("GitHub token invalid, removing from settings")
-        try:
-            settings_store.save(app_settings.model_copy(update={"github_token": None}))
-        except Exception:
-            logger.warning("Failed to persist token removal to settings", exc_info=True)
-        vresult = await validate_url(
-            cached.repository_url,
-            app_settings.url_validation_timeout,
-            github_token=None,
-            skip_connectivity_check=True,
-        )
 
     if vresult == UrlValidationResult.VALID:
         try:
@@ -125,20 +113,13 @@ async def resolve_purl(
         if settings_store is not None:
             app_settings = settings_store.load()
             if app_settings.validate_db_urls:
-                vresult = await validate_url(
+                vresult = await validate_url_with_retry(
                     repo_url,
                     app_settings.url_validation_timeout,
                     github_token=app_settings.github_token,
+                    settings_store=settings_store,
                     skip_connectivity_check=True,
                 )
-                if vresult == UrlValidationResult.TOKEN_INVALID:
-                    logger.warning("GitHub token invalid, retrying validation without token")
-                    vresult = await validate_url(
-                        repo_url,
-                        app_settings.url_validation_timeout,
-                        github_token=None,
-                        skip_connectivity_check=True,
-                    )
                 if vresult == UrlValidationResult.INVALID:
                     logger.warning(
                         "Resolver %s returned invalid URL %s for %s, skipping",

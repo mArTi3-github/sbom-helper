@@ -87,7 +87,7 @@ class TestValidationIntegration:
     @pytest.mark.asyncio
     async def test_valid_url_updates_resolved_at(self, mock_storage, mock_settings_store):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
             result = await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=mock_settings_store,
@@ -99,7 +99,7 @@ class TestValidationIntegration:
     @pytest.mark.asyncio
     async def test_invalid_url_deletes_and_falls_through(self, mock_storage, mock_settings_store, resolver):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
             await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [resolver],
                 settings_store=mock_settings_store,
@@ -110,7 +110,7 @@ class TestValidationIntegration:
     @pytest.mark.asyncio
     async def test_network_error_returns_cached(self, mock_storage, mock_settings_store):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
             result = await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=mock_settings_store,
@@ -122,7 +122,7 @@ class TestValidationIntegration:
     @pytest.mark.asyncio
     async def test_rate_limited_returns_cached(self, mock_storage, mock_settings_store):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.RATE_LIMITED):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.RATE_LIMITED):
             result = await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=mock_settings_store,
@@ -135,7 +135,7 @@ class TestValidationIntegration:
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         settings_store = MagicMock()
         settings_store.load = MagicMock(return_value=MagicMock(validate_db_urls=False))
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=settings_store,
@@ -150,7 +150,7 @@ class TestValidationIntegration:
             resolver="purl2repo",
             resolved_at=datetime.now().isoformat(),
         )
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=mock_settings_store,
@@ -160,13 +160,13 @@ class TestValidationIntegration:
     @pytest.mark.asyncio
     async def test_settings_store_none_skips_validation(self, mock_storage):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             await resolve_purl("pkg:pypi/requests", mock_storage, [])
             mock_validate.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_resolve_purl_passes_token_to_validate_url():
+async def test_resolve_purl_delegates_token_to_validate_url_with_retry():
     storage = AsyncMock()
     storage.lookup = AsyncMock(return_value=_cached_response(days_ago=3))
     storage.store = AsyncMock()
@@ -176,7 +176,7 @@ async def test_resolve_purl_passes_token_to_validate_url():
         github_token="ghp_test123",
         revalidation_cooldown_hours=24,
     )
-    with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID) as mock_validate:
+    with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID) as mock_validate:
         await resolve_purl(
             purl="pkg:pypi/requests@2.31.0",
             storage=storage,
@@ -186,35 +186,6 @@ async def test_resolve_purl_passes_token_to_validate_url():
         mock_validate.assert_called()
         call_kwargs = mock_validate.call_args[1]
         assert call_kwargs.get("github_token") == "ghp_test123"
-
-
-@pytest.mark.asyncio
-async def test_resolve_purl_handles_token_invalid():
-    storage = AsyncMock()
-    storage.lookup = AsyncMock(return_value=_cached_response(days_ago=3))
-    storage.store = AsyncMock()
-    storage.delete_purls = AsyncMock(return_value=1)
-    settings_store = MagicMock(spec=SettingsStore)
-    settings_store.load.return_value = AppSettings(
-        validate_db_urls=True,
-        github_token="ghp_invalid",
-        revalidation_cooldown_hours=24,
-    )
-    with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate, \
-         patch.object(settings_store, "save") as mock_save:
-        mock_validate.side_effect = [
-            UrlValidationResult.TOKEN_INVALID,
-            UrlValidationResult.VALID,
-        ]
-        await resolve_purl(
-            purl="pkg:pypi/requests@2.31.0",
-            storage=storage,
-            resolvers=[],
-            settings_store=settings_store,
-        )
-        mock_save.assert_called_once()
-        saved_settings = mock_save.call_args[0][0]
-        assert saved_settings.github_token is None
 
 
 class TestValidateCachedUrl:
@@ -266,7 +237,7 @@ class TestValidateCachedUrl:
             revalidation_cooldown_hours=24,
         )
         storage = AsyncMock()
-        with patch("purl_resolver.service.validate_url", return_value=UrlValidationResult.VALID):
+        with patch("purl_resolver.service.validate_url_with_retry", return_value=UrlValidationResult.VALID):
             result = await _validate_cached_url(cached, settings_store, "pkg:pypi/requests", storage)
         assert result == cached
         storage.store.assert_called_once_with(cached)
@@ -286,13 +257,13 @@ class TestValidateCachedUrl:
             revalidation_cooldown_hours=24,
         )
         storage = AsyncMock()
-        with patch("purl_resolver.service.validate_url", return_value=UrlValidationResult.INVALID):
+        with patch("purl_resolver.service.validate_url_with_retry", return_value=UrlValidationResult.INVALID):
             result = await _validate_cached_url(cached, settings_store, "pkg:pypi/requests", storage)
         assert result is None
         storage.delete_purls.assert_called_once_with(["pkg:pypi/requests"])
 
     @pytest.mark.asyncio
-    async def test_removes_token_on_token_invalid(self):
+    async def test_delegates_token_retry_to_validate_url_with_retry(self):
         cached = ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
@@ -307,11 +278,15 @@ class TestValidateCachedUrl:
         )
         settings_store.load.return_value = app_settings
         storage = AsyncMock()
-        with patch("purl_resolver.service.validate_url") as mock_validate:
-            mock_validate.side_effect = [UrlValidationResult.TOKEN_INVALID, UrlValidationResult.VALID]
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID) as mock_validate:
             result = await _validate_cached_url(cached, settings_store, "pkg:pypi/requests", storage)
         assert result == cached
-        settings_store.save.assert_called_once()
+        mock_validate.assert_called_once_with(
+            cached.repository_url, 5,
+            github_token="ghp_invalid",
+            settings_store=settings_store,
+            skip_connectivity_check=True,
+        )
 
     @pytest.mark.asyncio
     async def test_returns_cached_on_network_error(self):
@@ -328,7 +303,7 @@ class TestValidateCachedUrl:
             revalidation_cooldown_hours=24,
         )
         storage = AsyncMock()
-        with patch("purl_resolver.service.validate_url", return_value=UrlValidationResult.NETWORK_ERROR):
+        with patch("purl_resolver.service.validate_url_with_retry", return_value=UrlValidationResult.NETWORK_ERROR):
             result = await _validate_cached_url(cached, settings_store, "pkg:pypi/requests", storage)
         assert result == cached
 
@@ -349,7 +324,7 @@ class TestValidateCachedUrl:
         )
         storage = AsyncMock()
         with patch(
-            "purl_resolver.service.validate_url",
+            "purl_resolver.service.validate_url_with_retry",
             return_value=UrlValidationResult.RATE_LIMITED,
         ):
             result = await _validate_cached_url(
@@ -378,7 +353,7 @@ class TestResolverBasedCooldown:
             github_token=None,
             url_validation_timeout=5,
         )
-        with patch("purl_resolver.service.validate_url") as mock_validate:
+        with patch("purl_resolver.service.validate_url_with_retry") as mock_validate:
             result = await _validate_cached_url(
                 cached, settings_store, "pkg:pypi/requests", AsyncMock()
             )
@@ -401,7 +376,7 @@ class TestResolverBasedCooldown:
             url_validation_timeout=5,
         )
         with patch(
-            "purl_resolver.service.validate_url",
+            "purl_resolver.service.validate_url_with_retry",
             return_value=UrlValidationResult.VALID,
         ) as mock_validate:
             result = await _validate_cached_url(
@@ -426,7 +401,7 @@ class TestResolverBasedCooldown:
             url_validation_timeout=5,
         )
         with patch(
-            "purl_resolver.service.validate_url",
+            "purl_resolver.service.validate_url_with_retry",
             return_value=UrlValidationResult.VALID,
         ) as mock_validate:
             result = await _validate_cached_url(
@@ -451,7 +426,7 @@ class TestResolverBasedCooldown:
             url_validation_timeout=5,
         )
         with patch(
-            "purl_resolver.service.validate_url",
+            "purl_resolver.service.validate_url_with_retry",
             return_value=UrlValidationResult.VALID,
         ) as mock_validate:
             result = await _validate_cached_url(
@@ -476,7 +451,7 @@ class TestResolverBasedCooldown:
             url_validation_timeout=5,
         )
         with patch(
-            "purl_resolver.service.validate_url",
+            "purl_resolver.service.validate_url_with_retry",
             return_value=UrlValidationResult.VALID,
         ) as mock_validate:
             result = await _validate_cached_url(
@@ -515,7 +490,7 @@ class TestFreshResolverValidation:
         ))
         mock_storage.lookup = AsyncMock(return_value=None)
 
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             mock_validate.side_effect = [
                 UrlValidationResult.INVALID,
                 UrlValidationResult.VALID,
@@ -546,7 +521,7 @@ class TestFreshResolverValidation:
             version_reference=None,
         ))
 
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
             result = await resolve_purl(
                 "pkg:npm/archy@1.0.0", mock_storage, [resolver], mock_settings_store
             )
@@ -570,7 +545,7 @@ class TestFreshResolverValidation:
             version_reference=None,
         ))
 
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
             result = await resolve_purl(
                 "pkg:npm/archy@1.0.0", mock_storage, [resolver], mock_settings_store
             )
@@ -596,7 +571,7 @@ class TestFreshResolverValidation:
             version_reference=None,
         ))
 
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             result = await resolve_purl(
                 "pkg:npm/archy@1.0.0", mock_storage, [resolver], settings_store
             )
@@ -622,7 +597,7 @@ class TestFreshResolverValidation:
             confidence="low", evidence=["libraries.io"], warnings=[], version_reference=None,
         ))
 
-        with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
+        with patch("purl_resolver.service.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
             result = await resolve_purl(
                 "pkg:npm/archy@1.0.0", mock_storage, [first, second], mock_settings_store
             )

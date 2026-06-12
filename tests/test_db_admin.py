@@ -7,6 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from purl_resolver.db_admin_service import DbAdminService
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.router import router
 from purl_resolver.schemas import ResolveResponse
@@ -58,6 +59,7 @@ def populated_storage(storage):
 def admin_client(storage):
     test_app = FastAPI()
     test_app.state.storage = storage
+    test_app.state.db_admin_service = DbAdminService(storage)
     test_app.include_router(router)
     return TestClient(test_app)
 

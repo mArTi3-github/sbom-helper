@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from .purl_utils import normalize, validate
 from .resolver.interface import Resolver
-from .sbom.collector import _SOURCE_REF_TYPES, SbomComponent, collect_components
+from .sbom import SOURCE_REF_TYPES
+from .sbom.collector import SbomComponent, collect_components
 from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser
 from .sbom.remover import remove_unresolved_components
@@ -13,7 +14,7 @@ from .sbom.reporter import build_report
 from .service import resolve_batch, store_preexisting_references
 from .settings_store import SettingsStore
 from .storage.interface import Storage
-from .url_validator import UrlValidationResult, validate_url
+from .url_validator import UrlValidationResult, validate_url_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -71,15 +72,19 @@ class SbomEnrichmentPipeline:
         components = collect_components(sbom_data)
 
         if validate_existing_refs:
+            app_settings = self._settings_store.load() if self._settings_store else None
+            val_timeout = app_settings.url_validation_timeout if app_settings else 5
+            val_token = app_settings.github_token if app_settings else None
             for comp in components:
                 if comp.needs_enrichment:
                     continue
                 for ref in comp.existing_references:
-                    if ref.get("type") in _SOURCE_REF_TYPES and ref.get("url"):
-                        vresult = await validate_url(
+                    if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
+                        vresult = await validate_url_with_retry(
                             ref["url"],
-                            timeout=5,
-                            github_token=None,
+                            timeout=val_timeout,
+                            github_token=val_token,
+                            settings_store=self._settings_store,
                             skip_connectivity_check=True,
                         )
                         if vresult == UrlValidationResult.INVALID:
