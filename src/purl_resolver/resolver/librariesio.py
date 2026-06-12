@@ -9,6 +9,7 @@ import httpx
 
 from ..purl_utils import PurlValidationError, validate
 from .interface import Resolution, Resolver
+from .retry import RetryConfig, RetryHelper
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,12 @@ class LibrariesIoResolver(Resolver):
         "swift": "SwiftPM",
     }
 
-    def __init__(self, api_key: str, timeout: float = 15.0) -> None:
+    def __init__(self, api_key: str, timeout: float = 15.0, retry_config: RetryConfig | None = None) -> None:
         self._api_key = api_key
         self._timeout = timeout
         self._min_interval = 1.0
         self._last_request_time = 0.0
+        self._retry = RetryHelper(retry_config or RetryConfig())
         self._client = httpx.AsyncClient(timeout=timeout)
 
     @property
@@ -66,8 +68,9 @@ class LibrariesIoResolver(Resolver):
         encoded_name = quote(name, safe="")
         url = f"{_API_BASE}/{platform}/{encoded_name}"
         try:
-            response = await self._client.get(url, params={"api_key": self._api_key})
+            response = await self._retry.execute(lambda: self._client.get(url, params={"api_key": self._api_key}))
             response.raise_for_status()
+            logger.info("libraries.io resolved %s/%s successfully", platform, name)
         except httpx.TimeoutException:
             logger.warning("libraries.io request timed out for %s/%s", platform, name)
             return Resolution(purl=purl, warnings=[f"libraries.io timeout for {platform}/{name}"])
