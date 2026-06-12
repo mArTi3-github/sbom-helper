@@ -68,7 +68,7 @@ PURL, приведённый к минимальной форме `scheme:type/n
 Процесс обогащения CycloneDX SBOM-файла. Принимает на вход JSON-файл, находит компоненты без VCS/source-distribution ссылок в `externalReferences`, резолвит их PURL через существующий Service Layer, вставляет найденные ссылки и возвращает обогащённый SBOM вместе с отчётом (summary + results table).
 
 **Batch Resolution**:
-Функция `resolve_batch(purls, storage, resolvers) → dict` в Service Layer. Параллельно резолвит список PURL через `asyncio.gather()` с ограничением конкурентности (semaphore=10). Возвращает словарь `normalized_purl → repository_url` только для успешных резолвингов.
+Функция `resolve_batch(purls, storage, resolvers) → dict` в Service Layer. Параллельно резолвит список PURL через `asyncio.gather()` с ограничением конкурентности (semaphore=10). Возвращает словарь `normalized_purl → ResolveResponse` только для успешных резолвингов.
 
 **EcosystemsResolver**:
 Резолвер, использующий API `packages.ecosyste.ms` для поиска repository URL по PURL. Включён по умолчанию в настройках. Первый fallback-резолвер в цепочке. Возвращает `confidence: "medium"`.

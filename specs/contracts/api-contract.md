@@ -126,6 +126,7 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 - JSON is parsed, the root dict is validated for required CycloneDX fields, then mutated in-place during enrichment
 - Optional field `remove_unresolved_no_subcomponents` (boolean, default: `false`) — when `true`, removes components that were not resolved and have no nested subcomponents
 - Optional field `validate_existing_refs` (boolean, default: `false`) — when `true`, existing VCS externalReferences in the SBOM are validated; invalid URLs trigger re-resolution
+- Optional field `ignore_patterns` (JSON string, default: `null`) — when provided, a JSON array of `{"field": "...", "pattern": "..."}` objects specifying component field/pattern pairs; components whose specified field values contain the pattern string are excluded from enrichment and reported with `status: "ignored"`
 
 #### Success Response (200)
 
@@ -161,12 +162,13 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 }
 ```
 
-- `summary.total_purls` — number of unique PURLs that needed enrichment
+- `summary.total_purls` — number of unique PURLs that needed enrichment (excludes ignored components)
 - `summary.found` — how many resolved successfully
 - `summary.not_found` — how many had no repository URL found (excludes removed components)
 - `summary.skipped` — how many PURLs could not be parsed (invalid format)
 - `summary.removed` — how many components were removed (only when `remove_unresolved_no_subcomponents=true`)
-- `results` — per-PURL report for components that needed enrichment; components already having VCS/source-distribution references are excluded; removed components appear only as `status: "removed"`, not as `status: "not_found"`
+- `summary.ignored` — how many components were excluded via `ignore_patterns`
+- `results` — per-PURL report for components that needed enrichment; components already having VCS/source-distribution references are excluded; removed components appear only as `status: "removed"`, not as `status: "not_found"`; ignored components appear as `status: "ignored"`; each result includes `found_by` (either `"local_db"` or `"resolver"`) and `resolver` (resolver name) fields
 - `enriched_sbom` — the full enriched SBOM JSON (version incremented by 1, timestamp preserved); removed components are absent from `components` arrays
 
 #### Error Response (400) — invalid JSON
@@ -298,6 +300,10 @@ Return current application settings.
 - `revalidation_cooldown_hours`: integer — cooldown in hours for trusted resolver entries (0–720, default: `24`; `0` disables cooldown)
 - `librariesio_enabled`: boolean — whether the libraries.io resolver is active
 - `ecosystems_enabled`: boolean — whether the ecosyste.ms resolver is active (default: `true`)
+- `ecosystems_max_requests_per_second`: float — rate limit for ecosyste.ms API requests (0.1–100, default: `2.0`)
+- `retry_max_attempts`: integer — maximum HTTP retry attempts for fallback resolvers (1–10, default: `3`)
+- `retry_base_cooldown_seconds`: float — base wait between retries in seconds (0.5–120, default: `5.0`)
+- `log_level`: string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default: `"INFO"`)
 - `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
@@ -335,6 +341,10 @@ Both fields optional. Only provided fields are updated.
 - `librariesio_api_key`: optional string|null — libraries.io API key. Set to `null` to clear the key. Empty string is ignored. Non-empty values are validated via the libraries.io API and rejected with `400 invalid_token` if invalid.
 - `ecosystems_enabled`: optional bool — enable/disable the ecosyste.ms resolver.
 - `ecosystems_api_key`: optional string|null — ecosyste.ms API key (for higher rate limits). Set to `null` to clear the key. Empty string is ignored.
+- `ecosystems_max_requests_per_second`: optional float — rate limit for ecosyste.ms API requests (0.1–100).
+- `retry_max_attempts`: optional int — maximum HTTP retry attempts for fallback resolvers (1–10).
+- `retry_base_cooldown_seconds`: optional float — base wait between retries in seconds (0.5–120).
+- `log_level`: optional string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
 
 #### Response (200)
 
@@ -450,6 +460,7 @@ Standard FastAPI/Pydantic 422 response.
 | Images list conversion: invalid SBOM format | 400 | `invalid_sbom` |
 | Images list conversion: file too large | 413 | `file_too_large` |
 | Images list conversion: missing file field | 422 | (Pydantic validation) |
+| Network unavailable (GitHub connectivity check failed) | 503 | `network_unavailable` |
 
 ## Breaking Change Checklist
 

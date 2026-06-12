@@ -14,7 +14,9 @@
 |                v                                   |
 |  +-----------------------------+                   |
 |  |     API Layer               |                   |
-|  |  src/purl_resolver/router   |                   |
+|  |  src/purl_resolver           |                   |
+|  |  router.py (sub-routers in  |                   |
+|  |  routes/ subpackage)        |                   |
 |  |                             |                   |
 |  |  POST /api/v1/resolve      |                   |
 |  |  POST /api/v1/resolve/sbom |                   |
@@ -86,6 +88,7 @@
 |  |                             |                   |
 |  |  validate_url()             |                   |
 |  |  validate_github_token()    |                   |
+|  |  ensure_connectivity()      |                   |
 |  |  HEAD + git ls-remote       |                   |
 |  |  Rate limit mitigation      |                   |
 |  |  Token authentication       |                   |
@@ -96,6 +99,15 @@
 |  |  settings_store.py          |                   |
 |  |                             |                   |
 |  |  SettingsStore              |                   |
+|  |  load() / save()            |                   |
+|  |  JSON file persistence      |                   |
+|  +-----------------------------+                   |
+|                                                    |
+|  +-----------------------------+                   |
+|  |     Ignore Patterns Store   |                   |
+|  |  ignore_patterns_store.py   |                   |
+|  |                             |                   |
+|  |  IgnorePatternsStore        |                   |
 |  |  load() / save()            |                   |
 |  |  JSON file persistence      |                   |
 |  +-----------------------------+                   |
@@ -157,11 +169,11 @@
 
 ## Import Rules
 
-- **API Layer** imports **Service Layer** (`service.py`) and **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) — but not vice versa
-- **API Layer** imports **csv_io** module for CSV parsing/rendering
-- **API Layer** imports **Config Layer** (settings)
-- **API Layer** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
-- **API Layer** imports **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
+- **API Layer** (`router.py` includes sub-routers from `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`)
+- **API Layer (routes/)** imports **Service Layer** (`service.py`) and **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) — but not vice versa
+- **API Layer (routes/)** imports **csv_io** module for CSV parsing/rendering
+- **API Layer (routes/settings.py)** imports **Config Layer** (settings) and **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
+- **API Layer (routes/)** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `store_preexisting_references` for SBOM endpoint use; accepts optional `settings_store` parameter for URL validation; accepts optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`service.py`), **SBOM Module** (`sbom/`), **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`); receives dependencies via constructor injection
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
@@ -176,8 +188,8 @@
 
 ## Layer Responsibilities
 
-### API Layer (`router.py`)
-- Define HTTP endpoints (routes, methods, status codes)
+### API Layer (`routes/`)
+- Define HTTP endpoints (routes, methods, status codes) — split across `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) — handles parsing, collection, deduplication, batch resolution, and enrichment
@@ -222,7 +234,7 @@
 - Has zero dependency on any resolver implementation
 
 ### SBOM Module (`sbom/`)
-- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `remove_unresolved_components`, `build_report`, `ImagesListConverter`, `ImageInfo`, `ImagesListConversionResult`
+- **`__init__.py`** — Public exports: `SbomComponent`, `CycloneDXParser`, `SbomParseError`, `collect_components`, `enrich_sbom`, `build_report`
 - **`parser.py`** — `CycloneDXParser.parse(data) → dict` validates `bomFormat: CycloneDX` and `specVersion: 1.6`; raises `SbomParseError` on violation
 - **`collector.py`** — `collect_components(sbom) → list[SbomComponent]` recursively walks `components[]` arrays; `SbomComponent` dataclass tracks purl, path tuple, needs_enrichment flag, and existing references; components with `vcs` or `source-distribution` external references are marked as not needing enrichment
 - **`enricher.py`** — `enrich_sbom(sbom, components, resolved)` inserts `{"type": "vcs", "url": "..."}` into component `externalReferences` arrays at the correct paths; preserves existing references; increments `version` field by 1
@@ -239,13 +251,20 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key)
+- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
-- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60)
+- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120)
 - `ServiceTokens` dataclass for extracting API tokens from settings (extensible for future services)
 - `AppSettings.service_tokens() → ServiceTokens` method
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
 - Graceful handling: missing file → create with defaults; corrupt JSON → log warning, return defaults
+
+### Ignore Patterns Store (`ignore_patterns_store.py`)
+- JSON-based persistence for SBOM component ignore patterns (field/pattern pairs used to exclude components from enrichment)
+- `IgnorePatternsStore` class with `load() → list[dict]` and `save(patterns)` methods
+- File path default: `./data/sbom_components_ignore_patterns.json`
+- Graceful handling: missing file → return empty list; corrupt JSON → log warning, return empty list
+- Exposed via API endpoints `GET/POST /api/v1/sbom/ignore-patterns` in `routes/ignore_patterns.py`
 
 ### Web UI Layer (`templates/`)
 - `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater, DB-admin, and Settings pages
@@ -264,7 +283,7 @@
 - **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; creates `Purl2RepoResolver` from `Settings`, conditionally adds `EcosystemsResolver` (if `ecosystems_enabled`) and `LibrariesIoResolver` (if `librariesio_enabled` and API key present); used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
 - **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; async implementation uses `asyncio.to_thread()` to offload synchronous purl2repo calls to a thread pool; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
 - **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; async implementation uses `httpx.AsyncClient` and `asyncio.sleep()` for rate limiting; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms; rate-limited (1 req/sec via `asyncio.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
-- **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; async implementation uses `httpx.AsyncClient`; enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
+- **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; async implementation uses `httpx.AsyncClient`; enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); configurable rate limiting via `ecosystems_max_requests_per_second` app setting; URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **retry.py** — `RetryConfig` dataclass, `RetryableErrorPolicy` (retryable error classification), `RetryHelper` (async retry loop with linear backoff)
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 
