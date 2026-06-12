@@ -12,6 +12,7 @@ from .db_admin_service import DbAdminService
 from .ignore_patterns_store import IgnorePatternsStore
 from .resolver.factory import build_resolvers
 from .router import router
+from .service import PurlResolutionService
 from .settings_store import SettingsStore
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
@@ -38,6 +39,11 @@ async def lifespan(app: FastAPI):
     logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
     app.state.resolvers = build_resolvers(settings, app_settings)
     app.state.db_admin_service = DbAdminService(app.state.storage)
+    app.state.resolution_service = PurlResolutionService(
+        storage=app.state.storage,
+        resolvers=app.state.resolvers,
+        settings_store=app.state.settings_store,
+    )
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
     yield
