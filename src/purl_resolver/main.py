@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
     app.state.ignore_patterns_store = IgnorePatternsStore()
 
     app_settings = app.state.settings_store.load()
+    logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
     app.state.resolvers = build_resolvers(settings, app_settings)
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))

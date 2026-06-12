@@ -244,6 +244,26 @@
             </div>
         </div>
 
+        <div class="card" style="margin-top:1rem;">
+            <div class="card-title">Logging</div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Log level</div>
+                    <div class="setting-desc">
+                        Controls which log messages are shown in docker compose logs.
+                        DEBUG – all messages, INFO – general operations, WARNING – errors only.
+                    </div>
+                </div>
+                <select id="log-level-select" style="padding:0.5rem;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;">
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO" selected>INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+            </div>
+        </div>
+
         <button id="save-btn" style="margin-top:1rem;">Save</button>
         <div id="msg" class="msg"></div>
     </div>
@@ -268,6 +288,7 @@
         const ecoRateInput = document.getElementById("ecosystems-rate-input");
         const retryAttemptsInput = document.getElementById("retry-attempts-input");
         const retryCooldownInput = document.getElementById("retry-cooldown-input");
+        const logLevelSelect = document.getElementById("log-level-select");
 
         async function loadSettings() {
             try {
@@ -291,6 +312,7 @@
                 ecoRateInput.value = data.ecosystems_max_requests_per_second;
                 retryAttemptsInput.value = data.retry_max_attempts;
                 retryCooldownInput.value = data.retry_base_cooldown_seconds;
+                logLevelSelect.value = data.log_level;
             } catch {
                 showMessage("Failed to load settings", true);
             }
@@ -319,6 +341,7 @@
                 body.ecosystems_max_requests_per_second = parseFloat(ecoRateInput.value);
                 body.retry_max_attempts = parseInt(retryAttemptsInput.value, 10);
                 body.retry_base_cooldown_seconds = parseFloat(retryCooldownInput.value);
+                body.log_level = logLevelSelect.value;
                 const res = await fetch("/api/v1/settings", {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },

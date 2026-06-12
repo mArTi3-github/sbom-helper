@@ -28,6 +28,10 @@ class AppSettings(BaseModel):
     revalidation_cooldown_hours: int = Field(default=24, ge=0, le=720)
     retry_max_attempts: int = Field(default=3, ge=1, le=10)
     retry_base_cooldown_seconds: float = Field(default=5.0, ge=0.5, le=120.0)
+    log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+
+    def log_level_as_int(self) -> int:
+        return getattr(logging, self.log_level.upper(), logging.INFO)
 
     def service_tokens(self) -> ServiceTokens:
         return ServiceTokens(github_token=self.github_token)

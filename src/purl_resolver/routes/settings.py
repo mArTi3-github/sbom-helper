@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -35,6 +37,7 @@ class SettingsUpdate(BaseModel):
     revalidation_cooldown_hours: int | None = Field(None, ge=0, le=720)
     retry_max_attempts: int | None = Field(None, ge=1, le=10)
     retry_base_cooldown_seconds: float | None = Field(None, ge=0.5, le=120.0)
+    log_level: str | None = Field(None, pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -47,6 +50,12 @@ def _rebuild_resolvers(request: Request) -> None:
     request.app.state.resolvers = build_resolvers(settings, app_settings)
 
 
+def _reconfigure_logging(request: Request) -> None:
+    store: SettingsStore = request.app.state.settings_store
+    app_settings = store.load()
+    logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
+
+
 @router.get("/api/v1/settings")
 async def get_settings(request: Request) -> JSONResponse:
     store: SettingsStore = request.app.state.settings_store
@@ -57,6 +66,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "revalidation_cooldown_hours": settings.revalidation_cooldown_hours,
         "retry_max_attempts": settings.retry_max_attempts,
         "retry_base_cooldown_seconds": settings.retry_base_cooldown_seconds,
+        "log_level": settings.log_level,
         "librariesio_enabled": settings.librariesio_enabled,
         "ecosystems_enabled": settings.ecosystems_enabled,
         "ecosystems_max_requests_per_second": settings.ecosystems_max_requests_per_second,
@@ -108,6 +118,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         updated = current
 
     _rebuild_resolvers(request)
+    _reconfigure_logging(request)
 
     return JSONResponse(content={
         "validate_db_urls": updated.validate_db_urls,
@@ -115,6 +126,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "revalidation_cooldown_hours": updated.revalidation_cooldown_hours,
         "retry_max_attempts": updated.retry_max_attempts,
         "retry_base_cooldown_seconds": updated.retry_base_cooldown_seconds,
+        "log_level": updated.log_level,
         "librariesio_enabled": updated.librariesio_enabled,
         "ecosystems_enabled": updated.ecosystems_enabled,
         "ecosystems_max_requests_per_second": updated.ecosystems_max_requests_per_second,
