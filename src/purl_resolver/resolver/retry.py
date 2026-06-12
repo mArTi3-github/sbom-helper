@@ -15,6 +15,14 @@ class RetryConfig:
     max_attempts: int = 3
     base_cooldown_seconds: float = 5.0
 
+    def __post_init__(self) -> None:
+        if self.max_attempts < 1:
+            raise ValueError(f"max_attempts must be >= 1, got {self.max_attempts}")
+        if self.base_cooldown_seconds <= 0:
+            raise ValueError(
+                f"base_cooldown_seconds must be > 0, got {self.base_cooldown_seconds}"
+            )
+
 
 class RetryableErrorPolicy:
     @staticmethod
@@ -60,4 +68,5 @@ class RetryHelper:
             "Request failed after %d attempts: %s",
             max_attempts, last_exc,
         )
+        assert last_exc is not None
         raise last_exc
