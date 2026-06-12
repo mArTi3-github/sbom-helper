@@ -11,7 +11,7 @@ from purl_resolver.resolver.purl2repo import Purl2RepoResolver
 from purl_resolver.router import router
 from purl_resolver.sbom_enrichment import SbomEnrichmentPipeline
 from purl_resolver.schemas import ResolveResponse
-from purl_resolver.service import PurlResolutionService, resolve_batch
+from purl_resolver.service import PurlResolutionService
 from purl_resolver.settings_store import AppSettings
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.url_validator import UrlValidationResult
@@ -406,11 +406,13 @@ class TestFileUrlInvalidation:
         fake_empty_resolvers,
     ):
         """resolve_batch deletes invalid file:// entries from cache."""
-        result = await resolve_batch(
-            ["pkg:pypi/ptaf-task-manager"],
+        svc = PurlResolutionService(
             storage_with_file_url,
             fake_empty_resolvers,
             settings_store=settings_store_with_validation,
+        )
+        result = await svc.resolve_batch(
+            ["pkg:pypi/ptaf-task-manager"],
             resolver="import-sbom",
         )
         # Entry should be absent from storage (deleted by _validate_cached_url)

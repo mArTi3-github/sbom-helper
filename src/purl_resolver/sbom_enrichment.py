@@ -53,8 +53,8 @@ class SbomEnrichmentPipeline:
         self,
         storage: Storage,
         resolvers: list[Resolver],
+        resolution_service: PurlResolutionService,
         settings_store: SettingsStore | None = None,
-        resolution_service: PurlResolutionService | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers
@@ -118,26 +118,13 @@ class SbomEnrichmentPipeline:
                 seen.add(n)
                 unique_purls.append(comp.purl)
 
-        if self._resolution_service is not None:
-            resolved = await self._resolution_service.resolve_batch(
-                unique_purls,
-                resolver="import-sbom",
-            )
-            await self._resolution_service.store_preexisting_references(
-                components, resolver="import-sbom"
-            )
-        else:
-            from .service import resolve_batch, store_preexisting_references
-            resolved = await resolve_batch(
-                unique_purls,
-                self._storage,
-                self._resolvers,
-                settings_store=self._settings_store,
-                resolver="import-sbom",
-            )
-            await store_preexisting_references(
-                components, self._storage, resolver="import-sbom"
-            )
+        resolved = await self._resolution_service.resolve_batch(
+            unique_purls,
+            resolver="import-sbom",
+        )
+        await self._resolution_service.store_preexisting_references(
+            components, resolver="import-sbom"
+        )
 
         removed: list[dict] = []
         enrich_sbom(sbom_data, components, resolved)
