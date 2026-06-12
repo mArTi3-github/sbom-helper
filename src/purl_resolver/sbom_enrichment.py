@@ -11,7 +11,7 @@ from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser
 from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
-from .service import resolve_batch, store_preexisting_references
+from .service import PurlResolutionService
 from .settings_store import SettingsStore
 from .storage.interface import Storage
 from .url_validator import UrlValidationResult, validate_url_with_retry
@@ -54,10 +54,12 @@ class SbomEnrichmentPipeline:
         storage: Storage,
         resolvers: list[Resolver],
         settings_store: SettingsStore | None = None,
+        resolution_service: PurlResolutionService | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers
         self._settings_store = settings_store
+        self._resolution_service = resolution_service
 
     async def process(
         self,
@@ -116,16 +118,26 @@ class SbomEnrichmentPipeline:
                 seen.add(n)
                 unique_purls.append(comp.purl)
 
-        resolved = await resolve_batch(
-            unique_purls,
-            self._storage,
-            self._resolvers,
-            settings_store=self._settings_store,
-            resolver="import-sbom",
-        )
-        await store_preexisting_references(
-            components, self._storage, resolver="import-sbom"
-        )
+        if self._resolution_service is not None:
+            resolved = await self._resolution_service.resolve_batch(
+                unique_purls,
+                resolver="import-sbom",
+            )
+            await self._resolution_service.store_preexisting_references(
+                components, resolver="import-sbom"
+            )
+        else:
+            from .service import resolve_batch, store_preexisting_references
+            resolved = await resolve_batch(
+                unique_purls,
+                self._storage,
+                self._resolvers,
+                settings_store=self._settings_store,
+                resolver="import-sbom",
+            )
+            await store_preexisting_references(
+                components, self._storage, resolver="import-sbom"
+            )
 
         removed: list[dict] = []
         enrich_sbom(sbom_data, components, resolved)
