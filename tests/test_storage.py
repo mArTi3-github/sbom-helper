@@ -4,7 +4,7 @@ import pytest
 
 from purl_resolver.resolver.interface import InvalidPurlError, Resolution
 from purl_resolver.schemas import ResolveResponse
-from purl_resolver.service import resolve_purl
+from purl_resolver.service import PurlResolutionService
 from purl_resolver.storage.inmemory import InMemoryCache
 from tests.helpers import FakeResolver
 
@@ -74,8 +74,8 @@ class TestResolvePurl:
         await storage.store(cached_response)
 
         resolver = FakeResolver()
-        result = await resolve_purl(
-            "pkg:pypi/requests@2.31.0", storage, [resolver]
+        result = await PurlResolutionService(storage, [resolver]).resolve_purl(
+            "pkg:pypi/requests@2.31.0"
         )
 
         assert resolver.call_count == 0
@@ -94,8 +94,8 @@ class TestResolvePurl:
         await storage.store(cached_response)
 
         resolver = FakeResolver()
-        result = await resolve_purl(
-            "pkg:pypi/requests@3.0.0", storage, [resolver]
+        result = await PurlResolutionService(storage, [resolver]).resolve_purl(
+            "pkg:pypi/requests@3.0.0"
         )
 
         assert resolver.call_count == 0
@@ -116,8 +116,8 @@ class TestResolvePurl:
             )
         )
 
-        result = await resolve_purl(
-            "pkg:pypi/requests@2.31.0", storage, [resolver]
+        result = await PurlResolutionService(storage, [resolver]).resolve_purl(
+            "pkg:pypi/requests@2.31.0"
         )
 
         assert resolver.call_count == 1
@@ -150,8 +150,8 @@ class TestResolvePurl:
             )
         )
 
-        result = await resolve_purl(
-            "pkg:pypi/requests@2.31.0", broken_storage, [resolver]
+        result = await PurlResolutionService(broken_storage, [resolver]).resolve_purl(
+            "pkg:pypi/requests@2.31.0"
         )
 
         assert result.error_status is None
@@ -178,8 +178,8 @@ class TestResolvePurl:
             )
         )
 
-        result = await resolve_purl(
-            "pkg:pypi/requests@2.31.0", broken_storage, [resolver]
+        result = await PurlResolutionService(broken_storage, [resolver]).resolve_purl(
+            "pkg:pypi/requests@2.31.0"
         )
 
         assert result.error_status is None
@@ -195,8 +195,8 @@ class TestResolvePurl:
             )
         )
 
-        result = await resolve_purl(
-            "pkg:pypi/unknown@0.1", storage, [resolver]
+        result = await PurlResolutionService(storage, [resolver]).resolve_purl(
+            "pkg:pypi/unknown@0.1"
         )
 
         assert result.error_status is None
@@ -209,8 +209,8 @@ class TestResolvePurl:
     @pytest.mark.asyncio
     async def test_invalid_purl_returns_error_from_validation(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver()
-        result = await resolve_purl(
-            "not-a-purl", storage, [resolver]
+        result = await PurlResolutionService(storage, [resolver]).resolve_purl(
+            "not-a-purl"
         )
 
         assert resolver.call_count == 0
@@ -222,8 +222,8 @@ class TestResolvePurl:
     @pytest.mark.asyncio
     async def test_invalid_purl_from_resolver_still_works(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver(error=InvalidPurlError("unsupported ecosystem"))
-        result = await resolve_purl(
-            "pkg:pypi/somepackage@1.0", storage, [resolver]
+        result = await PurlResolutionService(storage, [resolver]).resolve_purl(
+            "pkg:pypi/somepackage@1.0"
         )
 
         assert resolver.call_count == 1
@@ -239,8 +239,8 @@ class TestResolvePurl:
             resolution=Resolution(purl="pkg:pypi/missing@1.0")
         )
 
-        result = await resolve_purl(
-            "pkg:pypi/missing@1.0", storage, [resolver_a, resolver_b]
+        result = await PurlResolutionService(storage, [resolver_a, resolver_b]).resolve_purl(
+            "pkg:pypi/missing@1.0"
         )
 
         assert result.error_status is None
@@ -261,8 +261,8 @@ class TestResolvePurl:
             )
         )
 
-        result = await resolve_purl(
-            "pkg:pypi/pkg@1.0", storage, [resolver_a, resolver_b]
+        result = await PurlResolutionService(storage, [resolver_a, resolver_b]).resolve_purl(
+            "pkg:pypi/pkg@1.0"
         )
 
         assert resolver_a.call_count == 1

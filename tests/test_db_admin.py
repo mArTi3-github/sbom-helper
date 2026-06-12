@@ -352,7 +352,7 @@ class TestSbomStoresPreExistingRefs:
         }
 
         from purl_resolver.sbom.collector import collect_components
-        from purl_resolver.service import resolve_batch, store_preexisting_references
+        from purl_resolver.service import PurlResolutionService
         from tests.helpers import FakeResolver
 
         components = collect_components(sbom)
@@ -365,8 +365,10 @@ class TestSbomStoresPreExistingRefs:
             )
         )
 
-        await resolve_batch(purls_to_resolve, storage, [resolver])
-        await store_preexisting_references(components, storage)
+        svc = PurlResolutionService(storage, [resolver])
+
+        await svc.resolve_batch(purls_to_resolve)
+        await svc.store_preexisting_references(components)
 
         assert "pkg:npm/express" in storage._store
         assert "pkg:pypi/requests" in storage._store

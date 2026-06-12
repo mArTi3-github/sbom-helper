@@ -8,7 +8,7 @@ import pytest
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.resolver.librariesio import LibrariesIoResolver
 from purl_resolver.resolver.purl2repo import Purl2RepoResolver
-from purl_resolver.service import resolve_purl
+from purl_resolver.service import PurlResolutionService
 from purl_resolver.storage.inmemory import InMemoryCache
 
 
@@ -39,10 +39,8 @@ class TestResolverChain:
         storage = InMemoryCache()
         resolvers = [purl2repo, lio]
 
-        result = await resolve_purl(
+        result = await PurlResolutionService(storage, resolvers).resolve_purl(
             "pkg:pypi/requests@2.31.0",
-            storage,
-            resolvers,
         )
 
         assert result.response is not None
@@ -68,10 +66,8 @@ class TestResolverChain:
         storage = InMemoryCache()
         resolvers = [purl2repo, lio]
 
-        result = await resolve_purl(
+        result = await PurlResolutionService(storage, resolvers).resolve_purl(
             "pkg:deb/debian/libssl",
-            storage,
-            resolvers,
         )
 
         assert result.response is not None
@@ -97,10 +93,8 @@ class TestResolverChain:
         storage = InMemoryCache()
         resolvers = [purl2repo, lio]
 
-        result = await resolve_purl(
+        result = await PurlResolutionService(storage, resolvers).resolve_purl(
             "pkg:pypi/requests@2.31.0",
-            storage,
-            resolvers,
         )
 
         assert result.response is not None
