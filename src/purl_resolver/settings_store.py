@@ -24,7 +24,10 @@ class AppSettings(BaseModel):
     librariesio_api_key: str | None = None
     ecosystems_enabled: bool = True
     ecosystems_api_key: str | None = None
+    ecosystems_max_requests_per_second: float = Field(default=2.0, ge=0.1, le=100)
     revalidation_cooldown_hours: int = Field(default=24, ge=0, le=720)
+    retry_max_attempts: int = Field(default=3, ge=1, le=10)
+    retry_base_cooldown_seconds: float = Field(default=5.0, ge=0.5, le=120.0)
 
     def service_tokens(self) -> ServiceTokens:
         return ServiceTokens(github_token=self.github_token)
