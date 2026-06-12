@@ -262,6 +262,7 @@ class TestValidateExistingRefs:
             storage=storage,
             resolvers=fake_resolvers,
             settings_store=None,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
             await pipeline.process(sbom, validate_existing_refs=True)
@@ -299,6 +300,7 @@ class TestValidateExistingRefs:
             storage=storage,
             resolvers=fake_resolvers,
             settings_store=None,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
             await pipeline.process(sbom, validate_existing_refs=True)
@@ -332,6 +334,7 @@ class TestValidateExistingRefs:
             storage=storage,
             resolvers=fake_resolvers,
             settings_store=None,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
             await pipeline.process(sbom, validate_existing_refs=False)
@@ -364,6 +367,7 @@ class TestValidateExistingRefs:
             storage=storage,
             resolvers=fake_resolvers,
             settings_store=None,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
             await pipeline.process(sbom, validate_existing_refs=True)
@@ -440,6 +444,7 @@ class TestFileUrlInvalidation:
             storage=storage_with_file_url,
             resolvers=fake_empty_resolvers,
             settings_store=settings_store_with_validation,
+            resolution_service=PurlResolutionService(storage_with_file_url, fake_empty_resolvers, settings_store_with_validation),
         )
         result = await pipeline.process(sbom, validate_existing_refs=False)
         # DB entry should be deleted after processing
