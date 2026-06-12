@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from purl_resolver.resolver.ecosystems import EcosystemsResolver, select_repository_url
+from purl_resolver.resolver.retry import RetryConfig
 
 
 class TestSelectRepositoryUrl:
@@ -125,7 +126,7 @@ class TestResolveErrors:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
 
-        r = EcosystemsResolver()
+        r = EcosystemsResolver(retry_config=RetryConfig(max_attempts=1))
         r._client = mock_client
 
         result = await r.resolve("pkg:pypi/requests")
@@ -143,7 +144,7 @@ class TestResolveErrors:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
-        r = EcosystemsResolver()
+        r = EcosystemsResolver(retry_config=RetryConfig(max_attempts=1))
         r._client = mock_client
 
         result = await r.resolve("pkg:pypi/requests")
@@ -161,7 +162,7 @@ class TestResolveErrors:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.return_value = mock_response
 
-        r = EcosystemsResolver()
+        r = EcosystemsResolver(retry_config=RetryConfig(max_attempts=1))
         r._client = mock_client
 
         result = await r.resolve("pkg:pypi/requests")
@@ -173,7 +174,7 @@ class TestResolveErrors:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get.side_effect = httpx.ConnectError("connection refused")
 
-        r = EcosystemsResolver()
+        r = EcosystemsResolver(retry_config=RetryConfig(max_attempts=1))
         r._client = mock_client
 
         result = await r.resolve("pkg:pypi/requests")
