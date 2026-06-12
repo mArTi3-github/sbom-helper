@@ -194,6 +194,8 @@ Client                    API Layer (router)         Service Layer             p
 | `revalidation_cooldown_hours` | `24` | Re-validation cooldown in hours for trusted resolvers (0 = no cooldown, max 720) |
 | `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
 | `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
+| `retry_max_attempts` | `3` | Maximum HTTP request attempts per resolver (1–10). Applied to ecosyste.ms and libraries.io on timeout, 429, and 5xx errors. |
+| `retry_base_cooldown_seconds` | `5.0` | Base wait time between retries; actual wait = cooldown × (attempt − 1). Range: 0.5–120. |
 
 ## Database Schema
 
