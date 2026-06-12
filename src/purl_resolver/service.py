@@ -93,7 +93,9 @@ class PurlResolutionService:
             cached = await self._storage.lookup(purl_key)
             if cached is not None:
                 logger.info("Cache hit for %s", purl_key)
-                cached = await self._validate_cached_url(cached, self._settings_store, purl_key, self._storage)
+                cached = await self._validate_cached_url(
+                    cached, self._settings_store, purl_key, self._storage,
+                )
             if cached is not None:
                 cached.found_by = "local_db"
                 return ResolveResult.ok(cached)
