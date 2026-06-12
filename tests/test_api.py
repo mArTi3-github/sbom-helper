@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.router import router
+from purl_resolver.service import PurlResolutionService
 from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.storage.inmemory import InMemoryCache
 from tests.helpers import FakeResolver
@@ -31,6 +32,11 @@ def client() -> TestClient:
         ),
     ]
     test_app.state.settings_store = SettingsStore()
+    test_app.state.resolution_service = PurlResolutionService(
+        storage=test_app.state.storage,
+        resolvers=test_app.state.resolvers,
+        settings_store=test_app.state.settings_store,
+    )
     test_app.include_router(router)
     with TestClient(test_app) as c:
         yield c
@@ -71,6 +77,11 @@ class TestResolve:
         self, client: TestClient
     ) -> None:
         client.app.state.resolvers = [FakeResolver()]
+        client.app.state.resolution_service = PurlResolutionService(
+            storage=client.app.state.storage,
+            resolvers=client.app.state.resolvers,
+            settings_store=client.app.state.settings_store,
+        )
         response = client.post(
             "/api/v1/resolve",
             json={"purl": "pkg:pypi/this-package-does-not-exist-12345@0.0.1"},

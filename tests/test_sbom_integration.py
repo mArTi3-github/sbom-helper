@@ -11,7 +11,7 @@ from purl_resolver.resolver.purl2repo import Purl2RepoResolver
 from purl_resolver.router import router
 from purl_resolver.sbom_enrichment import SbomEnrichmentPipeline
 from purl_resolver.schemas import ResolveResponse
-from purl_resolver.service import resolve_batch
+from purl_resolver.service import PurlResolutionService, resolve_batch
 from purl_resolver.settings_store import AppSettings
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.url_validator import UrlValidationResult
@@ -22,6 +22,10 @@ def client() -> TestClient:
     test_app = FastAPI()
     test_app.state.storage = InMemoryCache()
     test_app.state.resolvers = [Purl2RepoResolver()]
+    test_app.state.resolution_service = PurlResolutionService(
+        storage=test_app.state.storage,
+        resolvers=test_app.state.resolvers,
+    )
     test_app.include_router(router)
     with TestClient(test_app) as c:
         yield c

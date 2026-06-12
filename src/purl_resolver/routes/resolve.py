@@ -9,7 +9,6 @@ from ..config import sbom_settings
 from ..sbom.parser import SbomParseError
 from ..sbom_enrichment import SbomEnrichmentPipeline
 from ..schemas import ResolveRequest
-from ..service import resolve_purl
 from ..url_validator import ensure_connectivity
 
 router = APIRouter()
@@ -25,12 +24,7 @@ async def resolve_endpoint(body: ResolveRequest, request: Request) -> JSONRespon
             content={"error": "network_unavailable", "message": str(e)},
         )
 
-    result = await resolve_purl(
-        purl=body.purl,
-        storage=request.app.state.storage,
-        resolvers=request.app.state.resolvers,
-        settings_store=request.app.state.settings_store,
-    )
+    result = await request.app.state.resolution_service.resolve_purl(purl=body.purl)
 
     if result.error_status is not None:
         return JSONResponse(
@@ -87,6 +81,7 @@ async def resolve_sbom_endpoint(
         storage=request.app.state.storage,
         resolvers=request.app.state.resolvers,
         settings_store=getattr(request.app.state, "settings_store", None),
+        resolution_service=request.app.state.resolution_service,
     )
 
     try:
