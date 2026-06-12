@@ -114,3 +114,4 @@ feature idea
 
 For alternative workflows, use `compose_workflow` from superpowers to generate a tailored sequence.
 
+Планирование изменений (включая описание дизайн-плана) по методологии superpowers ведется в директории docs/superpowers/, как это предусмотрено по умолчанию скиллами superpowers. Папка specs/ описывает документацию проекта в целом, в папке .misc/ находятся различные дополнительные материалы, которые я обрабатываю вручную.
