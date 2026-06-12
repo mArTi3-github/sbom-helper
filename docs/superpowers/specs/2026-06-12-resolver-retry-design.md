@@ -126,6 +126,16 @@ Resolver.resolve(purl)
             └─ return Resolution(purl, warnings=[...])
 ```
 
+## Logging
+
+All retry-related events use `logger.warning()` — consistent with existing error logging in resolvers.
+
+| Event | Level | Message |
+|---|---|---|
+| Retryable failure, attempt < max (retrying) | `warning` | `"ecosyste.ms request failed for %s (attempt %d/%d), retrying in %.1fs"` |
+| All attempts exhausted | `warning` | `"ecosyste.ms request failed for %s after %d attempts"` |
+| Success after previous failures | — | Not logged (external behaviour unchanged) |
+
 ## Testing
 
 - New unit tests: `tests/test_retry_helper.py`
