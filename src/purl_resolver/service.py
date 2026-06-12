@@ -6,12 +6,11 @@ from datetime import datetime
 
 from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
+from .sbom.collector import SbomComponent
 from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
 from .url_validator import UrlValidationResult, validate_url
-
-from .sbom.collector import SbomComponent
 
 logger = logging.getLogger(__name__)
 

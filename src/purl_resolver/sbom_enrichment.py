@@ -3,18 +3,17 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from .purl_utils import normalize, safe_normalize, validate
+from .purl_utils import normalize, validate
 from .resolver.interface import Resolver
 from .sbom.collector import _SOURCE_REF_TYPES, SbomComponent, collect_components
-from .ignore_patterns_store import IgnorePatternsStore
-from .url_validator import UrlValidationResult, validate_url
 from .sbom.enricher import enrich_sbom
-from .sbom.parser import CycloneDXParser, SbomParseError
+from .sbom.parser import CycloneDXParser
 from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import resolve_batch, store_preexisting_references
 from .settings_store import SettingsStore
 from .storage.interface import Storage
+from .url_validator import UrlValidationResult, validate_url
 
 logger = logging.getLogger(__name__)
 

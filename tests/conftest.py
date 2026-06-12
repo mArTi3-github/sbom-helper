@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from purl_resolver.resolver.interface import Resolution
-
 from tests.helpers import FakeResolver
 
 

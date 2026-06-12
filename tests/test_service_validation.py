@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from purl_resolver.schemas import ResolveResponse, ResolveResult
-from purl_resolver.service import resolve_purl, _validate_cached_url
+from purl_resolver.schemas import ResolveResponse
+from purl_resolver.service import _validate_cached_url, resolve_purl
 from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.url_validator import UrlValidationResult
 
@@ -100,7 +100,7 @@ class TestValidationIntegration:
     async def test_invalid_url_deletes_and_falls_through(self, mock_storage, mock_settings_store, resolver):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         with patch("purl_resolver.service.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
-            result = await resolve_purl(
+            await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [resolver],
                 settings_store=mock_settings_store,
             )
@@ -136,7 +136,7 @@ class TestValidationIntegration:
         settings_store = MagicMock()
         settings_store.load = MagicMock(return_value=MagicMock(validate_db_urls=False))
         with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
-            result = await resolve_purl(
+            await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=settings_store,
             )
@@ -151,7 +151,7 @@ class TestValidationIntegration:
             resolved_at=datetime.now().isoformat(),
         )
         with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
-            result = await resolve_purl(
+            await resolve_purl(
                 "pkg:pypi/requests", mock_storage, [],
                 settings_store=mock_settings_store,
             )
@@ -161,7 +161,7 @@ class TestValidationIntegration:
     async def test_settings_store_none_skips_validation(self, mock_storage):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         with patch("purl_resolver.service.validate_url", new_callable=AsyncMock) as mock_validate:
-            result = await resolve_purl("pkg:pypi/requests", mock_storage, [])
+            await resolve_purl("pkg:pypi/requests", mock_storage, [])
             mock_validate.assert_not_called()
 
 

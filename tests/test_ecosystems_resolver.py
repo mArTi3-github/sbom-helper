@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 
 from purl_resolver.resolver.ecosystems import EcosystemsResolver, select_repository_url
-from purl_resolver.resolver.interface import Resolution
 
 
 class TestSelectRepositoryUrl:
@@ -224,3 +224,44 @@ class TestInvalidPurl:
         result = await r.resolve("not-a-valid-purl")
         assert result.repository_url is None
         assert any("invalid" in w.lower() for w in result.warnings)
+
+
+class TestRateLimiting:
+    @pytest.mark.asyncio
+    async def test_minimum_interval_between_requests(self) -> None:
+        r = EcosystemsResolver(max_requests_per_second=10.0)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [{"name": "pkg", "ecosystem": "pypi", "repository_url": "https://github.com/a/b"}]
+        mock_response.raise_for_status = MagicMock()
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get.return_value = mock_response
+        r._client = mock_client
+
+        t0 = time.monotonic()
+        await r.resolve("pkg:pypi/a")
+        await r.resolve("pkg:pypi/b")
+        elapsed = time.monotonic() - t0
+        assert elapsed >= 0.09  # 1/10 * 2 requests = 0.2s min, but allow some margin
+
+    @pytest.mark.asyncio
+    async def test_no_rate_limit_when_max_requests_per_second_zero(self) -> None:
+        r = EcosystemsResolver(max_requests_per_second=0)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [{"name": "pkg", "ecosystem": "pypi", "repository_url": "https://github.com/a/b"}]
+        mock_response.raise_for_status = MagicMock()
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get.return_value = mock_response
+        r._client = mock_client
+
+        t0 = time.monotonic()
+        await r.resolve("pkg:pypi/a")
+        await r.resolve("pkg:pypi/b")
+        elapsed = time.monotonic() - t0
+        assert elapsed < 0.1  # no sleep between requests
+
+    @pytest.mark.asyncio
+    async def test_constructor_accepts_max_requests_per_second(self) -> None:
+        r = EcosystemsResolver(max_requests_per_second=5.0)
+        assert r._min_interval == 0.2

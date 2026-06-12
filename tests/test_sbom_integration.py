@@ -260,7 +260,7 @@ class TestValidateExistingRefs:
             settings_store=None,
         )
         with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.INVALID):
-            result = await pipeline.process(sbom, validate_existing_refs=True)
+            await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         found_new_ref = any(
             r.get("type") == "vcs" and "github.com" in (r.get("url") or "")
@@ -297,7 +297,7 @@ class TestValidateExistingRefs:
             settings_store=None,
         )
         with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.VALID):
-            result = await pipeline.process(sbom, validate_existing_refs=True)
+            await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert len(enriched_refs) == len(original_refs)
         assert enriched_refs[0]["url"] == original_refs[0]["url"]
@@ -330,7 +330,7 @@ class TestValidateExistingRefs:
             settings_store=None,
         )
         with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock) as mock_validate:
-            result = await pipeline.process(sbom, validate_existing_refs=False)
+            await pipeline.process(sbom, validate_existing_refs=False)
         mock_validate.assert_not_called()
 
     @pytest.mark.asyncio
@@ -362,7 +362,7 @@ class TestValidateExistingRefs:
             settings_store=None,
         )
         with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock, return_value=UrlValidationResult.NETWORK_ERROR):
-            result = await pipeline.process(sbom, validate_existing_refs=True)
+            await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs == original_refs
 

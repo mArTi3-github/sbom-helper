@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import pytest
-
-from purl_resolver.sbom.collector import SbomComponent, collect_components
+from purl_resolver.sbom.collector import collect_components
 
 
 class TestCollectComponents:

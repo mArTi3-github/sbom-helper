@@ -9,7 +9,6 @@ from purl_resolver.sbom.collector import collect_components
 from purl_resolver.sbom.reporter import build_report
 from purl_resolver.sbom_enrichment import _component_matches_any_pattern
 
-
 TEST_SBOM = Path(__file__).parent.parent / ".misc/addictional_materials/sbom_example_missed_references.json"
 
 
@@ -62,7 +61,7 @@ def test_ignore_patterns_no_false_positives(sbom_data):
 
 
 def test_ignore_patterns_reporter_integration(sbom_data):
-    """Verify that running full enrichment pipeline end-to-end with ignore patterns 
+    """Verify that running full enrichment pipeline end-to-end with ignore patterns
     produces correct report including ignored status."""
 
     ignore_patterns = [{"field": "purl", "pattern": "test"}]
@@ -74,7 +73,7 @@ def test_ignore_patterns_reporter_integration(sbom_data):
             comp.needs_enrichment = False
 
     report = build_report(components, resolved={})
-    
+
     assert report["summary"]["ignored"] == 1
     ignored_results = [r for r in report["results"] if r["status"] == "ignored"]
     assert len(ignored_results) == 1

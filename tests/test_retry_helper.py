@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from purl_resolver.resolver.retry import RetryConfig, RetryHelper, RetryableErrorPolicy
+from purl_resolver.resolver.retry import RetryableErrorPolicy, RetryConfig, RetryHelper
 
 
 class TestRetryableErrorPolicy:

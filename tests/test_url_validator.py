@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-import asyncio
-from enum import Enum
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from purl_resolver.url_validator import UrlValidationResult, validate_url, validate_github_token, _RateLimitTracker, _git_ls_remote, ensure_connectivity
+from purl_resolver.url_validator import (
+    UrlValidationResult,
+    _git_ls_remote,
+    _RateLimitTracker,
+    ensure_connectivity,
+    validate_github_token,
+    validate_url,
+)
 
 
 @pytest.fixture(autouse=True)

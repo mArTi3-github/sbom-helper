@@ -8,10 +8,10 @@ import uvicorn
 from fastapi import FastAPI
 
 from .config import settings, storage_settings
-from .resolver.factory import build_resolvers
 from .ignore_patterns_store import IgnorePatternsStore
-from .settings_store import SettingsStore
+from .resolver.factory import build_resolvers
 from .router import router
+from .settings_store import SettingsStore
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
 

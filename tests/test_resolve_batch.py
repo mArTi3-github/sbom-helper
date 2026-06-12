@@ -5,7 +5,6 @@ import pytest
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.service import resolve_batch
 from purl_resolver.storage.inmemory import InMemoryCache
-
 from tests.helpers import FakeResolver
 
 

@@ -123,7 +123,6 @@ class TestBuildReport:
         assert item["resolver"] == "ecosyste.ms"
 
     def test_not_found_result_has_empty_found_by(self) -> None:
-        from purl_resolver.schemas import ResolveResponse
         components = [
             SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
         ]

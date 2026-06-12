@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from .collector import SbomComponent
 from ..purl_utils import safe_normalize
 from ..schemas import ResolveResponse
+from .collector import SbomComponent
 
 
 def remove_unresolved_components(

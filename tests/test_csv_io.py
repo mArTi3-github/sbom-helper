@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from purl_resolver.csv_io import detect_delimiter, parse_csv_import, render_csv_export
 from purl_resolver.storage.interface import PurlRow
 

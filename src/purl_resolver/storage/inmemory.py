@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..schemas import ResolveResponse
-from .interface import PurlFilters, PurlRow, UpsertRow, Storage
+from .interface import PurlFilters, PurlRow, Storage, UpsertRow
 
 
 class InMemoryCache(Storage):

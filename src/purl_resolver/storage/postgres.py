@@ -7,7 +7,7 @@ import asyncpg
 
 from ..config import storage_settings
 from ..schemas import ResolveResponse
-from .interface import PurlFilters, PurlRow, UpsertRow, Storage
+from .interface import PurlFilters, PurlRow, Storage, UpsertRow
 
 logger = logging.getLogger(__name__)
 

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
 
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.router import router
-from purl_resolver.settings_store import SettingsStore, AppSettings
+from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.storage.inmemory import InMemoryCache
-
 from tests.helpers import FakeResolver
 
 

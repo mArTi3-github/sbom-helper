@@ -61,6 +61,12 @@ class Purl2RepoResolver(Resolver):
             raise InvalidPurlError(str(e)) from e
         except (Purl2RepoResolutionError, MetadataFetchError) as e:
             raise UpstreamError(str(e)) from e
+        except Exception as e:
+            logger.warning("purl2repo raised unexpected error for %s: %s", purl, e, exc_info=True)
+            return Resolution(
+                purl=purl,
+                warnings=[f"purl2repo error for {purl}: {e}"],
+            )
         return Resolution(
             purl=purl,
             repository_url=result.repository_url,

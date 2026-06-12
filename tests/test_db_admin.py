@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import io
 import csv
-import pytest
+import io
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from purl_resolver.resolver.interface import Resolution
-from purl_resolver.storage.inmemory import InMemoryCache
-from purl_resolver.schemas import ResolveResponse
 from purl_resolver.router import router
+from purl_resolver.schemas import ResolveResponse
+from purl_resolver.storage.inmemory import InMemoryCache
 
 
 @pytest.fixture

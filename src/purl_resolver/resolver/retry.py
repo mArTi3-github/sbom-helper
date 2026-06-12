@@ -4,10 +4,13 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import TypeVar
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -41,7 +44,7 @@ class RetryHelper:
     def __init__(self, config: RetryConfig) -> None:
         self._config = config
 
-    async def execute[T](
+    async def execute(
         self,
         coroutine_factory: Callable[[], Awaitable[T]],
     ) -> T:

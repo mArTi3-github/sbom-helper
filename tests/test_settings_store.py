@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-import pytest
 from pathlib import Path
 
-from purl_resolver.settings_store import SettingsStore, AppSettings, ServiceTokens
+import pytest
+
+from purl_resolver.settings_store import AppSettings, ServiceTokens, SettingsStore
 
 
 @pytest.fixture
@@ -127,3 +128,18 @@ class TestLibrariesIoSettings:
 
         final = store.load()
         assert final.librariesio_api_key is None
+
+
+class TestEcosystemsSettings:
+    def test_default_ecosystems_max_requests_per_second(self) -> None:
+        s = AppSettings()
+        assert s.ecosystems_max_requests_per_second == 2.0
+
+    def test_save_and_load_ecosystems_rate(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        settings = store.load()
+        updated = settings.model_copy(update={"ecosystems_max_requests_per_second": 5.0})
+        store.save(updated)
+
+        loaded = store.load()
+        assert loaded.ecosystems_max_requests_per_second == 5.0

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 
-from purl_resolver.resolver.interface import Resolution
 from purl_resolver.resolver.librariesio import LibrariesIoResolver
 
 

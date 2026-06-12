@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
+
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from ..config import sbom_settings
+from ..sbom.parser import SbomParseError
+from ..sbom_enrichment import SbomEnrichmentPipeline
 from ..schemas import ResolveRequest
 from ..service import resolve_purl
-from ..sbom_enrichment import SbomEnrichmentPipeline
-from ..sbom.parser import SbomParseError
 from ..url_validator import ensure_connectivity
 
 router = APIRouter()

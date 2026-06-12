@@ -6,7 +6,6 @@ from purl_resolver.resolver.interface import InvalidPurlError, Resolution
 from purl_resolver.schemas import ResolveResponse
 from purl_resolver.service import resolve_purl
 from purl_resolver.storage.inmemory import InMemoryCache
-
 from tests.helpers import FakeResolver
 
 
