@@ -31,7 +31,10 @@ class SettingsUpdate(BaseModel):
     librariesio_api_key: str | None = None
     ecosystems_enabled: bool | None = None
     ecosystems_api_key: str | None = None
+    ecosystems_max_requests_per_second: float | None = Field(None, ge=0.1, le=100)
     revalidation_cooldown_hours: int | None = Field(None, ge=0, le=720)
+    retry_max_attempts: int | None = Field(None, ge=1, le=10)
+    retry_base_cooldown_seconds: float | None = Field(None, ge=0.5, le=120.0)
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -52,8 +55,11 @@ async def get_settings(request: Request) -> JSONResponse:
         "validate_db_urls": settings.validate_db_urls,
         "url_validation_timeout": settings.url_validation_timeout,
         "revalidation_cooldown_hours": settings.revalidation_cooldown_hours,
+        "retry_max_attempts": settings.retry_max_attempts,
+        "retry_base_cooldown_seconds": settings.retry_base_cooldown_seconds,
         "librariesio_enabled": settings.librariesio_enabled,
         "ecosystems_enabled": settings.ecosystems_enabled,
+        "ecosystems_max_requests_per_second": settings.ecosystems_max_requests_per_second,
         "token_set": {
             "github_token": settings.github_token is not None,
             "librariesio_api_key": settings.librariesio_api_key is not None,
@@ -107,8 +113,11 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "validate_db_urls": updated.validate_db_urls,
         "url_validation_timeout": updated.url_validation_timeout,
         "revalidation_cooldown_hours": updated.revalidation_cooldown_hours,
+        "retry_max_attempts": updated.retry_max_attempts,
+        "retry_base_cooldown_seconds": updated.retry_base_cooldown_seconds,
         "librariesio_enabled": updated.librariesio_enabled,
         "ecosystems_enabled": updated.ecosystems_enabled,
+        "ecosystems_max_requests_per_second": updated.ecosystems_max_requests_per_second,
         "token_set": {
             "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,
