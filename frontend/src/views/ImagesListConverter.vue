@@ -77,6 +77,7 @@ import { ref } from 'vue'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import { convertImagesList } from '../api/images'
 import { ApiError } from '../api/client'
+import { downloadJson } from '../composables/useDownload'
 import type { ImagesListResponse } from '../types/api'
 
 const selectedFile = ref<File | null>(null)
@@ -119,15 +120,7 @@ async function handleConvert() {
 
 function downloadResult() {
   if (!imagesListData.value || !selectedFile.value) return
-  const blob = new Blob([JSON.stringify(imagesListData.value, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = selectedFile.value.name.replace(/\.json$/, '') + '_images_list.json'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  downloadJson(imagesListData.value, selectedFile.value.name.replace(/\.json$/, '') + '_images_list.json')
 }
 </script>
 

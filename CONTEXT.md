@@ -87,3 +87,20 @@ PURL, приведённый к минимальной форме `scheme:type/n
 
 **SbomEnrichmentPipeline**:
 Класс-оркестратор в `sbom_enrichment.py`, управляющий полным циклом обогащения SBOM: парсинг → сбор компонентов → сохранение pre-existing references → batch-резолвинг → удаление неразрешённых (опционально) → enrichment → отчёт. Инкапсулирует взаимодействие между `sbom/*`, `service.py` и `storage`.
+
+## Frontend (Vue 3 SPA)
+
+**SPA Architecture**:
+Фронтенд реализован как Single-Page Application на Vue 3 + Vite + TypeScript. Размещается в `frontend/`. FastAPI раздаёт статику через `SPAStaticFiles` (кастомный подкласс `StaticFiles` с fallback на `index.html` для клиентского роутинга), монтируется в `main.py` после всех API-роутов. Vue Router (`createWebHistory()`) обрабатывает клиентский роутинг для 5 страниц: PURL Resolver (`/`), SBOM Updater (`/sbom-updater`), Database Admin (`/db-admin`), Settings (`/settings`), Images List Converter (`/images-list-converter`). Catch-all маршрут (`/:pathMatch(.*)*`) отображает `NotFound.vue`. API-запросы направляются на существующие бэкендовые эндпоинты. Каждый `.vue`-компонент использует `<style scoped>` для изоляции стилей; глобальные CSS-переменные в `src/assets/main.css`.
+
+**SbomUpdater**:
+Страница обогащения CycloneDX SBOM. Использует `FileUploadZone` для загрузки файла, чекбоксы для опций, редактор паттернов игнорирования, `POST /api/v1/resolve/sbom` для обработки. Отображает сводку (total/found/not_found/skipped/removed/ignored) и таблицу результатов.
+
+**DatabaseAdmin**:
+Страница управления таблицей `resolved_purls`. Поддерживает фильтрацию (поиск, резолвер, confidence, даты), сортировку по колонкам, инлайн-редактирование, одиночное/массовое удаление, CSV-импорт (с выбором стратегии upsert/skip_existing) и CSV-экспорт. Пагинация реализована через композабл `usePagination`. Все колонки отображаются по умолчанию без чекбоксов видимости.
+
+**API Client**:
+Типизированный HTTP-клиент в `frontend/src/api/`. Модули: `client.ts` (базовая fetch-обёртка с `ApiError`), `purl.ts`, `sbom.ts`, `db.ts`, `settings.ts`, `images.ts`. Все ответы типизированы через интерфейсы в `types/api.ts`, зеркалирующие `schemas.py`.
+
+**Pinia**:
+Не используется. Состояние на уровне компонентов (`ref`, `reactive`) достаточно для текущего набора страниц.

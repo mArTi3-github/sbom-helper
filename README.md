@@ -8,11 +8,7 @@ Resolve Package URLs (PURLs) to source code repository URLs with confidence scor
 docker compose up -d
 ```
 
-```bash
-curl -X POST http://localhost:8000/api/v1/resolve \
-  -H "Content-Type: application/json" \
-  -d '{"purl":"pkg:pypi/requests@2.31.0"}'
-```
+Open `https://localhost:8443/` in your browser to access the SPA.
 
 For development with hot-reload (src/ is mounted as a volume, changes apply on save):
 
@@ -20,7 +16,17 @@ For development with hot-reload (src/ is mounted as a volume, changes apply on s
 docker compose up -d
 ```
 
-Docker Compose automatically merges `docker-compose.override.yml`, switching the build target to `dev` with `--reload` and source code mounting. No `--build` needed for `src/` changes — uvicorn reloads automatically. Rebuild only when `pyproject.toml` (dependencies) changes.
+Docker Compose automatically merges `docker-compose.override.yml`, switching the build target to `dev` with `--reload` and source code mounting. No `--build` needed for `src/` changes — uvicorn reloads automatically. Rebuild only when `pyproject.toml` (dependencies) or `frontend/` changes.
+
+**Frontend development** (Vue 3 SPA at `frontend/`):
+
+```bash
+cd frontend
+npm install
+npm run build -- --watch    # auto-rebuild on changes
+```
+
+Then `docker compose up -d` (or `docker compose up --build` if the dist directory changed outside the container).
 
 For production, exclude the override file:
 
@@ -82,7 +88,7 @@ docker compose -f docker-compose.yml up -d
 ## Stack
 
 **Backend:** FastAPI, Pydantic, purl2repo, ecosyste.ms, libraries.io  
-**UI:** Jinja2, vanilla JS  
+**UI:** Vue 3 SPA (Vite, TypeScript, Vue Router) — replaces Jinja2 + vanilla JS  
 **Infrastructure:** Docker, Docker Compose  
 **Python:** 3.11+
 

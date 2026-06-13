@@ -69,3 +69,64 @@ export interface ImagesListResponse {
   images: ImageItem[]
   images_list: unknown
 }
+
+export interface IgnorePatternItem {
+  field: string
+  pattern: string
+}
+
+export interface SbomSummary {
+  total_purls: number
+  found: number
+  not_found: number
+  skipped: number
+  removed: number
+  ignored: number
+}
+
+export interface SbomResultItem {
+  purl: string
+  status: 'found' | 'not_found' | 'removed' | 'ignored'
+  repository_url: string | null
+  found_by?: string
+  resolver?: string
+  name?: string
+  version?: string
+}
+
+export interface SbomResponse {
+  summary: SbomSummary
+  results: SbomResultItem[]
+  enriched_sbom: unknown
+}
+
+export interface PurlListResponse {
+  rows: ResolveResponse[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface PurlUpdateRequest {
+  purl?: string | null
+  repository_url?: string | null
+}
+
+export interface PurlDeleteRequest {
+  purls: string[]
+}
+
+export interface DeleteResponse {
+  deleted: number
+}
+
+export interface ImportErrorItem {
+  row: number
+  error: string
+}
+
+export interface ImportResponse {
+  imported: number
+  skipped: number
+  errors: ImportErrorItem[]
+}

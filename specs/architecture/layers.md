@@ -153,16 +153,19 @@
 |                                                    |
 |  +-----------------------------+                   |
 |  |     Web UI Layer            |                   |
-|  |  src/purl_resolver/         |                   |
-|  |  templates/index.html       |                   |
-|  |  templates/sbom.html        |                   |
-|  |  templates/settings.html    |                   |
-|  |  templates/images-list-     |                   |
-|  |    converter.html            |                   |
-|  |  templates/db-admin.html    |                   |
+|  |  frontend/                  |                   |
+|  |  src/views/*.vue            |                   |
+|  |  src/components/*.vue       |                   |
+|  |  src/api/*.ts               |                   |
+|  |  src/composables/*.ts       |                   |
+|  |  src/types/api.ts           |                   |
+|  |  src/router/index.ts        |                   |
 |  |                             |                   |
-|  |  Jinja2 templates           |                   |
-|  |  Vanilla JS + fetch()       |                   |
+|  |  Vue 3 SPA                  |                   |
+|  |  Vue Router                 |                   |
+|  |  TypeScript                 |                   |
+|  |  Vite build → dist/         |                   |
+|  |  SPAStaticFiles mount       |                   |
 |  +-----------------------------+                   |
 +---------------------------------------------------+
 ```
@@ -183,7 +186,7 @@
 - **Resolver Layer** imports purl2repo, httpx, and `purl_utils`; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
-- **Web UI Layer** is served by the API Layer and communicates via HTTP (fetch → API Layer)
+- **Web UI Layer** (`frontend/`) is a standalone Vue 3 SPA; communicates with the API Layer via HTTP (`fetch` → API endpoints); FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass with `index.html` fallback for client-side routing); SPA is mounted after all API routes
 - Tests (`tests/`) import `main:app` and FastAPI TestClient; unit tests for storage/service/purl_utils import them directly
 
 ## Layer Responsibilities
@@ -198,7 +201,7 @@
 - Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, returns conversion result with completeness flags
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`
 - Handle error responses from Service Layer and Pipeline
-- Serve Jinja2 templates for the web UI (`index.html`, `sbom.html`, `db-admin.html`, `settings.html`)
+- Serve the Vue 3 SPA via `SPAStaticFiles` mounted at `/` in `main.py` (after all API routes); `SPAStaticFiles` falls back to `index.html` for any unmatched path, enabling Vue Router client-side routing
 
 ### Service Layer (`service.py`)
 - `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`)
@@ -266,12 +269,18 @@
 - Graceful handling: missing file → return empty list; corrupt JSON → log warning, return empty list
 - Exposed via API endpoints `GET/POST /api/v1/sbom/ignore-patterns` in `routes/ignore_patterns.py`
 
-### Web UI Layer (`templates/`)
-- `index.html` — form-based PURL input; fetch resolution results via `POST /api/v1/resolve`; display results in a readable card format with expandable details; navigation link to SBOM-updater, DB-admin, and Settings pages
-- `sbom.html` — file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/resolve/sbom` (multipart); display summary cards + results table; "Скачать обогащённый SBOM" triggers JSON file download; navigation link to PURL resolver, DB-admin, and Settings pages
-- `db-admin.html` — database administration page: filterable table with pagination, inline editing of PURL and repository_url, CSV import/export (semicolon delimiter, BOM handling), bulk delete; column visibility controls; navigation link to PURL resolver, SBOM-updater, and Settings pages
-- `settings.html` — settings page: URL validation toggle, timeout configuration, GitHub token management (set/clear), Libraries.io resolver card (enable toggle, API key input, status badge, clear button); loads settings via `GET /api/v1/settings`, saves via `PATCH /api/v1/settings`; navigation link to all other pages
-- `images-list-converter.html` — Images List Converter page: file upload form (drag-and-drop) for CycloneDX JSON; fetch results via `POST /api/v1/convert/images-list` (multipart); display status card (was_transformed), images table with completeness flags (✅/❌ for components, name, version, properties), "Скачать список образов" triggers JSON file download; navigation link to all other pages
+### Web UI Layer (`frontend/`)
+- Vue 3 SPA built with Vite + TypeScript, source in `frontend/src/`
+- **Views** (`src/views/`): `PurlResolver.vue`, `SbomUpdater.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
+- **Components** (`src/components/`): `AppNav.vue` (navigation bar), `FileUploadZone.vue` (drag-and-drop upload), `ModalDialog.vue` (reusable modal)
+- **Composables** (`src/composables/`): `usePagination.ts` (pagination state), `useDownload.ts` (file download helper)
+- **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts`, `db.ts`, `settings.ts`, `images.ts`
+- **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`
+- **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 5 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`
+- FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass) mounted at `/` in `main.py`; `SPAStaticFiles` falls back to `index.html` for unmatched paths, enabling client-side routing
+- Each `.vue` component uses `<style scoped>` for CSS isolation; global CSS variables in `src/assets/main.css`
+- No CSS framework — design system uses CSS custom properties
+- Build output: `frontend/dist/` (copied into Docker image via multi-stage build)
 
 ### Domain Layer (`purl2repo`)
 - Resolve PURL strings to repository URLs with confidence/evidence
@@ -289,7 +298,7 @@
 
 ## Anti-Patterns
 
-- Importing purl2repo exception classes in the Web UI layer
+- Importing purl2repo exception classes in the Web UI layer (Vue SPA communicates via HTTP only)
 - Bypassing the API Layer — direct calls to purl2repo from the test client
 - Calling purl2repo directly from the API Layer (must go through Service Layer)
 - Putting SBOM enrichment orchestration logic in `router.py` — use `SbomEnrichmentPipeline` instead
@@ -304,12 +313,14 @@
 
 ### Build Strategy
 Multi-stage Dockerfile:
-- **dev stage**: editable install (`pip install -e .`), `--reload` for hot-reload development
-- **prod stage**: non-editable install, `app` user (UID 1001), HEALTHCHECK configured
+- **frontend-build stage**: `node:20-alpine` — `npm ci` + `npm run build` to produce `frontend/dist/`
+- **dev stage**: `python:3.12-slim`, editable install (`pip install -e .`), `--reload` for hot-reload development; copies built frontend from `frontend-build` stage
+- **prod stage**: `python:3.12-slim`, non-editable install, `app` user (UID 1001), HEALTHCHECK configured; copies built frontend from `frontend-build` stage
 
 ### Docker Compose
 - `docker-compose.yml` defines app service with `${VAR:-default}` pattern for deployment-specific overrides
 - `docker-compose.override.yml` (auto-merged by Compose) mounts `./src` as a volume for dev hot-reload
+- Frontend development: `cd frontend && npm run build -- --watch` for auto-rebuild on changes; `docker compose up --build` if `dist/` changed outside the container
 - Environment variables are the sole configuration mechanism (twelve-factor app). No `.env` is baked into the image.
 
 ### Security
@@ -317,4 +328,4 @@ Multi-stage Dockerfile:
 - HEALTHCHECK monitors service availability — container marked unhealthy on repeated failure
 
 ### Build Context
-`.dockerignore` excludes `.git`, `.venv`, `__pycache__`, `.pytest_cache`, `.env` files to keep build context minimal. `pyproject.toml` and `src/` are copied separately to optimize Docker layer caching.
+`.dockerignore` excludes `.git`, `.venv`, `__pycache__`, `.pytest_cache`, `.env` files to keep build context minimal. `pyproject.toml`, `src/`, and `frontend/` are copied separately to optimize Docker layer caching. `frontend/node_modules/` is not copied — `npm ci` in the `frontend-build` stage installs dependencies fresh.

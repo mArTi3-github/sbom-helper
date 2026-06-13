@@ -5,7 +5,22 @@ from contextlib import asynccontextmanager
 
 import asyncpg
 import uvicorn
+import pathlib
+
 from fastapi import FastAPI
+from starlette.exceptions import HTTPException
+from starlette.responses import FileResponse
+from starlette.staticfiles import StaticFiles
+
+
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except HTTPException:
+            if self.html:
+                return await super().get_response("index.html", scope)
+            raise
 
 from .config import settings, storage_settings
 from .db_admin_service import DbAdminService
@@ -53,6 +68,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="sbom-helper", lifespan=lifespan)
 app.include_router(router)
+
+SPA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if SPA_DIR.exists():
+    app.mount("/", SPAStaticFiles(directory=str(SPA_DIR), html=True), name="spa")
 
 
 def main() -> None:

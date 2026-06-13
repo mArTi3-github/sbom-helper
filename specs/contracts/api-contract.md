@@ -3,7 +3,7 @@
 ## Participants
 
 - **Provider**: sbom-helper service (FastAPI)
-- **Consumer**: Any HTTP client (browser, curl, scripts, future frontend)
+- **Consumer**: Any HTTP client (browser Vue SPA, curl, scripts)
 
 ## Base URL
 
@@ -95,21 +95,21 @@ Simple health check for monitoring and container orchestration.
 
 ### `GET /`
 
-Serve the web UI HTML page (PURL resolver).
+Serve the Vue 3 SPA (PURL resolver page).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns the Jinja2-rendered index page with a navigation bar linking to PURL Resolver, SBOM Updater, Database Admin, Settings, and Images List Converter pages.
+Content-Type: `text/html`. Returns `index.html` from the built SPA (`frontend/dist/`). Vue Router handles client-side routing — all SPA routes (`/`, `/sbom-updater`, `/db-admin`, `/settings`, `/images-list-converter`) return the same `index.html`; the router mounts the corresponding view component. API routes are registered before the SPA mount and take priority.
 
 ---
 
 ### `GET /sbom-updater`
 
-Serve the SBOM-updater web UI page.
+Serve the SBOM-updater web UI page (Vue SPA route).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns the Jinja2-rendered sbom.html page with a file upload form for CycloneDX JSON SBOM files. The page handles file selection, upload, result display, and enriched SBOM download via JavaScript.
+Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomUpdater.vue` with file upload (drag-and-drop), enrichment options, ignore patterns editor, results display, and download button.
 
 ---
 
@@ -252,25 +252,25 @@ Response: `Content-Type: text/csv`, `Content-Disposition: attachment; filename="
 
 ### `GET /db-admin`
 
-Serve the database admin page HTML.
+Serve the database admin page (Vue SPA route).
 
-Response (200): `Content-Type: text/html`. Jinja2-rendered `db-admin.html`.
+Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `DatabaseAdmin.vue` with filterable/sortable table, inline editing, CSV import/export, and bulk delete.
 
 ---
 
 ### `GET /settings`
 
-Serve the settings page HTML.
+Serve the settings page (Vue SPA route).
 
-Response (200): `Content-Type: text/html`. Jinja2-rendered `settings.html`.
+Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `Settings.vue` with URL validation, retry config, log level, GitHub token, ecosyste.ms, and Libraries.io settings cards.
 
 ---
 
 ### `GET /images-list-converter`
 
-Serve the Images List Converter web UI page.
+Serve the Images List Converter web UI page (Vue SPA route).
 
-Response (200): `Content-Type: text/html`. Jinja2-rendered `images-list-converter.html` with a file upload form for CycloneDX JSON SBOM files. The page handles file selection, upload, result display, and images list download via JavaScript.
+Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `ImagesListConverter.vue` with file upload (drag-and-drop), conversion status card, images table with completeness flags, and download button.
 
 ---
 

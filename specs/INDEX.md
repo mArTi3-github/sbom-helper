@@ -65,7 +65,7 @@ specs/
 │   └── layers.md                    — Layer hierarchy and import rules
 ├── domains/
 │   ├── purl-resolution.md           — Core resolution capability
-│   └── web-ui.md                    — Browser interface (four pages)
+│   └── web-ui.md                    — Browser interface (five pages, Vue SPA)
 ├── contracts/
 │   └── api-contract.md              — HTTP API contract (including db-admin and settings endpoints)
 └── decisions/

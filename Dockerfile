@@ -1,3 +1,11 @@
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+
 FROM python:3.12-slim AS dev
 
 WORKDIR /app
@@ -16,6 +24,7 @@ RUN pip install --no-cache-dir -e ".[dev]" && \
     rm -rf /root/.cache
 
 COPY scripts/ ./scripts/
+COPY --from=frontend-build /frontend/dist/ /app/frontend/dist/
 RUN bash scripts/generate-ssl-cert.sh && \
     chown -R app:app /app
 
@@ -45,6 +54,7 @@ RUN pip install --no-cache-dir . && \
     rm -rf /root/.cache
 
 COPY scripts/ ./scripts/
+COPY --from=frontend-build /frontend/dist/ /app/frontend/dist/
 RUN bash scripts/generate-ssl-cert.sh && \
     chown -R app:app /app
 
