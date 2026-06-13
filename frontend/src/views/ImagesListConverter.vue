@@ -109,6 +109,8 @@ async function handleConvert() {
       error.value = e.message
     } else if (e instanceof Error) {
       error.value = 'Network error: could not reach the server.'
+    } else {
+      error.value = 'An unexpected error occurred.'
     }
   } finally {
     loading.value = false

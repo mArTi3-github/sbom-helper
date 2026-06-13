@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   accept?: string
   maxSize?: number
 }>()
@@ -11,6 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const selectedFile = ref<File | null>(null)
+const errorMessage = ref<string | null>(null)
 const isDragover = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -33,6 +34,12 @@ function onFileInput(e: Event) {
 }
 
 function handleFile(file: File) {
+  const maxBytes = (props.maxSize || 200) * 1048576
+  if (file.size > maxBytes) {
+    errorMessage.value = `File exceeds maximum size of ${props.maxSize || 200} MB.`
+    return
+  }
+  errorMessage.value = null
   selectedFile.value = file
   emit('file-selected', file)
 }
@@ -66,6 +73,7 @@ function openFileDialog() {
     <div v-if="selectedFile" class="file-name">
       File: {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
     </div>
+    <div v-if="errorMessage" class="error-msg">{{ errorMessage }}</div>
   </div>
 </template>
 
@@ -99,6 +107,11 @@ function openFileDialog() {
 .file-name {
   font-size: 0.9rem;
   color: #555;
+  margin-top: 0.5rem;
+}
+.error-msg {
+  color: #b91c1c;
+  font-size: 0.85rem;
   margin-top: 0.5rem;
 }
 </style>

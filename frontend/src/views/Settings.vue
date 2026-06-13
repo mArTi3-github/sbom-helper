@@ -209,7 +209,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getSettings, updateSettings } from '../api/settings'
-import type { SettingsTokenSet } from '../types/api'
+import type { SettingsTokenSet, SettingsUpdate } from '../types/api'
 
 const validateDbUrls = ref(false)
 const urlValidationTimeout = ref(5)
@@ -259,7 +259,7 @@ async function loadSettings() {
 async function saveSettings() {
   saving.value = true
   try {
-    const body: Record<string, unknown> = {
+    const body: SettingsUpdate = {
       validate_db_urls: validateDbUrls.value,
       url_validation_timeout: urlValidationTimeout.value,
       revalidation_cooldown_hours: revalidationCooldownHours.value,

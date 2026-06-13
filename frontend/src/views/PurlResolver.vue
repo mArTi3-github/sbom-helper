@@ -123,6 +123,8 @@ async function handleResolve() {
       error.value = e.message
     } else if (e instanceof Error) {
       error.value = 'Network error: could not reach the server. Please try again.'
+    } else {
+      error.value = 'An unexpected error occurred.'
     }
   } finally {
     loading.value = false
