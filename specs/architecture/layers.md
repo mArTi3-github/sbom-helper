@@ -319,8 +319,8 @@ Multi-stage Dockerfile:
 
 ### Docker Compose
 - `docker-compose.yml` defines app service with `${VAR:-default}` pattern for deployment-specific overrides
-- `docker-compose.override.yml` (auto-merged by Compose) mounts `./src` as a volume for dev hot-reload
-- Frontend development: `cd frontend && npm run build -- --watch` for auto-rebuild on changes; `docker compose up --build` if `dist/` changed outside the container
+- `docker-compose.override.yml` (auto-merged by Compose) mounts `./src` for Python hot-reload and `./frontend/dist` so frontend build output is available without rebuilding the image
+- Frontend development: `cd frontend && npm run build -- --watch` for auto-rebuild on changes; the volume mount `./frontend/dist:/app/frontend/dist` in the override picks up rebuilt files without `docker compose up --build`
 - Environment variables are the sole configuration mechanism (twelve-factor app). No `.env` is baked into the image.
 
 ### Security

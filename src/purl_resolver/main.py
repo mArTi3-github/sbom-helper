@@ -4,8 +4,8 @@ import logging
 from contextlib import asynccontextmanager
 
 import asyncpg
-import uvicorn
 import pathlib
+import uvicorn
 
 from fastapi import FastAPI
 from starlette.exceptions import HTTPException
@@ -69,8 +69,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="sbom-helper", lifespan=lifespan)
 app.include_router(router)
 
-SPA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-if SPA_DIR.exists():
+
+def _find_spa_dir() -> pathlib.Path | None:
+    docker_dir = pathlib.Path("/app/frontend/dist")
+    if docker_dir.is_dir():
+        return docker_dir
+    src_dir = pathlib.Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if src_dir.is_dir():
+        return src_dir
+    logger.warning("No SPA directory found in any location — frontend will not be served")
+    return None
+
+
+SPA_DIR = _find_spa_dir()
+if SPA_DIR is not None:
     app.mount("/", SPAStaticFiles(directory=str(SPA_DIR), html=True), name="spa")
 
 

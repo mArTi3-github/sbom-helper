@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import pathlib
+from unittest.mock import MagicMock, patch
 
 from purl_resolver.resolver.librariesio import LibrariesIoResolver
 from purl_resolver.resolver.purl2repo import Purl2RepoResolver
@@ -51,3 +52,27 @@ class TestResolverRegistration:
             resolvers.append(LibrariesIoResolver(api_key=settings.librariesio_api_key))
 
         assert len(resolvers) == 1
+
+
+class TestFindSpaDir:
+    def test_returns_none_when_no_dir_exists(self, tmp_path: pathlib.Path) -> None:
+        """_find_spa_dir returns None when no SPA directory is found anywhere."""
+        from purl_resolver.main import _find_spa_dir
+
+        with (
+            patch("purl_resolver.main.pathlib.Path.is_dir", return_value=False),
+        ):
+            result = _find_spa_dir()
+        assert result is None
+
+    def test_returns_path_when_docker_dir_exists(self, tmp_path: pathlib.Path) -> None:
+        """_find_spa_dir returns /app/frontend/dist when it exists."""
+        docker_dir = pathlib.Path("/app/frontend/dist")
+        from purl_resolver.main import _find_spa_dir
+
+        def fake_is_dir(self_):
+            return self_ == docker_dir
+
+        with patch("purl_resolver.main.pathlib.Path.is_dir", fake_is_dir):
+            result = _find_spa_dir()
+        assert result == docker_dir
