@@ -44,29 +44,47 @@
 
     <div v-if="result" class="results">
       <div class="summary-grid">
-        <div class="summary-item" title="Уникальных PURL, направленных на обогащение">
+        <div class="summary-item">
           <div class="summary-value">{{ result.summary.total_purls }}</div>
-          <div class="summary-label">Всего</div>
+          <div class="summary-label">
+            Всего
+            <span class="info-icon" data-tooltip="Уникальных PURL, направленных на обогащение">i</span>
+          </div>
         </div>
-        <div class="summary-item summary-found" title="Уникальных PURL с найденным VCS-репозиторием">
+        <div class="summary-item summary-found">
           <div class="summary-value">{{ result.summary.found }}</div>
-          <div class="summary-label">Найдено</div>
+          <div class="summary-label">
+            Найдено
+            <span class="info-icon" data-tooltip="Уникальных PURL с найденным VCS-репозиторием">i</span>
+          </div>
         </div>
-        <div class="summary-item summary-not-found" title="Уникальных PURL без найденного VCS-репозитория">
+        <div class="summary-item summary-not-found">
           <div class="summary-value">{{ result.summary.not_found }}</div>
-          <div class="summary-label">Не найдено</div>
+          <div class="summary-label">
+            Не найдено
+            <span class="info-icon" data-tooltip="Уникальных PURL без найденного VCS-репозитория">i</span>
+          </div>
         </div>
-        <div v-if="result.summary.skipped > 0" class="summary-item summary-skipped" title="PURL, пропущенные из-за ошибки нормализации">
+        <div v-if="result.summary.skipped > 0" class="summary-item summary-skipped">
           <div class="summary-value">{{ result.summary.skipped }}</div>
-          <div class="summary-label">Пропущено</div>
+          <div class="summary-label">
+            Пропущено
+            <span class="info-icon" data-tooltip="PURL, пропущенные из-за ошибки нормализации">i</span>
+          </div>
         </div>
-        <div v-if="result.summary.removed > 0" class="summary-item summary-removed" title="Всего удалённых записей (включая повторяющиеся PURL на разных уровнях вложенности)">
+        <div v-if="result.summary.removed > 0" class="summary-item summary-removed">
           <div class="summary-value">{{ result.summary.removed }}</div>
-          <div class="summary-label">Удалено</div>
+          <div class="summary-label">
+            Удалено
+            <span class="info-icon" data-tooltip="Всего удалённых записей (включая повторяющиеся PURL на разных уровнях вложенности)">i</span>
+          </div>
         </div>
-        <div v-if="result.summary.ignored > 0" class="summary-item summary-ignored" title="Уникальных PURL, исключённых из обработки по правилам игнорирования">
+        <div v-if="result.summary.ignored > 0" class="summary-item summary-ignored">
           <div class="summary-value">{{ result.summary.ignored }}</div>
-          <div class="summary-label">Игнорировано</div>
+          <div class="summary-label">
+            Игнорировано
+            <span class="info-icon" data-tooltip="Уникальных PURL, исключённых из обработки по правилам игнорирования">i</span>
+          </div>
         </div>
       </div>
 
@@ -452,6 +470,53 @@ h1 {
   font-size: 0.8rem;
   color: var(--color-muted);
   margin-top: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-muted-light);
+  color: var(--color-muted-light);
+
+  position: relative;
+  line-height: 1;
+}
+
+.info-icon:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2d2d2d;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.info-icon:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #2d2d2d;
+  z-index: 100;
+  pointer-events: none;
 }
 
 .summary-found .summary-value {
