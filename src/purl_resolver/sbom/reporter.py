@@ -22,11 +22,11 @@ def build_report(
 
     for comp in components:
         if comp.ignored:
-            ignored_count += 1
             key = safe_normalize(comp.purl)
             if key in seen:
                 continue
             seen.add(key)
+            ignored_count += 1
             results.append({
                 "purl": key,
                 "status": "ignored",

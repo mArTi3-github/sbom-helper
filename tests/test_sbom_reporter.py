@@ -167,6 +167,26 @@ def test_build_report_includes_ignored_components():
     assert ignored[0]["version"] == "1.0"
 
 
+def test_build_report_ignored_deduplicates_by_normalized_purl():
+    comps = [
+        SbomComponent(
+            name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0",
+            path=("components", 0), needs_enrichment=False, ignored=True,
+        ),
+        SbomComponent(
+            name="pkg-a", version="1.0", purl="pkg:pypi/pkg-a@1.0",
+            path=("components", 1, "components", 0), needs_enrichment=False, ignored=True,
+        ),
+        SbomComponent(
+            name="pkg-b", version="2.0", purl="pkg:pypi/pkg-b@2.0",
+            path=("components", 2), needs_enrichment=False, ignored=True,
+        ),
+    ]
+    report = build_report(comps, {})
+    assert report["summary"]["ignored"] == 2
+    assert len([r for r in report["results"] if r["status"] == "ignored"]) == 2
+
+
 def test_build_report_ignored_not_counted_in_total():
     comps = [
         SbomComponent(

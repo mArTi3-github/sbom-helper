@@ -44,27 +44,27 @@
 
     <div v-if="result" class="results">
       <div class="summary-grid">
-        <div class="summary-item">
+        <div class="summary-item" title="Уникальных PURL, направленных на обогащение">
           <div class="summary-value">{{ result.summary.total_purls }}</div>
           <div class="summary-label">Всего</div>
         </div>
-        <div class="summary-item summary-found">
+        <div class="summary-item summary-found" title="Уникальных PURL с найденным VCS-репозиторием">
           <div class="summary-value">{{ result.summary.found }}</div>
           <div class="summary-label">Найдено</div>
         </div>
-        <div class="summary-item summary-not-found">
+        <div class="summary-item summary-not-found" title="Уникальных PURL без найденного VCS-репозитория">
           <div class="summary-value">{{ result.summary.not_found }}</div>
           <div class="summary-label">Не найдено</div>
         </div>
-        <div v-if="result.summary.skipped > 0" class="summary-item summary-skipped">
+        <div v-if="result.summary.skipped > 0" class="summary-item summary-skipped" title="PURL, пропущенные из-за ошибки нормализации">
           <div class="summary-value">{{ result.summary.skipped }}</div>
           <div class="summary-label">Пропущено</div>
         </div>
-        <div v-if="result.summary.removed > 0" class="summary-item summary-removed">
+        <div v-if="result.summary.removed > 0" class="summary-item summary-removed" title="Всего удалённых записей (включая повторяющиеся PURL на разных уровнях вложенности)">
           <div class="summary-value">{{ result.summary.removed }}</div>
           <div class="summary-label">Удалено</div>
         </div>
-        <div v-if="result.summary.ignored > 0" class="summary-item summary-ignored">
+        <div v-if="result.summary.ignored > 0" class="summary-item summary-ignored" title="Уникальных PURL, исключённых из обработки по правилам игнорирования">
           <div class="summary-value">{{ result.summary.ignored }}</div>
           <div class="summary-label">Игнорировано</div>
         </div>
