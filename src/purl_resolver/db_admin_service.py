@@ -100,20 +100,10 @@ class DbAdminService:
             errors=[ImportErrorItem(row=e["row"], error=str(e["error"])) for e in errors],
         )
 
-    async def export_csv(self, params: PurlListParams) -> str:
-        filters = PurlFilters(
-            search=params.search,
-            resolver=params.resolver,
-            confidence=params.confidence,
-            date_from=params.date_from,
-            date_to=params.date_to,
-        )
-        total = await self._storage.count_purls(filters)
-        rows = await self._storage.list_purls(
-            offset=0,
-            limit=max(total, 1),
-            filters=filters,
-            sort_by=params.sort_by,
-            sort_order=params.sort_order,
-        )
+    async def export_selected_csv(self, purls: list[str]) -> str:
+        rows = []
+        for purl in purls:
+            row = await self._storage.lookup(purl)
+            if row is not None:
+                rows.append(row)
         return render_csv_export(rows)

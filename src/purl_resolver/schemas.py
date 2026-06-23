@@ -83,6 +83,10 @@ class PurlDeleteRequest(BaseModel):
     purls: list[str]
 
 
+class ExportRequest(BaseModel):
+    purls: list[str]
+
+
 class DeleteResponse(BaseModel):
     deleted: int
 

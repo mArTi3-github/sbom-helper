@@ -144,7 +144,7 @@ User                   Browser (Vue SPA)             API Layer
 - All columns are displayed by default (no visibility checkboxes)
 - All states (loading, empty, error, success) have distinct visual representations
 - Edits update via PATCH and re-fetch the current page
-- Export uses semicolon (`;`) delimiter and respects current filter settings
+- Export exports the currently selected rows via semicolon (`;`) delimited CSV; button shows selected count and is disabled when no rows are selected
 - Import expects semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically); first row must contain headers; required columns: `purl`, `repository_url`
 - Import modal includes a collapsible CSV format reference section
 - Import modal supports drag-and-drop for CSV files (via `FileUploadZone` and `ModalDialog` components)

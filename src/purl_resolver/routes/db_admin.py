@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse, Response
 
 from ..db_admin_service import DbAdminError, DbAdminService
 from ..schemas import (
+    ExportRequest,
     ImportStrategy,
     PurlDeleteRequest,
     PurlListParams,
@@ -69,16 +70,16 @@ async def import_csv_endpoint(
     return JSONResponse(status_code=200, content=result.model_dump())
 
 
-@router.get("/api/v1/db/export")
+@router.post("/api/v1/db/export")
 async def export_csv_endpoint(
     request: Request,
-    params: PurlListParams = Query(),
+    body: ExportRequest,
 ):
     service: DbAdminService = request.app.state.db_admin_service
-    csv_text = await service.export_csv(params)
+    csv_text = await service.export_selected_csv(body.purls)
     csv_bytes = csv_text.encode("utf-8")
     return Response(
         content=csv_bytes,
         media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="resolved_purls_export.csv"'},
+        headers={"Content-Disposition": 'attachment; filename="purls_export.csv"'},
     )

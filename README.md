@@ -45,7 +45,7 @@ docker compose -f docker-compose.yml up -d
 | `PATCH /api/v1/db/purls/{purl}` | Edit a PURL row |
 | `DELETE /api/v1/db/purls` | Bulk delete PURL rows |
 | `POST /api/v1/db/import` | Import PURLs from CSV (semicolon delimiter) |
-| `GET /api/v1/db/export` | Export PURLs to CSV (semicolon delimiter) |
+| `POST /api/v1/db/export` | Export selected PURLs to CSV (semicolon delimiter) |
 | `GET /health` | Health check |
 | `GET /api/v1/settings` | Get application settings |
 | `PATCH /api/v1/settings` | Update application settings |

@@ -30,7 +30,7 @@
 |  |  PATCH /api/v1/db/purls/   |                   |
 |  |  DELETE /api/v1/db/purls   |                   |
 |  |  POST /api/v1/db/import    |                   |
-|  |  GET /api/v1/db/export     |                   |
+|  |  POST /api/v1/db/export    |                   |
 |  |  GET /api/v1/settings      |                   |
 |  |  PATCH /api/v1/settings    |                   |
 |  +-------------+---------------+                   |

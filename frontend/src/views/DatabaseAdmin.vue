@@ -45,7 +45,7 @@
         <span v-if="loading" class="spinner"></span>
         <span v-else>Refresh</span>
       </button>
-      <button class="btn btn-secondary" @click="exportCsv">Export CSV</button>
+      <button class="btn btn-secondary" :disabled="selectedRows.size === 0" @click="exportCsv">Export CSV ({{ selectedRows.size }})</button>
       <button class="btn btn-secondary" @click="showImportModal = true">Import CSV</button>
       <button class="btn btn-danger" :disabled="selectedRows.size === 0" @click="deleteSelected">
         Delete Selected ({{ selectedRows.size }})
@@ -258,7 +258,7 @@ pkg:pypi/flask@2.3.0,https://github.com/pallets/flask</pre>
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { usePagination } from '../composables/usePagination'
-import { listPurls, updatePurl, deletePurls, importCsv, exportCsv as apiExportCsv } from '../api/db'
+import { listPurls, updatePurl, deletePurls, importCsv, exportSelectedCsv as apiExportCsv } from '../api/db'
 import type { PurlListParams } from '../api/db'
 import { ApiError } from '../api/client'
 import { safeUrl } from '../composables/useDownload'
@@ -510,19 +510,9 @@ async function deleteSelected() {
 }
 
 async function exportCsv() {
+  if (selectedRows.value.size === 0) return
   try {
-    const params: PurlListParams = {
-      page: 1,
-      page_size: 100000,
-      search: search.value || undefined,
-      resolver: resolver.value || undefined,
-      confidence: confidence.value || undefined,
-      date_from: dateFrom.value || undefined,
-      date_to: dateTo.value || undefined,
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value,
-    }
-    const blob = await apiExportCsv(params)
+    const blob = await apiExportCsv(Array.from(selectedRows.value))
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

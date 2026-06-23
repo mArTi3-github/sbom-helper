@@ -59,7 +59,10 @@ export function importCsv(file: File, strategy: 'upsert' | 'skip_existing'): Pro
   })
 }
 
-export function exportCsv(params: PurlListParams): Promise<Blob> {
-  const query = buildPurlQuery(params)
-  return requestBlob(`/api/v1/db/export?${query.toString()}`)
+export function exportSelectedCsv(purls: string[]): Promise<Blob> {
+  return requestBlob('/api/v1/db/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ purls }),
+  })
 }

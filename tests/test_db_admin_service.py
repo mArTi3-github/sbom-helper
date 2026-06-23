@@ -141,21 +141,24 @@ class TestDbAdminServiceImport:
 
 class TestDbAdminServiceExport:
     @pytest.mark.asyncio
-    async def test_export_empty(self, service):
-        params = PurlListParams()
-        csv_text = await service.export_csv(params)
+    async def test_export_selected_empty(self, service):
+        csv_text = await service.export_selected_csv([])
         assert "purl;repository_url" in csv_text
 
     @pytest.mark.asyncio
-    async def test_export_with_data(self, populated_storage, service):
-        params = PurlListParams()
-        csv_text = await service.export_csv(params)
+    async def test_export_selected_with_data(self, populated_storage, service):
+        csv_text = await service.export_selected_csv(["pkg:pypi/requests", "pkg:npm/express"])
         lines = csv_text.strip().split("\n")
         assert len(lines) == 3  # header + 2 rows
 
     @pytest.mark.asyncio
-    async def test_export_with_search(self, populated_storage, service):
-        params = PurlListParams(search="requests")
-        csv_text = await service.export_csv(params)
+    async def test_export_selected_partial(self, populated_storage, service):
+        csv_text = await service.export_selected_csv(["pkg:pypi/requests", "pkg:pypi/nonexistent"])
         lines = csv_text.strip().split("\n")
-        assert len(lines) == 2  # header + 1 row
+        assert len(lines) == 2  # header + 1 row (nonexistent skipped)
+
+    @pytest.mark.asyncio
+    async def test_export_selected_unknown(self, service):
+        csv_text = await service.export_selected_csv(["pkg:pypi/unknown"])
+        lines = csv_text.strip().split("\n")
+        assert len(lines) == 1  # header only

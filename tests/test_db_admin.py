@@ -260,17 +260,36 @@ class TestAdminImport:
 
 
 class TestAdminExport:
-    def test_export_csv(self, admin_client):
-        response = admin_client.get("/api/v1/db/export")
+    def test_export_selected_csv(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/export",
+            json={"purls": ["pkg:pypi/requests", "pkg:npm/express"]},
+        )
         assert response.status_code == 200
         assert "attachment" in response.headers.get("content-disposition", "")
         content = response.content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(content), delimiter=";")
-        assert "purl" in (reader.fieldnames or [])
-        assert "repository_url" in (reader.fieldnames or [])
+        rows = list(reader)
+        assert len(rows) == 2
+        assert rows[0]["purl"] == "pkg:pypi/requests"
+        assert rows[1]["purl"] == "pkg:npm/express"
 
-    def test_export_csv_with_filter(self, populated_storage, admin_client):
-        response = admin_client.get("/api/v1/db/export?search=requests")
+    def test_export_selected_empty_list(self, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/export",
+            json={"purls": []},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        reader = csv.DictReader(io.StringIO(content), delimiter=";")
+        rows = list(reader)
+        assert len(rows) == 0
+
+    def test_export_selected_partial(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/export",
+            json={"purls": ["pkg:pypi/requests", "pkg:pypi/nonexistent"]},
+        )
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(content), delimiter=";")
@@ -278,8 +297,11 @@ class TestAdminExport:
         assert len(rows) == 1
         assert rows[0]["purl"] == "pkg:pypi/requests"
 
-    def test_export_csv_with_data(self, populated_storage, admin_client):
-        response = admin_client.get("/api/v1/db/export")
+    def test_export_selected_all_existing(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/export",
+            json={"purls": ["pkg:pypi/requests", "pkg:npm/express", "pkg:pypi/flask"]},
+        )
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(content), delimiter=";")
@@ -287,7 +309,10 @@ class TestAdminExport:
         assert len(rows) == 3
 
     def test_export_uses_semicolon_delimiter(self, populated_storage, admin_client):
-        response = admin_client.get("/api/v1/db/export")
+        response = admin_client.post(
+            "/api/v1/db/export",
+            json={"purls": ["pkg:pypi/requests"]},
+        )
         content = response.content.decode("utf-8")
         first_line = content.split("\n")[0]
         assert ";" in first_line

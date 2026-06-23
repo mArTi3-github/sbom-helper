@@ -242,19 +242,29 @@ CSV format: semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically
 Response (200): `{ "imported": N, "skipped": N, "errors": [...] }`
 Response (400): `{ "error": "invalid_csv", "message": "..." }` (missing columns, wrong format)
 
-### `GET /api/v1/db/export`
+### `POST /api/v1/db/export`
 
-Export CSV. Same filter/sort params as `GET /api/v1/db/purls` (no pagination).
+Export selected PURLs as CSV. Accepts a list of PURLs to export; returns a semicolon-delimited CSV file.
 
-CSV format: semicolon (`;`) delimiter, UTF-8 encoding. All 10 columns exported. JSONB fields (`evidence`, `warnings`) serialized as JSON strings within quoted CSV cells.
+#### Request
 
-Response: `Content-Type: text/csv`, `Content-Disposition: attachment; filename="resolved_purls_export.csv"`
+```json
+{
+  "purls": ["pkg:pypi/requests", "pkg:npm/express"]
+}
+```
+
+#### Response
+
+`Content-Type: text/csv`, `Content-Disposition: attachment; filename="purls_export.csv"`
+
+CSV format: semicolon (`;`) delimiter, UTF-8 encoding. All 10 columns exported. JSONB fields (`evidence`, `warnings`) serialized as JSON strings within quoted CSV cells. Non-existing PURLs are silently skipped.
 
 ### `GET /db-admin`
 
 Serve the database admin page (Vue SPA route).
 
-Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `DatabaseAdmin.vue` with filterable/sortable table, inline editing, CSV import/export, and bulk delete.
+Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `DatabaseAdmin.vue` with filterable/sortable table, inline editing, CSV import, CSV export of selected rows, and bulk delete.
 
 ---
 
