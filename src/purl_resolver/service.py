@@ -10,7 +10,7 @@ from .sbom.collector import SbomComponent
 from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
-from .url_validator import UrlValidationResult, validate_url_with_retry
+from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class PurlResolutionService:
                 pass
 
         github_token = app_settings.github_token
-        vresult = await validate_url_with_retry(
+        voutput = await validate_url_with_retry(
             cached.repository_url,
             app_settings.url_validation_timeout,
             github_token=github_token,
@@ -63,12 +63,16 @@ class PurlResolutionService:
             skip_connectivity_check=True,
         )
 
-        if vresult == UrlValidationResult.VALID:
+        if voutput.result == UrlValidationResult.VALID:
+            new_url = voutput.final_url or cached.repository_url
+            if new_url != cached.repository_url:
+                logger.info("Updated repository URL for %s: %s -> %s", purl_key, cached.repository_url, new_url)
+                cached.repository_url = new_url
             try:
                 await storage.store(cached)
             except Exception:
                 logger.warning("Failed to update resolved_at for %s", purl_key, exc_info=True)
-        elif vresult == UrlValidationResult.INVALID:
+        elif voutput.result == UrlValidationResult.INVALID:
             try:
                 await storage.delete_purls([purl_key])
             except Exception:
@@ -122,24 +126,25 @@ class PurlResolutionService:
             if self._settings_store is not None:
                 app_settings = self._settings_store.load()
                 if app_settings.validate_db_urls:
-                    vresult = await validate_url_with_retry(
+                    voutput = await validate_url_with_retry(
                         repo_url,
                         app_settings.url_validation_timeout,
                         github_token=app_settings.github_token,
                         settings_store=self._settings_store,
                         skip_connectivity_check=True,
                     )
-                    if vresult == UrlValidationResult.INVALID:
+                    if voutput.result == UrlValidationResult.INVALID:
                         logger.warning(
                             "Resolver %s returned invalid URL %s for %s, skipping",
                             r.name, repo_url, purl,
                         )
                         continue
-                    if vresult in (UrlValidationResult.NETWORK_ERROR, UrlValidationResult.RATE_LIMITED):
+                    if voutput.result in (UrlValidationResult.NETWORK_ERROR, UrlValidationResult.RATE_LIMITED):
                         logger.warning(
                             "URL validation inconclusive for %s (resolver=%s, result=%s), accepting anyway",
-                            repo_url, r.name, vresult,
+                            repo_url, r.name, voutput.result.value,
                         )
+                    repo_url = voutput.final_url or repo_url
 
             response = ResolveResponse(
                 purl=purl_key,
