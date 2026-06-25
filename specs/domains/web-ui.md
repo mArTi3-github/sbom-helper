@@ -161,8 +161,8 @@ User                   Browser (Vue SPA)             API Layer
 - ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits), rate limit input (`ecosystems_max_requests_per_second`, 0.1–100), status badge (set/not set), clear button
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
 - Settings are loaded from `GET /api/v1/settings` on page mount
-- Settings are saved via `PATCH /api/v1/settings` on button click
-- Success/error feedback is shown after save attempt
+- Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
+- Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error)
 
 ### Images List Converter Page
 
