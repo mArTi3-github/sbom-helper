@@ -8,6 +8,16 @@
 
 Для планирования, внедрения и тестирования изменений используй скиллы из набора "superpowers". Для начала работы со скиллами используй скилл "superpowers:superpowers_using-superpowers". Для подключения нужных скиллов используй MCP-сервер superpowers-mcp.
 
+### Расположение helper-скриптов superpowers
+
+Helper-скрипты скиллов (не сами скиллы, а утилиты вроде `task-brief`, `review-package`) лежат в `~/.superpowers-mcp/skills/skills/<skill-name>/scripts/`:
+
+- `~/.superpowers-mcp/skills/skills/subagent-driven-development/scripts/` — `task-brief PLAN N [OUTFILE]` (извлекает текст задачи в файл), `review-package BASE HEAD` (готовит diff для ревьюера), `sdd-workspace`
+- `~/.superpowers-mcp/skills/skills/brainstorming/scripts/` — `start-server.sh`, `stop-server.sh` (для visual companion)
+- `~/.superpowers-mcp/skills/skills/systematic-debugging/find-polluter.sh`
+
+Перед использованием скилла `subagent-driven-development` сначала запускай `task-brief` для генерации брифа задачи и `review-package BASE HEAD` для генерации diff-файла перед ревью.
+
 Перед структурными изменениями сначала читай соответствующий spec из specs/.
 
 Для запуска кода на python используй виртуальное окружение .venv. Также передавай эту инструкцию по использованию виртуального окружения суб-агентам при необходимости, чтобы они не пытались запускать код напрямую. При необходимости установки новых python-модулей, также вызывай pip внутри виртуального окружения.
