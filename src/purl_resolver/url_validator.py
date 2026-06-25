@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,12 @@ class UrlValidationResult(Enum):
     NETWORK_ERROR = "network_error"
     RATE_LIMITED = "rate_limited"
     TOKEN_INVALID = "token_invalid"
+
+
+@dataclass
+class UrlValidationOutput:
+    result: UrlValidationResult
+    final_url: str | None = None
 
 
 class _RateLimitTracker:
@@ -144,56 +151,59 @@ async def validate_url(
     timeout: int,
     github_token: str | None = None,
     skip_connectivity_check: bool = False,
-) -> UrlValidationResult:
+) -> UrlValidationOutput:
     if not url.startswith(("http://", "https://")):
-        return UrlValidationResult.INVALID
+        return UrlValidationOutput(UrlValidationResult.INVALID)
 
     if _RateLimitTracker.is_in_cooldown():
-        return UrlValidationResult.RATE_LIMITED
+        return UrlValidationOutput(UrlValidationResult.RATE_LIMITED)
 
     if not skip_connectivity_check:
         try:
             github_ok = await _check_connectivity(github_token=github_token)
         except Exception:
-            return UrlValidationResult.NETWORK_ERROR
+            return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
         if not github_ok:
-            return UrlValidationResult.NETWORK_ERROR
+            return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
     try:
         resp = await _head_request(url, timeout, github_token=github_token)
+        final_url = str(resp.url)
+        if final_url != url:
+            logger.info("URL redirected: %s -> %s", url, final_url)
         headers = dict(resp.headers)
         status = resp.status_code
     except Exception:
         _RateLimitTracker.reset()
-        return UrlValidationResult.NETWORK_ERROR
+        return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
     if _is_rate_limited(status, headers):
         _RateLimitTracker.record_rate_limit()
-        return UrlValidationResult.RATE_LIMITED
+        return UrlValidationOutput(UrlValidationResult.RATE_LIMITED, final_url=final_url)
 
     _RateLimitTracker.reset()
 
     if status in (401, 403) and github_token:
-        return UrlValidationResult.TOKEN_INVALID
+        return UrlValidationOutput(UrlValidationResult.TOKEN_INVALID, final_url=final_url)
 
     if status in (404, 405):
-        return UrlValidationResult.INVALID
+        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
     if status == 403:
-        return UrlValidationResult.INVALID
+        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
     if status >= 400:
-        return UrlValidationResult.INVALID
+        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
 
     try:
-        git_result = await _git_ls_remote(url, timeout, github_token=github_token)
+        git_result = await _git_ls_remote(final_url, timeout, github_token=github_token)
     except Exception:
-        return UrlValidationResult.NETWORK_ERROR
+        return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR, final_url=final_url)
     if git_result is None:
-        return UrlValidationResult.NETWORK_ERROR
+        return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR, final_url=final_url)
     if git_result is False:
-        return UrlValidationResult.INVALID
+        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
 
-    return UrlValidationResult.VALID
+    return UrlValidationOutput(UrlValidationResult.VALID, final_url=final_url)
 
 
 async def validate_url_with_retry(

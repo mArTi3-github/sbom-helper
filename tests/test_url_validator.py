@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from purl_resolver.url_validator import (
+    UrlValidationOutput,
     UrlValidationResult,
     _git_ls_remote,
     _RateLimitTracker,
@@ -28,6 +29,7 @@ def _mock_response(status_code: int = 200, headers: dict | None = None) -> Async
     resp = AsyncMock()
     resp.status_code = status_code
     resp.headers = headers or {}
+    resp.url = "https://github.com/psf/requests"
     resp.__aenter__ = AsyncMock(return_value=resp)
     resp.__aexit__ = AsyncMock(return_value=False)
     return resp
@@ -45,7 +47,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result == UrlValidationResult.VALID
+            assert result.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
     async def test_head_404_returns_invalid(self):
@@ -53,7 +55,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(404)
             result = await validate_url("https://github.com/deleted/repo", timeout=5)
-            assert result == UrlValidationResult.INVALID
+            assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
     async def test_head_403_without_rate_limit_headers_returns_invalid(self):
@@ -61,7 +63,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(403, {"x-github-media-type": "v3"})
             result = await validate_url("https://github.com/private/repo", timeout=5)
-            assert result == UrlValidationResult.INVALID
+            assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
     async def test_head_403_with_rate_limit_remaining_zero_returns_rate_limited(self):
@@ -69,7 +71,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(403, {"x-ratelimit-remaining": "0"})
             result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result == UrlValidationResult.RATE_LIMITED
+            assert result.result == UrlValidationResult.RATE_LIMITED
 
     @pytest.mark.asyncio
     async def test_head_429_returns_rate_limited(self):
@@ -77,7 +79,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(429)
             result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result == UrlValidationResult.RATE_LIMITED
+            assert result.result == UrlValidationResult.RATE_LIMITED
 
     @pytest.mark.asyncio
     async def test_head_connection_error_returns_network_error(self):
@@ -85,18 +87,18 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.side_effect = Exception("Connection refused")
             result = await validate_url("https://example.com/repo", timeout=5)
-            assert result == UrlValidationResult.NETWORK_ERROR
+            assert result.result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
     async def test_file_url_returns_invalid(self):
         result = await validate_url("file:///usr/src/app/ptaf-task-mgr", timeout=5)
-        assert result == UrlValidationResult.INVALID
+        assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
     async def test_connectivity_probe_fails_returns_network_error(self):
         with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
             result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result == UrlValidationResult.NETWORK_ERROR
+            assert result.result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
     async def test_git_ls_remote_fails_returns_invalid(self):
@@ -105,7 +107,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=False):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/deleted/repo", timeout=5)
-            assert result == UrlValidationResult.INVALID
+            assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
     async def test_git_ls_remote_timeout_returns_network_error(self):
@@ -114,7 +116,7 @@ class TestValidateUrl:
              patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=None):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://example.com/repo", timeout=5)
-            assert result == UrlValidationResult.NETWORK_ERROR
+            assert result.result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
     async def test_rate_limit_cooldown_skips_validation(self):
@@ -122,7 +124,47 @@ class TestValidateUrl:
         _RateLimitTracker._count = 5
         _RateLimitTracker._cooldown_until = time.time() + 60
         result = await validate_url("https://github.com/psf/requests", timeout=5)
-        assert result == UrlValidationResult.RATE_LIMITED
+        assert result.result == UrlValidationResult.RATE_LIMITED
+
+
+class TestUrlValidationOutputDataclass:
+    def test_has_result_and_final_url_fields(self):
+        assert "result" in UrlValidationOutput.__dataclass_fields__
+        assert "final_url" in UrlValidationOutput.__dataclass_fields__
+
+
+class TestValidateUrlRedirectCapture:
+    @pytest.mark.asyncio
+    async def test_captures_final_url(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
+            mock_resp = _mock_head(200)
+            mock_resp.url = "https://github.com/psf/requests"
+            mock_head.return_value = mock_resp
+            output = await validate_url("https://github.com/psf/requests", timeout=5)
+            assert output.result == UrlValidationResult.VALID
+            assert output.final_url == "https://github.com/psf/requests"
+
+    @pytest.mark.asyncio
+    async def test_captures_redirect_target(self):
+        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
+             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock) as mock_git:
+            mock_resp = _mock_head(200)
+            mock_resp.url = "https://github.com/psf/requests"
+            mock_head.return_value = mock_resp
+            mock_git.return_value = True
+            output = await validate_url("https://old-url.com/psf/requests", timeout=5)
+            assert output.result == UrlValidationResult.VALID
+            assert output.final_url == "https://github.com/psf/requests"
+            mock_git.assert_called_once_with("https://github.com/psf/requests", 5, github_token=None)
+
+    @pytest.mark.asyncio
+    async def test_final_url_none_when_head_not_executed(self):
+        result = await validate_url("file:///usr/src/app/ptaf-task-mgr", timeout=5)
+        assert result.result == UrlValidationResult.INVALID
+        assert result.final_url is None
 
 class TestValidateUrlWithToken:
     @pytest.mark.asyncio
@@ -162,7 +204,7 @@ class TestValidateUrlWithToken:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
             result = await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_invalid")
-            assert result == UrlValidationResult.TOKEN_INVALID
+            assert result.result == UrlValidationResult.TOKEN_INVALID
 
 
 class TestGitLsRemoteTokenTransformation:
@@ -247,7 +289,7 @@ class TestValidateUrlSkipConnectivity:
              patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/psf/requests", timeout=5, skip_connectivity_check=True)
-            assert result == UrlValidationResult.VALID
+            assert result.result == UrlValidationResult.VALID
             mock_conn.assert_not_called()
 
     @pytest.mark.asyncio
@@ -257,7 +299,7 @@ class TestValidateUrlSkipConnectivity:
              patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result == UrlValidationResult.VALID
+            assert result.result == UrlValidationResult.VALID
             mock_conn.assert_called_once()
 
 
