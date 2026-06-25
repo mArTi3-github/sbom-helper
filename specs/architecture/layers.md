@@ -229,9 +229,8 @@
 
 ### CSV I/O Module (`csv_io.py`)
 - Pure functions for CSV parsing and rendering, no HTTP or Storage dependencies
-- `detect_delimiter(text) → str` — detects semicolon or comma delimiter from header line
-- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, semicolon delimiter, required column validation; when `resolver` column is absent, defaults to `"import-csv"`
-- `render_csv_export(rows: list[PurlRow]) → str` — renders PurlRow objects as semicolon-delimited CSV string
+- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, comma delimiter, required column validation, RFC 4180 quoting; when `resolver` column is absent, defaults to `"import-csv"`
+- `render_csv_export(rows: list[PurlRow]) → str` — renders PurlRow objects as comma-delimited CSV string with automatic RFC 4180 quoting
 - Dependencies: only `csv`, `io`, `json` from stdlib
 
 ### PURL Utils Layer (`purl_utils/`)

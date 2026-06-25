@@ -44,8 +44,8 @@ docker compose -f docker-compose.yml up -d
 | `GET /api/v1/db/purls` | List PURLs with pagination and filtering |
 | `PATCH /api/v1/db/purls/{purl}` | Edit a PURL row |
 | `DELETE /api/v1/db/purls` | Bulk delete PURL rows |
-| `POST /api/v1/db/import` | Import PURLs from CSV (semicolon delimiter) |
-| `POST /api/v1/db/export` | Export selected PURLs to CSV (semicolon delimiter) |
+| `POST /api/v1/db/import` | Import PURLs from CSV (comma delimiter) |
+| `POST /api/v1/db/export` | Export selected PURLs to CSV (comma delimiter) |
 | `GET /health` | Health check |
 | `GET /api/v1/settings` | Get application settings |
 | `PATCH /api/v1/settings` | Update application settings |
@@ -94,7 +94,7 @@ docker compose -f docker-compose.yml up -d
 
 ## Status
 
-Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), database administration (view, edit, filter, import/export via CSV, bulk delete), and SBOM-to-images-list conversion (promotes container components from CycloneDX SBOMs into a dedicated images list format with completeness flags). CSV uses semicolon delimiter with BOM handling.
+Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), database administration (view, edit, filter, import/export via CSV, bulk delete), and SBOM-to-images-list conversion (promotes container components from CycloneDX SBOMs into a dedicated images list format with completeness flags). CSV uses comma delimiter with BOM handling; values containing commas are quoted per RFC 4180.
 
 **Optional resolvers:** ecosyste.ms is enabled by default as a fallback resolver after purl2repo. libraries.io can be enabled as an additional fallback (requires API key), configured via the Settings page (`/settings`). Supports: Cargo, Composer (Packagist), Conda, CPAN, CRAN, Gem (RubyGems), Generic (GitHub), Go, Hackage, Hex, Maven, NPM, NuGet, Pub, PyPI, Swift (SwiftPM).
 

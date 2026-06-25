@@ -7,16 +7,8 @@ import json
 from .storage.interface import PurlRow, UpsertRow
 
 
-def detect_delimiter(text: str) -> str:
-    first_line = text.split("\n", 1)[0]
-    if ";" in first_line:
-        return ";"
-    return ","
-
-
 def parse_csv_import(text: str) -> tuple[list[UpsertRow], list[dict]]:
-    delimiter = detect_delimiter(text)
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    reader = csv.DictReader(io.StringIO(text), delimiter=",")
 
     if reader.fieldnames is None or not reader.fieldnames:
         return [], [{"row": 1, "error": "CSV has no header row"}]
@@ -72,7 +64,7 @@ def _parse_jsonb_field(value: str | None) -> list[str]:
 
 def render_csv_export(rows: list[PurlRow]) -> str:
     output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
+    writer = csv.writer(output, delimiter=",")
     writer.writerow([
         "purl", "repository_url", "repository_type", "repository_kind",
         "confidence", "evidence", "warnings", "version_reference",

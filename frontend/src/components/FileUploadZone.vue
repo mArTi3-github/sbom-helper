@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps<{
   accept?: string
   maxSize?: number
 }>()
+
+const hintText = computed(() => {
+  const sizeMb = props.maxSize || 200
+  const accept = (props.accept || '').toLowerCase()
+  if (accept.includes('.csv')) return `CSV, до ${sizeMb} МБ`
+  if (accept.includes('.json')) return `CycloneDX JSON, до ${sizeMb} МБ`
+  return `до ${sizeMb} МБ`
+})
 
 const emit = defineEmits<{
   'file-selected': [file: File]
@@ -69,7 +77,7 @@ function openFileDialog() {
     <div class="upload-label">
       <strong>Выберите файл</strong> или перетащите его сюда
     </div>
-    <div class="upload-hint">CycloneDX JSON, до {{ maxSize || 200 }} МБ</div>
+    <div class="upload-hint">{{ hintText }}</div>
     <div v-if="selectedFile" class="file-name">
       File: {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
     </div>

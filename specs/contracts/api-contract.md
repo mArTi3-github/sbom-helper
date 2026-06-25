@@ -237,14 +237,14 @@ Response (200): `{ "deleted": N }`
 
 Import CSV. Multipart: `file` (CSV) + `strategy` (`"upsert"` or `"skip_existing"`).
 
-CSV format: semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `repository_type`, `repository_kind`, `confidence`, `evidence` (JSON array), `warnings` (JSON array), `version_reference`, `resolver` (default: `"import-csv"` when absent), `resolved_at`.
+CSV format: comma (`,`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `repository_type`, `repository_kind`, `confidence`, `evidence` (JSON array), `warnings` (JSON array), `version_reference`, `resolver` (default: `"import-csv"` when absent), `resolved_at`. Values containing commas must be quoted per RFC 4180.
 
 Response (200): `{ "imported": N, "skipped": N, "errors": [...] }`
 Response (400): `{ "error": "invalid_csv", "message": "..." }` (missing columns, wrong format)
 
 ### `POST /api/v1/db/export`
 
-Export selected PURLs as CSV. Accepts a list of PURLs to export; returns a semicolon-delimited CSV file.
+Export selected PURLs as CSV. Accepts a list of PURLs to export; returns a comma-delimited CSV file.
 
 #### Request
 
@@ -258,7 +258,7 @@ Export selected PURLs as CSV. Accepts a list of PURLs to export; returns a semic
 
 `Content-Type: text/csv`, `Content-Disposition: attachment; filename="purls_export.csv"`
 
-CSV format: semicolon (`;`) delimiter, UTF-8 encoding. All 10 columns exported. JSONB fields (`evidence`, `warnings`) serialized as JSON strings within quoted CSV cells. Non-existing PURLs are silently skipped.
+CSV format: comma (`,`) delimiter, UTF-8 encoding. All 10 columns exported. JSONB fields (`evidence`, `warnings`) serialized as JSON strings within quoted CSV cells. Non-existing PURLs are silently skipped.
 
 ### `GET /db-admin`
 

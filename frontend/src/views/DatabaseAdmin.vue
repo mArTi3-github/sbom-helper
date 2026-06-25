@@ -203,22 +203,33 @@
       <details class="csv-ref">
         <summary>CSV Format Reference</summary>
         <div class="csv-ref-content">
-          <p>The CSV file must have a header row. Supported columns:</p>
+          <p>The CSV file must have a header row. Comma (<code>,</code>) delimiter. UTF-8 encoding (BOM handled automatically).</p>
+          <p>Required columns:</p>
           <ul>
-            <li><code>purl</code> (required) — Package URL</li>
-            <li><code>repository_url</code> (optional) — Repository URL</li>
+            <li><code>purl</code> — Package URL</li>
+            <li><code>repository_url</code> — Repository URL</li>
+          </ul>
+          <p>Optional columns:</p>
+          <ul>
+            <li><code>repository_type</code> — e.g. <code>github</code>, <code>gitlab</code></li>
+            <li><code>repository_kind</code> — e.g. <code>source_code</code></li>
+            <li><code>confidence</code> — <code>high</code>, <code>medium</code>, or <code>low</code></li>
+            <li><code>version_reference</code> — version tag/branch/SHA</li>
+            <li><code>resolver</code> — resolver name (default: <code>import-csv</code>)</li>
+            <li><code>evidence</code> — JSON array, e.g. <code>["homepage","description"]</code></li>
+            <li><code>warnings</code> — JSON array, e.g. <code>["low_confidence"]</code></li>
           </ul>
           <p>Example:</p>
-          <pre>purl,repository_url
-pkg:pypi/requests@2.31.0,https://github.com/psf/requests
-pkg:pypi/flask@2.3.0,https://github.com/pallets/flask</pre>
+          <pre>purl,repository_url,confidence,resolver
+pkg:pypi/requests@2.31.0,https://github.com/psf/requests,high,import-csv
+pkg:pypi/flask@2.3.0,https://github.com/pallets/flask,medium,import-csv</pre>
         </div>
       </details>
 
       <div class="import-strategy">
         <label class="radio-label">
           <input type="radio" v-model="importStrategy" value="upsert">
-          Upsert (overwrite existing)
+          Overwrite existing
         </label>
         <label class="radio-label">
           <input type="radio" v-model="importStrategy" value="skip_existing">

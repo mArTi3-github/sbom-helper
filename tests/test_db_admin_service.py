@@ -121,7 +121,7 @@ class TestDbAdminServiceDelete:
 class TestDbAdminServiceImport:
     @pytest.mark.asyncio
     async def test_import_upsert(self, service):
-        text = "purl;repository_url\npkg:pypi/newpkg;https://github.com/new/pkg\n"
+        text = "purl,repository_url\npkg:pypi/newpkg,https://github.com/new/pkg\n"
         result = await service.import_csv(text, ImportStrategy.upsert)
         assert result.imported == 1
         assert result.skipped == 0
@@ -130,9 +130,9 @@ class TestDbAdminServiceImport:
     @pytest.mark.asyncio
     async def test_import_skip_existing(self, populated_storage, service):
         text = (
-            "purl;repository_url\n"
-            "pkg:pypi/requests;https://github.com/NEW/requests\n"
-            "pkg:pypi/totallynew;https://github.com/new/totallynew\n"
+            "purl,repository_url\n"
+            "pkg:pypi/requests,https://github.com/NEW/requests\n"
+            "pkg:pypi/totallynew,https://github.com/new/totallynew\n"
         )
         result = await service.import_csv(text, ImportStrategy.skip_existing)
         assert result.imported == 1
@@ -143,7 +143,7 @@ class TestDbAdminServiceExport:
     @pytest.mark.asyncio
     async def test_export_selected_empty(self, service):
         csv_text = await service.export_selected_csv([])
-        assert "purl;repository_url" in csv_text
+        assert "purl,repository_url" in csv_text
 
     @pytest.mark.asyncio
     async def test_export_selected_with_data(self, populated_storage, service):

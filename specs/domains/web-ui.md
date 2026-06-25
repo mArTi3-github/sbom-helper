@@ -144,9 +144,10 @@ User                   Browser (Vue SPA)             API Layer
 - All columns are displayed by default (no visibility checkboxes)
 - All states (loading, empty, error, success) have distinct visual representations
 - Edits update via PATCH and re-fetch the current page
-- Export exports the currently selected rows via semicolon (`;`) delimited CSV; button shows selected count and is disabled when no rows are selected
-- Import expects semicolon (`;`) delimiter, UTF-8 encoding (BOM handled automatically); first row must contain headers; required columns: `purl`, `repository_url`
-- Import modal includes a collapsible CSV format reference section
+- Export exports the currently selected rows via comma (`,`) delimited CSV; button shows selected count and is disabled when no rows are selected
+- Import accepts comma (`,`) delimiter; UTF-8 encoding (BOM handled automatically); first row must contain headers; required columns: `purl`, `repository_url`; optional columns: `repository_type`, `repository_kind`, `confidence`, `version_reference`, `resolver` (default `import-csv`), `evidence` (JSON array string), `warnings` (JSON array string); values containing commas must be quoted per RFC 4180
+- Import modal includes a collapsible CSV format reference section listing required/optional columns and a multi-column example using `,` delimiter
+- Import strategy radio labels: "Overwrite existing" (upsert) and "Skip existing" (skip_existing)
 - Import modal supports drag-and-drop for CSV files (via `FileUploadZone` and `ModalDialog` components)
 - Pagination is managed by `usePagination` composable
 
