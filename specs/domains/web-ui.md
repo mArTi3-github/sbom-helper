@@ -188,3 +188,36 @@ User                   Browser (Vue SPA)             API Layer
 - Each `.vue` component uses `<style scoped>` for CSS isolation
 - Global CSS variables and resets are in `frontend/src/assets/main.css`
 - TypeScript interfaces in `frontend/src/types/api.ts` mirror backend `schemas.py` — any schema change must be reflected in both
+
+### Test Coverage
+
+Frontend unit tests are written with **Vitest 4.1.9**, `@vue/test-utils 2.4.11`, and `happy-dom`. All tests follow the conventions established in `frontend/src/views/Settings.test.ts`:
+
+- Explicit imports from `'vitest'` (no globals).
+- Module-level API mocking via `vi.mock('../api/<module>')`.
+- Fake timers via `vi.useFakeTimers()` + `vi.advanceTimersByTime()` + `await flushPromises()`.
+- Vue mounting via `mount()` + `await flushPromises()` for initial loads.
+
+**Tested files:**
+
+- `frontend/src/views/Settings.test.ts` — auto-save, debounce, blur logic, success/error toast, clear-token behaviour.
+- `frontend/src/views/PurlResolver.test.ts` — resolve flow, details toggle, ApiError and network errors.
+- `frontend/src/views/SbomUpdater.test.ts` — ignore-patterns editor (add/remove/save), process flow, AbortSignal passed to `resolveSbom`.
+- `frontend/src/views/ImagesListConverter.test.ts` — conversion flow, status cards (transformed / not transformed), JSON download.
+- `frontend/src/views/DatabaseAdmin.test.ts` — filter, sort, select, inline edit (Enter/Escape/blur), single and bulk delete (confirm branches), CSV export, CSV import (upsert / skip_existing), pagination (next page, page size), ApiError and network errors.
+- `frontend/src/composables/useDownload.test.ts` — `downloadJson` blob/anchor behaviour, `safeUrl` dangerous-protocol rejection (javascript, data, vbscript).
+- `frontend/src/composables/usePagination.test.ts` — initial state, `totalPages` computation, `goToPage` guard logic, `changePageSize` resets page.
+
+**Deliberately not tested (YAGNI):** `NotFound.vue`, `AppNav.vue`, `FileUploadZone.vue`, `ModalDialog.vue` — trivial components with minimal logic; tests would yield low signal-to-noise.
+
+Run all frontend tests:
+
+```bash
+npm test --prefix frontend
+```
+
+Run with coverage:
+
+```bash
+npm run test:coverage --prefix frontend
+```
