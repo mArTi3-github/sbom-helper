@@ -87,11 +87,17 @@
 |  |  url_validator.py           |                   |
 |  |                             |                   |
 |  |  validate_url()             |                   |
+|  |  validate_url_with_retry()  |                   |
 |  |  validate_github_token()    |                   |
 |  |  ensure_connectivity()      |                   |
 |  |  HEAD + git ls-remote       |                   |
 |  |  Rate limit mitigation      |                   |
 |  |  Token authentication       |                   |
+|  |  Redirect resolution        |                   |
+|  |    follows 3xx, captures    |                   |
+|  |    final URL, returns       |                   |
+|  |    UrlValidationOutput      |                   |
+|  |    with final_url field     |                   |
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
@@ -206,7 +212,7 @@
 ### Service Layer (`service.py`)
 - `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver chain (iterates resolvers, first success wins) → storage store; uses `resolver.name` property to tag stored records with the actual resolver identifier (e.g. `"purl2repo"`, `"libraries.io"`)
-- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + git ls-remote with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today; remove invalid tokens from settings automatically
+- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + git ls-remote with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today; remove invalid tokens from settings automatically. Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result.
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `self._storage.store()`
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format; tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
@@ -268,6 +274,17 @@
 - File path default: `./data/sbom_components_ignore_patterns.json`
 - Graceful handling: missing file → return empty list; corrupt JSON → log warning, return empty list
 - Exposed via API endpoints `GET/POST /api/v1/sbom/ignore-patterns` in `routes/ignore_patterns.py`
+
+### URL Validator (`url_validator.py`)
+- Validates repository URLs via HTTP HEAD + `git ls-remote` to verify the URL exists and is reachable
+- `validate_url(url, timeout, github_token=None, skip_connectivity_check=False) → UrlValidationOutput` — performs HEAD (with `follow_redirects=True`), captures the final URL after all 3xx redirects via `str(resp.url)`, then runs `git ls-remote` against the final URL; returns `UrlValidationOutput(result, final_url)`
+- `validate_url_with_retry(url, timeout, github_token=None, settings_store=None, skip_connectivity_check=False) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
+- `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
+- `ensure_connectivity(github_token=None) → bool` — connectivity probe against `github.com`; raises `ConnectionError` on failure
+- `_RateLimitTracker` — class-level in-memory counter; after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
+- `_git_ls_remote(url, timeout, github_token=None) → bool | None` — returns True/False/None for valid/invalid/network-error; rewrites `github.com` URLs with `oauth2:token@` for authenticated `git` calls; called with the resolved final URL by `validate_url()`
+- `UrlValidationResult` enum — `VALID`, `INVALID`, `NETWORK_ERROR`, `RATE_LIMITED`, `TOKEN_INVALID`
+- `UrlValidationOutput` dataclass — `result: UrlValidationResult`, `final_url: str | None = None`; `final_url` is `str(resp.url)` after redirects, `None` when HEAD did not execute (scheme error, cooldown, connectivity failure, HEAD exception)
 
 ### Web UI Layer (`frontend/`)
 - Vue 3 SPA built with Vite + TypeScript, source in `frontend/src/`

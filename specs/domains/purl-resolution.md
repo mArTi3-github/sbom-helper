@@ -22,7 +22,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
 - `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys)
-- `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + git ls-remote with rate limit mitigation
+- `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + git ls-remote with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
 
@@ -57,6 +57,21 @@ class PurlComponents:
     version: str | None
     qualifiers: dict[str, str] | None
     subpath: str | None
+
+class UrlValidationResult(Enum):
+    VALID = "valid"
+    INVALID = "invalid"
+    NETWORK_ERROR = "network_error"
+    RATE_LIMITED = "rate_limited"
+    TOKEN_INVALID = "token_invalid"
+
+@dataclass
+class UrlValidationOutput:
+    result: UrlValidationResult
+    final_url: str | None = None
+    # final_url is str(resp.url) from httpx with follow_redirects=True
+    # final_url is None only when HEAD request did not execute
+    # (scheme error, rate-limit cooldown, connectivity failure, HEAD exception)
 ```
 
 ## Flow
@@ -90,42 +105,47 @@ Client                    API Layer (router)         Service Layer             p
   |                          |                          |<---------------------------------------|                |
   |                          |                          |                        |                |                |
   |                          |                          | [если validate_db_urls |                |                |
-  |                          |                          |  и resolved_at != сегодня]             |                |
-  |                          |                          | validate_url(url, timeout)              |                |
-  |                          |                          | ------+               |                |                |
-  |                          |                          |        | HEAD + git   |                |                |
-  |                          |                          | <------+               |                |                |
-  |                          |                          |                        |                |                |
-  |                          |                          | VALID → store(cached)  |                |                |
-  |                          |                          | INVALID → delete, fall |                |                |
-  |                          |                          | NETWORK_ERROR → return |                |                |
-  |                          |                          |                        |                |                |
-  |                          |                          | (если не найдено или  |                |                |
-  |                          |                          |  cache deleted)        |                |                |
-  |                          |                          | resolve(original_purl) |                |                |
-  |                          |                          |------------------------------------------------------>|
-  |                          |                          |                        |                |                |
-  |                          |                          | ResolutionResult       |                |                |
-  |                          |                          |<------------------------------------------------------|
-  |                          |                          |                        |                |                |
-  |                          |                          | (если success)         |                |                |
-  |                          |                          | [если validate_db_urls  |                |                |
-  |                          |                          |  включена]              |                |                |
-  |                          |                          | validate_url(url, timeout)              |                |
-  |                          |                          | ------+                |                |                |
-  |                          |                          |        | HEAD + git    |                |                |
-  |                          |                          | <------+                |                |                |
-  |                          |                          |                        |                |                |
-  |                          |                          | VALID → store + return |                |                |
-  |                          |                          | INVALID → continue to  |                |                |
-  |                          |                          |           next resolver|                |                |
-  |                          |                          | NETWORK_ERROR → store  |                |                |
-  |                          |                          |           + return     |                |                |
-  |                          |                          |                        |                |                |
-  |                          |                          | [если validate_db_urls |                |                |
-  |                          |                          |  выключена]            |                |                |
-  |                          |                          | storage.store(result)  |                |                |
-  |                          |                          |--------------------------------------->|                |
+  |                          |                          |  и resolved_at != сегодня]             |                |                |
+  |                          |                          | validate_url_with_retry(url, timeout)   |                |                |
+   |                          |                          | ------+               |                |                |
+   |                          |                          |        | HEAD + git   |                |                |
+   |                          |                          | <------+               |                |                |
+   |                          |                          |                        |                |                |
+   |                          |                          | VALID → store(cached)  |                |                |
+   |                          |                          |  (при отличии output.  |                |                |
+   |                          |                          |   final_url URL в кэше |                |                |
+   |                          |                          |   обновляется)         |                |                |
+   |                          |                          | INVALID → delete, fall |                |                |
+   |                          |                          | NETWORK_ERROR → return |                |                |
+   |                          |                          |                        |                |                |
+   |                          |                          | (если не найдено или  |                |                |
+   |                          |                          |  cache deleted)        |                |                |
+   |                          |                          | resolve(original_purl) |                |                |
+   |                          |                          |------------------------------------------------------>|
+   |                          |                          |                        |                |                |
+   |                          |                          | ResolutionResult       |                |                |
+   |                          |                          |<------------------------------------------------------|
+   |                          |                          |                        |                |                |
+   |                          |                          | (если success)         |                |                |
+   |                          |                          | [если validate_db_urls  |                |                |
+   |                          |                          |  включена]              |                |                |
+   |                          |                          | validate_url_with_retry(url, timeout)   |                |                |
+   |                          |                          | ------+                |                |                |
+   |                          |                          |        | HEAD + git    |                |                |
+   |                          |                          | <------+                |                |                |
+   |                          |                          |                        |                |                |
+   |                          |                          | VALID → store + return |                |                |
+   |                          |                          |  (используется output. |                |                |
+   |                          |                          |   final_url для repo_url)               |                |                |
+   |                          |                          | INVALID → continue to  |                |                |
+   |                          |                          |           next resolver|                |                |
+   |                          |                          | NETWORK_ERROR → store  |                |                |
+   |                          |                          |           + return     |                |                |
+   |                          |                          |                        |                |                |
+   |                          |                          | [если validate_db_urls |                |                |
+   |                          |                          |  выключена]            |                |                |
+   |                          |                          | storage.store(result)  |                |                |
+   |                          |                          |--------------------------------------->|                |
   |                          |                          |                        |                |                |
   |                          | 200 {normalized purl}    |                        |                |                |
   |<-------------------------|--------------------------|                        |                |                |
@@ -155,8 +175,8 @@ Client                    API Layer (router)         Service Layer             p
 - **SBOM existing-ref validation**: Optional checkbox `validate_existing_refs` in SBOM Updater validates existing VCS references via HEAD + git ls-remote; `INVALID` results mark the component for re-resolution (`needs_enrichment=True`)
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds, returning `RATE_LIMITED`
-- **Validation never crashes**: `validate_url()` always returns a `UrlValidationResult`, never raises exceptions
-- **Non-http/https URLs are invalid immediately**: `validate_url()` returns `INVALID` for any URL that does not start with `http://` or `https://` without making any network request
+- **Validation never crashes**: `validate_url()` and `validate_url_with_retry()` always return a `UrlValidationOutput`, never raise exceptions
+- **Non-http/https URLs are invalid immediately**: `validate_url()` returns `UrlValidationOutput(INVALID)` for any URL that does not start with `http://` or `https://` without making any network request
 - **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
 - **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **URL redirects are resolved on validation**: `validate_url()` and `validate_url_with_retry()` return `UrlValidationOutput` containing the final URL after all 3xx redirects; `final_url` is `str(resp.url)` from httpx with `follow_redirects=True`
