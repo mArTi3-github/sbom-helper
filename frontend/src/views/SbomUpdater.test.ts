@@ -53,8 +53,8 @@ describe('SbomUpdater.vue', () => {
     const rows = wrapper.findAll('.pattern-row')
     expect(rows.length).toBe(1)
     const inputs = rows[0].findAll('input[type="text"]')
-    expect(inputs[0].element.value).toBe('')
-    expect(inputs[1].element.value).toBe('')
+    expect((inputs[0].element as HTMLInputElement).value).toBe('')
+    expect((inputs[1].element as HTMLInputElement).value).toBe('')
   })
 
   it('loads existing ignore patterns from API', async () => {
@@ -63,8 +63,8 @@ describe('SbomUpdater.vue', () => {
     await flushPromises()
     const rows = wrapper.findAll('.pattern-row')
     expect(rows.length).toBe(2)
-    expect(rows[0].findAll('input[type="text"]')[0].element.value).toBe('purl')
-    expect(rows[0].findAll('input[type="text"]')[1].element.value).toBe('requests')
+    expect((rows[0].findAll('input[type="text"]')[0].element as HTMLInputElement).value).toBe('purl')
+    expect((rows[0].findAll('input[type="text"]')[1].element as HTMLInputElement).value).toBe('requests')
   })
 
   it('falls back to empty pattern row when getIgnorePatterns fails', async () => {
