@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <h1>sbom-helper</h1>
+    <h1>PURL Resolver</h1>
     <p class="subtitle">Resolve a Package URL to its source code repository</p>
 
     <form class="form-group" @submit.prevent="handleResolve">

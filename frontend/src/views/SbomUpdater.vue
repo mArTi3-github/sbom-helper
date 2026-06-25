@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <h1>SBOM-updater</h1>
+    <h1>SBOM Updater</h1>
     <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы обогатить компоненты ссылками на репозитории исходных текстов</p>
 
     <FileUploadZone accept=".json" :max-size="200" @file-selected="onFileSelected" />

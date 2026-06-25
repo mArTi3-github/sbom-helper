@@ -1,6 +1,6 @@
 <template>
   <div class="settings-page">
-    <h1>sbom-helper</h1>
+    <h1>Settings</h1>
     <p class="subtitle">Application settings</p>
 
     <div v-if="loading" class="loading">
