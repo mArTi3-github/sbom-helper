@@ -155,4 +155,55 @@ describe('DatabaseAdmin.vue', () => {
     expect(wrapper.find('.empty-row').exists()).toBe(true)
     expect(wrapper.find('.empty-row').text()).toBe('No records found')
   })
+
+  it('enters edit mode and saves change on Enter key', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+
+    const firstRow = wrapper.findAll('tbody tr')[0]
+    const purlCell = firstRow.findAll('td')[1]
+    await purlCell.trigger('dblclick')
+    await flushPromises()
+
+    const editInput = firstRow.find('input.inline-edit')
+    expect(editInput.exists()).toBe(true)
+    await editInput.setValue('pkg:pypi/requests@2.32.0')
+    await editInput.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+
+    expect(updatePurlMock).toHaveBeenCalledTimes(1)
+    expect(updatePurlMock).toHaveBeenCalledWith('pkg:pypi/requests@2.31.0', { purl: 'pkg:pypi/requests@2.32.0' })
+  })
+
+  it('cancels edit mode on Escape key without saving', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+    const firstRow = wrapper.findAll('tbody tr')[0]
+    await firstRow.findAll('td')[1].trigger('dblclick')
+    await flushPromises()
+
+    const editInput = firstRow.find('input.inline-edit')
+    await editInput.setValue('changed')
+    await editInput.trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+
+    expect(updatePurlMock).not.toHaveBeenCalled()
+    expect(wrapper.find('input.inline-edit').exists()).toBe(false)
+  })
+
+  it('saves inline edit on blur', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+    const firstRow = wrapper.findAll('tbody tr')[0]
+    await firstRow.findAll('td')[1].trigger('dblclick')
+    await flushPromises()
+
+    const editInput = firstRow.find('input.inline-edit')
+    await editInput.setValue('pkg:pypi/new@1.0.0')
+    await editInput.trigger('blur')
+    await flushPromises()
+
+    expect(updatePurlMock).toHaveBeenCalledTimes(1)
+    expect(updatePurlMock).toHaveBeenCalledWith('pkg:pypi/requests@2.31.0', { purl: 'pkg:pypi/new@1.0.0' })
+  })
 })
