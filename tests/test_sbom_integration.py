@@ -14,7 +14,11 @@ from purl_resolver.schemas import ResolveResponse
 from purl_resolver.service import PurlResolutionService
 from purl_resolver.settings_store import AppSettings
 from purl_resolver.storage.inmemory import InMemoryCache
-from purl_resolver.url_validator import UrlValidationResult
+from purl_resolver.url_validator import UrlValidationOutput, UrlValidationResult
+
+
+def _url_output(result: UrlValidationResult, final_url: str | None = None) -> UrlValidationOutput:
+    return UrlValidationOutput(result=result, final_url=final_url)
 
 
 @pytest.fixture
@@ -272,7 +276,7 @@ class TestValidateExistingRefs:
         with patch(
             "purl_resolver.sbom_enrichment.validate_url_with_retry",
             new_callable=AsyncMock,
-            return_value=UrlValidationResult.INVALID,
+            return_value=_url_output(UrlValidationResult.INVALID),
         ):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
@@ -314,7 +318,7 @@ class TestValidateExistingRefs:
         with patch(
             "purl_resolver.sbom_enrichment.validate_url_with_retry",
             new_callable=AsyncMock,
-            return_value=UrlValidationResult.VALID,
+            return_value=_url_output(UrlValidationResult.VALID),
         ):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
@@ -385,11 +389,86 @@ class TestValidateExistingRefs:
         with patch(
             "purl_resolver.sbom_enrichment.validate_url_with_retry",
             new_callable=AsyncMock,
-            return_value=UrlValidationResult.NETWORK_ERROR,
+            return_value=_url_output(UrlValidationResult.NETWORK_ERROR),
         ):
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs == original_refs
+
+    @pytest.mark.asyncio
+    async def test_redirect_updates_ref_url(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://old-url.com/psf/requests"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.VALID, final_url="https://github.com/psf/requests"),
+        ):
+            await pipeline.process(sbom, validate_existing_refs=True)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        assert len(enriched_refs) == 1
+        assert enriched_refs[0]["url"] == "https://github.com/psf/requests"
+
+    @pytest.mark.asyncio
+    async def test_rate_limited_with_redirect_updates_ref_url(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://old-url.com/psf/requests"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.RATE_LIMITED, final_url="https://github.com/psf/requests"),
+        ):
+            await pipeline.process(sbom, validate_existing_refs=True)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        assert enriched_refs[0]["url"] == "https://github.com/psf/requests"
 
 
 class TestFileUrlInvalidation:
