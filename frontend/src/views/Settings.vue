@@ -21,7 +21,7 @@
             </div>
           </div>
           <label class="toggle">
-            <input type="checkbox" v-model="validateDbUrls">
+            <input type="checkbox" v-model="validateDbUrls" @change="debouncedAutoSave({ validate_db_urls: validateDbUrls })">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -32,7 +32,7 @@
               Timeout for each HTTP HEAD and git ls-remote check (1-60 seconds).
             </div>
           </div>
-          <input type="number" v-model.number="urlValidationTimeout" min="1" max="60" class="num-input">
+          <input type="number" v-model.number="urlValidationTimeout" min="1" max="60" @change="debouncedAutoSave({ url_validation_timeout: urlValidationTimeout })" class="num-input">
         </div>
         <div class="setting-row">
           <div>
@@ -44,7 +44,7 @@
               Set to 0 to disable cooldown and always validate.
             </div>
           </div>
-          <input type="number" v-model.number="revalidationCooldownHours" min="0" max="720" class="num-input">
+          <input type="number" v-model.number="revalidationCooldownHours" min="0" max="720" @change="debouncedAutoSave({ revalidation_cooldown_hours: revalidationCooldownHours })" class="num-input">
         </div>
       </div>
 
@@ -68,7 +68,7 @@
             </div>
           </div>
           <div class="input-right">
-            <input type="password" v-model="githubTokenInput" placeholder="ghp_..." class="pw-input">
+            <input type="password" :value="githubTokenInput" @input="githubTokenInput = ($event.target as HTMLInputElement).value" @blur="onGithubTokenBlur" placeholder="ghp_..." class="pw-input">
           </div>
         </div>
       </div>
@@ -84,7 +84,7 @@
             </div>
           </div>
           <label class="toggle">
-            <input type="checkbox" v-model="librariesioEnabled">
+            <input type="checkbox" v-model="librariesioEnabled" @change="debouncedAutoSave({ librariesio_enabled: librariesioEnabled })">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -104,7 +104,7 @@
             </div>
           </div>
           <div class="input-right">
-            <input type="password" v-model="librariesioKeyInput" placeholder="libraries.io API key" class="pw-input">
+            <input type="password" :value="librariesioKeyInput" @input="librariesioKeyInput = ($event.target as HTMLInputElement).value" @blur="onLibrariesIoKeyBlur" placeholder="libraries.io API key" class="pw-input">
           </div>
         </div>
       </div>
@@ -120,7 +120,7 @@
             </div>
           </div>
           <label class="toggle">
-            <input type="checkbox" v-model="ecosystemsEnabled">
+            <input type="checkbox" v-model="ecosystemsEnabled" @change="debouncedAutoSave({ ecosystems_enabled: ecosystemsEnabled })">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -136,7 +136,7 @@
             </div>
           </div>
           <div class="input-right">
-            <input type="password" v-model="ecosystemsKeyInput" placeholder="ecosyste.ms API key (optional)" class="pw-input">
+            <input type="password" :value="ecosystemsKeyInput" @input="ecosystemsKeyInput = ($event.target as HTMLInputElement).value" @blur="onEcosystemsKeyBlur" placeholder="ecosyste.ms API key (optional)" class="pw-input">
           </div>
         </div>
         <div class="setting-row">
@@ -147,7 +147,7 @@
               Default: 2.0. Lower values reduce timeout risk under concurrent load.
             </div>
           </div>
-          <input type="number" v-model.number="ecosystemsMaxRequestsPerSecond" min="0.1" max="100" step="0.1" class="num-input">
+          <input type="number" v-model.number="ecosystemsMaxRequestsPerSecond" min="0.1" max="100" step="0.1" @change="debouncedAutoSave({ ecosystems_max_requests_per_second: ecosystemsMaxRequestsPerSecond })" class="num-input">
         </div>
       </div>
 
@@ -162,7 +162,7 @@
               Default: 3. Range: 1–10.
             </div>
           </div>
-          <input type="number" v-model.number="retryMaxAttempts" min="1" max="10" class="num-input">
+          <input type="number" v-model.number="retryMaxAttempts" min="1" max="10" @change="debouncedAutoSave({ retry_max_attempts: retryMaxAttempts })" class="num-input">
         </div>
         <div class="setting-row">
           <div>
@@ -173,7 +173,7 @@
               Range: 0.5–120 seconds.
             </div>
           </div>
-          <input type="number" v-model.number="retryBaseCooldownSeconds" min="0.5" max="120" step="0.5" class="num-input">
+          <input type="number" v-model.number="retryBaseCooldownSeconds" min="0.5" max="120" step="0.5" @change="debouncedAutoSave({ retry_base_cooldown_seconds: retryBaseCooldownSeconds })" class="num-input">
         </div>
       </div>
 
@@ -187,7 +187,7 @@
               DEBUG – all messages, INFO – general operations, WARNING – errors only.
             </div>
           </div>
-          <select v-model="logLevel" class="select-input">
+          <select v-model="logLevel" @change="debouncedAutoSave({ log_level: logLevel })" class="select-input">
             <option value="DEBUG">DEBUG</option>
             <option value="INFO">INFO</option>
             <option value="WARNING">WARNING</option>
@@ -197,17 +197,15 @@
         </div>
       </div>
 
-      <button class="save-btn" :disabled="saving" @click="saveSettings">Save</button>
-
-      <div v-if="message" :class="['msg', message.isError ? 'msg-err' : 'msg-ok']">
-        {{ message.text }}
+      <div v-if="toast" :class="['toast', toast.isError ? 'toast-err' : 'toast-ok']">
+        {{ toast.text }}
       </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { getSettings, updateSettings } from '../api/settings'
 import type { SettingsTokenSet, SettingsUpdate } from '../types/api'
 
@@ -225,17 +223,28 @@ const githubTokenInput = ref('')
 const librariesioKeyInput = ref('')
 const ecosystemsKeyInput = ref('')
 const loading = ref(true)
-const saving = ref(false)
-const message = ref<{ text: string; isError: boolean } | null>(null)
+const toast = ref<{ text: string; isError: boolean } | null>(null)
 
-let messageTimer: ReturnType<typeof setTimeout> | null = null
+let toastTimer: ReturnType<typeof setTimeout> | null = null
 
-function showMessage(text: string, isError: boolean) {
-  if (messageTimer) clearTimeout(messageTimer)
-  message.value = { text, isError }
-  messageTimer = setTimeout(() => {
-    message.value = null
-  }, 3000)
+function showToast(text: string, isError: boolean) {
+  if (toastTimer) clearTimeout(toastTimer)
+  toast.value = { text, isError }
+  toastTimer = setTimeout(() => {
+    toast.value = null
+    toastTimer = null
+  }, isError ? 5000 : 3000)
+}
+
+function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  return ((...args: Parameters<T>) => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      fn(...args)
+    }, ms)
+  }) as T
 }
 
 async function loadSettings() {
@@ -252,79 +261,81 @@ async function loadSettings() {
     ecosystemsMaxRequestsPerSecond.value = data.ecosystems_max_requests_per_second
     tokenSet.value = data.token_set
   } catch {
-    showMessage('Failed to load settings', true)
+    showToast('Failed to load settings', true)
   }
 }
 
-async function saveSettings() {
-  saving.value = true
+async function autoSave(partial: Partial<SettingsUpdate>) {
   try {
-    const body: SettingsUpdate = {
-      validate_db_urls: validateDbUrls.value,
-      url_validation_timeout: urlValidationTimeout.value,
-      revalidation_cooldown_hours: revalidationCooldownHours.value,
-      librariesio_enabled: librariesioEnabled.value,
-      ecosystems_enabled: ecosystemsEnabled.value,
-      ecosystems_max_requests_per_second: ecosystemsMaxRequestsPerSecond.value,
-      retry_max_attempts: retryMaxAttempts.value,
-      retry_base_cooldown_seconds: retryBaseCooldownSeconds.value,
-      log_level: logLevel.value,
-    }
-    if (githubTokenInput.value.trim() !== '') {
-      body.github_token = githubTokenInput.value.trim()
-    }
-    if (librariesioKeyInput.value.trim() !== '') {
-      body.librariesio_api_key = librariesioKeyInput.value.trim()
-    }
-    if (ecosystemsKeyInput.value.trim() !== '') {
-      body.ecosystems_api_key = ecosystemsKeyInput.value.trim()
-    }
-    await updateSettings(body)
-    showMessage('Settings saved', false)
-    githubTokenInput.value = ''
-    librariesioKeyInput.value = ''
-    ecosystemsKeyInput.value = ''
+    await updateSettings(partial)
+    showToast('Settings saved', false)
+    if ('github_token' in partial) githubTokenInput.value = ''
+    if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
+    if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
     await loadSettings()
-  } catch {
-    showMessage('Failed to save settings', true)
-  } finally {
-    saving.value = false
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'unknown error'
+    showToast(`Failed to save: ${detail}`, true)
   }
+}
+
+const debouncedAutoSave = debounce(autoSave, 500)
+
+async function onGithubTokenBlur() {
+  const value = githubTokenInput.value.trim()
+  if (!value) return
+  await autoSave({ github_token: value })
+}
+
+async function onLibrariesIoKeyBlur() {
+  const value = librariesioKeyInput.value.trim()
+  if (!value) return
+  await autoSave({ librariesio_api_key: value })
+}
+
+async function onEcosystemsKeyBlur() {
+  const value = ecosystemsKeyInput.value.trim()
+  if (!value) return
+  await autoSave({ ecosystems_api_key: value })
 }
 
 async function clearToken() {
   try {
     await updateSettings({ github_token: null })
-    showMessage('Token cleared', false)
+    showToast('Token cleared', false)
     await loadSettings()
   } catch {
-    showMessage('Failed to clear token', true)
+    showToast('Failed to clear token', true)
   }
 }
 
 async function clearLibrariesIoKey() {
   try {
     await updateSettings({ librariesio_api_key: null })
-    showMessage('Libraries.io key cleared', false)
+    showToast('Libraries.io key cleared', false)
     await loadSettings()
   } catch {
-    showMessage('Failed to clear key', true)
+    showToast('Failed to clear key', true)
   }
 }
 
 async function clearEcosystemsKey() {
   try {
     await updateSettings({ ecosystems_api_key: null })
-    showMessage('ecosyste.ms key cleared', false)
+    showToast('ecosyste.ms key cleared', false)
     await loadSettings()
   } catch {
-    showMessage('Failed to clear key', true)
+    showToast('Failed to clear key', true)
   }
 }
 
 onMounted(async () => {
   await loadSettings()
   loading.value = false
+})
+
+onBeforeUnmount(() => {
+  if (toastTimer) clearTimeout(toastTimer)
 })
 </script>
 
@@ -495,26 +506,6 @@ h1 {
   border-color: var(--color-primary);
 }
 
-.save-btn {
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.save-btn:hover {
-  background: var(--color-primary-hover);
-}
-
-.save-btn:disabled {
-  background: var(--color-primary-disabled);
-  cursor: not-allowed;
-}
-
 .btn-danger {
   background: var(--color-danger);
   color: #fff;
@@ -533,19 +524,30 @@ h1 {
   margin-left: 0.5rem;
 }
 
-.msg {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
+.toast {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  padding: 0.75rem 1rem;
   border-radius: var(--border-radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 360px;
+  animation: toast-in 0.2s ease-out;
 }
 
-.msg-ok {
+.toast-ok {
   background: var(--color-success-bg);
   color: var(--color-success);
 }
 
-.msg-err {
+.toast-err {
   background: var(--color-error-bg);
   color: var(--color-error);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
