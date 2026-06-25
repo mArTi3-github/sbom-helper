@@ -6,7 +6,7 @@
     <div class="card filter-panel">
       <div class="filter-row">
         <div class="filter-group">
-          <label for="search">Search</label>
+          <label for="search">Search by PURL</label>
           <input id="search" v-model="search" type="text" placeholder="e.g. requests" @keyup.enter="applyFilters">
         </div>
         <div class="filter-group">
@@ -34,17 +34,16 @@
           <input id="date-to" v-model="dateTo" type="date">
         </div>
         <div class="filter-actions">
-          <button class="btn btn-primary" @click="applyFilters">Apply</button>
+          <button class="btn btn-primary" @click="applyFilters" :disabled="loading">
+            <span v-if="loading" class="spinner"></span>
+            <span v-else>Apply</span>
+          </button>
           <button class="btn btn-secondary" @click="resetFilters">Reset</button>
         </div>
       </div>
     </div>
 
     <div class="toolbar">
-      <button class="btn btn-primary" @click="fetchData" :disabled="loading">
-        <span v-if="loading" class="spinner"></span>
-        <span v-else>Refresh</span>
-      </button>
       <button class="btn btn-secondary" :disabled="selectedRows.size === 0" @click="exportCsv">Export CSV ({{ selectedRows.size }})</button>
       <button class="btn btn-secondary" @click="showImportModal = true">Import CSV</button>
       <button class="btn btn-danger" :disabled="selectedRows.size === 0" @click="deleteSelected">
@@ -376,6 +375,7 @@ async function fetchData() {
 
 function applyFilters() {
   page.value = 1
+  fetchData()
 }
 
 function resetFilters() {
@@ -387,6 +387,7 @@ function resetFilters() {
   sortBy.value = 'resolved_at'
   sortOrder.value = 'desc'
   page.value = 1
+  fetchData()
 }
 
 function setSort(column: string) {
@@ -582,7 +583,7 @@ onMounted(() => {
 
 <style scoped>
 .db-admin {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem 1rem;
   flex: 1;
@@ -741,7 +742,6 @@ h1 {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1100px;
 }
 
 th {

@@ -19,7 +19,6 @@ import AppNav from './components/AppNav.vue'
   flex-direction: column;
 }
 .container {
-  max-width: 960px;
   margin: 0 auto;
   padding: 2rem 1rem;
   flex: 1;

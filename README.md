@@ -102,6 +102,23 @@ Core features complete: PURL resolution, SBOM enrichment (including storage of p
 
 See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
 
+## Dev stand deployment
+
+After making changes to `frontend/` or `src/`, redeploy on the current dev stand:
+
+```bash
+# 1. Rebuild the frontend (required for any .vue/.ts change)
+cd frontend && npm run build && cd ..
+
+# 2. If pyproject.toml dependencies changed, rebuild the container:
+docker compose build --no-cache
+
+# 3. Restart the container (picks up new frontend dist and/or new image):
+docker compose up -d
+```
+
+Steps 1 and 3 are sufficient when only frontend code or Python sources changed (the `src/` directory is mounted as a volume in dev mode). Step 2 is needed only when `pyproject.toml` (Python dependencies) or `Dockerfile` changed.
+
 ## Specs
 
 Project specifications live in `specs/`. Start with `specs/INDEX.md`.
