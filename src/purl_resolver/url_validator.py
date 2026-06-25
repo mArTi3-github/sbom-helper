@@ -212,24 +212,24 @@ async def validate_url_with_retry(
     github_token: str | None = None,
     settings_store: SettingsStore | None = None,
     skip_connectivity_check: bool = False,
-) -> UrlValidationResult:
-    vresult = await validate_url(
+) -> UrlValidationOutput:
+    voutput = await validate_url(
         url, timeout,
         github_token=github_token,
         skip_connectivity_check=skip_connectivity_check,
     )
 
-    if vresult == UrlValidationResult.TOKEN_INVALID and settings_store is not None:
+    if voutput.result == UrlValidationResult.TOKEN_INVALID and settings_store is not None:
         logger.warning("GitHub token invalid, removing from settings")
         try:
             app_settings = settings_store.load()
             settings_store.save(app_settings.model_copy(update={"github_token": None}))
         except Exception:
             logger.warning("Failed to persist token removal to settings", exc_info=True)
-        vresult = await validate_url(
+        voutput = await validate_url(
             url, timeout,
             github_token=None,
             skip_connectivity_check=skip_connectivity_check,
         )
 
-    return vresult
+    return voutput

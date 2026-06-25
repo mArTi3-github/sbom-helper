@@ -310,8 +310,8 @@ class TestValidateUrlWithRetry:
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._git_ls_remote", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
-            result = await validate_url_with_retry("https://github.com/psf/requests", timeout=5)
-            assert result == UrlValidationResult.VALID
+            output = await validate_url_with_retry("https://github.com/psf/requests", timeout=5)
+            assert output.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
     async def test_token_invalid_retries_without_token(self):
@@ -334,20 +334,20 @@ class TestValidateUrlWithRetry:
                 return _mock_response(200)
 
             mock_head.side_effect = side_effect
-            result = await validate_url_with_retry(
+            output = await validate_url_with_retry(
                 "https://github.com/psf/requests", timeout=5,
                 github_token="ghp_invalid",
                 settings_store=FakeSettingsStore(),
             )
-            assert result == UrlValidationResult.VALID
+            assert output.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
     async def test_token_invalid_without_settings_store_does_not_retry(self):
         with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
-            result = await validate_url_with_retry(
+            output = await validate_url_with_retry(
                 "https://github.com/psf/requests", timeout=5,
                 github_token="ghp_invalid",
             )
-            assert result == UrlValidationResult.TOKEN_INVALID
+            assert output.result == UrlValidationResult.TOKEN_INVALID
