@@ -163,6 +163,7 @@ User                   Browser (Vue SPA)             API Layer
 - Settings are loaded from `GET /api/v1/settings` on page mount
 - Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
 - Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error)
+- Component is covered by `frontend/src/views/Settings.test.ts` (Vitest) with tests for auto-save, debounce, blur logic, success/error toast, and clear-token behaviour
 
 ### Images List Converter Page
 
