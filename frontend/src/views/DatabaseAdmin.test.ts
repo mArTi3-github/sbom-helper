@@ -206,4 +206,183 @@ describe('DatabaseAdmin.vue', () => {
     expect(updatePurlMock).toHaveBeenCalledTimes(1)
     expect(updatePurlMock).toHaveBeenCalledWith('pkg:pypi/requests@2.31.0', { purl: 'pkg:pypi/new@1.0.0' })
   })
+
+  it('deletes a single row when confirm returns true', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+    const delBtn = wrapper.findAll('tbody tr')[0].findAll('button').find((b) => b.text() === 'Del')!
+    await delBtn.trigger('click')
+    await flushPromises()
+
+    expect(window.confirm).toHaveBeenCalled()
+    expect(deletePurlsMock).toHaveBeenCalledTimes(1)
+    expect(deletePurlsMock).toHaveBeenCalledWith(['pkg:pypi/requests@2.31.0'])
+  })
+
+  it('does not delete when confirm returns false', async () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(false)
+    const wrapper = mountAdmin()
+    await flushPromises()
+    const delBtn = wrapper.findAll('tbody tr')[0].findAll('button').find((b) => b.text() === 'Del')!
+    await delBtn.trigger('click')
+    await flushPromises()
+
+    expect(deletePurlsMock).not.toHaveBeenCalled()
+  })
+
+  it('bulk deletes selected rows', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+    const rowCheckboxes = wrapper.findAll('tbody tr input[type="checkbox"]')
+    await rowCheckboxes[0].setValue(true)
+    await rowCheckboxes[1].setValue(true)
+    await flushPromises()
+
+    const bulkBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Delete Selected'))!
+    await bulkBtn.trigger('click')
+    await flushPromises()
+
+    expect(deletePurlsMock).toHaveBeenCalledTimes(1)
+    const deletedPurls = deletePurlsMock.mock.calls[0][0] as string[]
+    expect(deletedPurls).toHaveLength(2)
+    expect(deletedPurls).toContain('pkg:pypi/requests@2.31.0')
+    expect(deletedPurls).toContain('pkg:pypi/flask@2.3.0')
+  })
+
+  it('exports selected rows as CSV and triggers download', async () => {
+    const clickSpy = vi.fn()
+    const originalCreate = document.createElement.bind(document)
+    const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag === 'a') {
+        const anchor = originalCreate('a') as HTMLAnchorElement
+        vi.spyOn(anchor, 'click').mockImplementation(clickSpy)
+        return anchor
+      }
+      return originalCreate(tag)
+    })
+
+    const wrapper = mountAdmin()
+    await flushPromises()
+    await wrapper.findAll('tbody tr input[type="checkbox"]')[0].setValue(true)
+    await flushPromises()
+
+    const exportBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Export CSV'))!
+    await exportBtn.trigger('click')
+    await flushPromises()
+
+    expect(exportCsvMock).toHaveBeenCalledTimes(1)
+    expect(exportCsvMock).toHaveBeenCalledWith(['pkg:pypi/requests@2.31.0'])
+    expect(clickSpy).toHaveBeenCalled()
+    createSpy.mockRestore()
+  })
+
+  it('imports CSV file with upsert strategy by default', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+    await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Import CSV'))!.trigger('click')
+    await flushPromises()
+
+    const file = new File(['purl,repository_url\npkg:pypi/x@1,https://github.com/x'], 'import.csv', { type: 'text/csv' })
+    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    await flushPromises()
+
+    const uploadBtn = document.querySelector('.modal-body .toolbar button') as HTMLElement
+    uploadBtn.click()
+    await flushPromises()
+
+    expect(importCsvMock).toHaveBeenCalledTimes(1)
+    expect(importCsvMock).toHaveBeenCalledWith(file, 'upsert')
+  })
+
+  it('imports CSV file with skip_existing strategy when radio is changed', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+    await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Import CSV'))!.trigger('click')
+    await flushPromises()
+
+    const file = new File(['purl,repository_url\npkg:pypi/x@1,https://github.com/x'], 'import.csv', { type: 'text/csv' })
+    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    await flushPromises()
+
+    const skipRadio = document.querySelector('input[type="radio"][value="skip_existing"]') as HTMLInputElement
+    skipRadio.checked = true
+    skipRadio.dispatchEvent(new Event('change'))
+    await flushPromises()
+
+    const uploadBtn = document.querySelector('.modal-body .toolbar button') as HTMLElement
+    uploadBtn.click()
+    await flushPromises()
+
+    expect(importCsvMock).toHaveBeenCalled()
+    const lastCallArgs = importCsvMock.mock.calls[importCsvMock.mock.calls.length - 1]
+    expect(lastCallArgs[1]).toBe('skip_existing')
+  })
+
+  it('shows import error message on ApiError', async () => {
+    importCsvMock.mockRejectedValueOnce(new ApiError(400, 'bad_csv', 'Malformed CSV'))
+    const wrapper = mountAdmin()
+    await flushPromises()
+    await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Import CSV'))!.trigger('click')
+    await flushPromises()
+    const file = new File(['bad'], 'bad.csv', { type: 'text/csv' })
+    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    await flushPromises()
+    const uploadBtn = document.querySelector('.modal-body .toolbar button') as HTMLElement
+    uploadBtn.click()
+    await flushPromises()
+
+    expect(document.querySelector('.modal-body .error-msg')).not.toBeNull()
+    expect(document.body.textContent).toContain('Malformed CSV')
+  })
+
+  it('paginates to next page when Next button is clicked', async () => {
+    listPurlsMock.mockResolvedValueOnce({ rows, total: 100, page: 1, page_size: 50 })
+    const wrapper = mountAdmin()
+    await flushPromises()
+    listPurlsMock.mockClear()
+
+    const nextBtn = wrapper.findAll('.pagination-controls button').find((b) => b.text().includes('Next'))!
+    await nextBtn.trigger('click')
+    await flushPromises()
+
+    expect(listPurlsMock).toHaveBeenCalledTimes(1)
+    const params = listPurlsMock.mock.calls[0][0] as Record<string, unknown>
+    expect(params.page).toBe(2)
+  })
+
+  it('changes page size and resets page to 1', async () => {
+    listPurlsMock.mockResolvedValueOnce({ rows, total: 100, page: 1, page_size: 50 })
+    const wrapper = mountAdmin()
+    await flushPromises()
+
+    // navigate to page 2 first so the page reset on size change actually triggers a fetch
+    await wrapper.findAll('.pagination-controls button').find((b) => b.text().includes('Next'))!.trigger('click')
+    await flushPromises()
+    listPurlsMock.mockClear()
+
+    const pageSizeSelect = wrapper.find('.pagination-size select')
+    await pageSizeSelect.setValue('100')
+    await flushPromises()
+
+    expect(listPurlsMock).toHaveBeenCalledTimes(1)
+    const params = listPurlsMock.mock.calls[0][0] as Record<string, unknown>
+    expect(params.page_size).toBe(100)
+    expect(params.page).toBe(1)
+  })
+
+  it('shows API error message when listPurls rejects with ApiError', async () => {
+    listPurlsMock.mockRejectedValueOnce(new ApiError(500, 'server_error', 'Database unavailable'))
+    const wrapper = mountAdmin()
+    await flushPromises()
+    expect(wrapper.find('.error-msg').exists()).toBe(true)
+    expect(wrapper.find('.error-msg').text()).toBe('Database unavailable')
+  })
+
+  it('shows network error message when listPurls rejects with generic Error', async () => {
+    listPurlsMock.mockRejectedValueOnce(new Error('network'))
+    const wrapper = mountAdmin()
+    await flushPromises()
+    expect(wrapper.find('.error-msg').exists()).toBe(true)
+    expect(wrapper.find('.error-msg').text()).toContain('Network error')
+  })
 })
