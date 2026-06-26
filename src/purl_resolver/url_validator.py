@@ -103,37 +103,6 @@ async def _head_request(url: str, timeout: int, github_token: str | None = None)
         return await client.head(url, headers=headers)
 
 
-async def _git_ls_remote(url: str, timeout: int, github_token: str | None = None) -> bool | None:
-    """Return True if valid, False if not found, None if network error."""
-    try:
-        git_url = url
-        if github_token and "github.com" in url and url.startswith("https://"):
-            git_url = f"https://oauth2:{github_token}@{url[len('https://'):]}"
-        proc = await asyncio.create_subprocess_exec(
-            "git", "ls-remote", "--exit-code", git_url,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
-            logger.warning("git ls-remote timed out for %s", url)
-            return None
-        if proc.returncode == 0:
-            return True
-        stderr_text = stderr.decode(errors="replace") if stderr else ""
-        if "not found" in stderr_text.lower() or "does not exist" in stderr_text.lower():
-            return False
-        return None
-    except FileNotFoundError:
-        logger.warning("git not found, skipping git ls-remote check")
-        return None
-    except Exception:
-        return None
-
-
 async def _git_probe(url: str, timeout: int, github_token: str | None = None) -> bool | None:
     """Probe URL via git ls-remote. Returns True/False/None."""
     try:
