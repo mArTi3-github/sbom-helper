@@ -19,7 +19,7 @@ def _make_proc(returncode: int = 0, stderr: bytes = b"") -> AsyncMock:
     mock_proc = AsyncMock()
     mock_proc.communicate = AsyncMock(return_value=(b"", stderr))
     mock_proc.returncode = returncode
-    mock_proc.kill = AsyncMock()
+    mock_proc.kill = MagicMock()
     mock_proc.wait = AsyncMock()
     return mock_proc
 
@@ -28,7 +28,7 @@ def _make_proc_timeout():
     """Create a mock subprocess whose communicate() raises asyncio.TimeoutError."""
     mock_proc = AsyncMock()
     mock_proc.communicate = AsyncMock(side_effect=TimeoutError)
-    mock_proc.kill = AsyncMock()
+    mock_proc.kill = MagicMock()
     mock_proc.wait = AsyncMock()
     return mock_proc
 
