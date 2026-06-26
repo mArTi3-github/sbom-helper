@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -133,6 +134,134 @@ async def _git_ls_remote(url: str, timeout: int, github_token: str | None = None
         return None
 
 
+async def _git_probe(url: str, timeout: int, github_token: str | None = None) -> bool | None:
+    """Probe URL via git ls-remote. Returns True/False/None."""
+    try:
+        git_url = url
+        if github_token and "github.com" in url and url.startswith("https://"):
+            git_url = f"https://oauth2:{github_token}@{url[len('https://'):]}"
+        proc = await asyncio.create_subprocess_exec(
+            "git", "ls-remote", "--exit-code", git_url,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            await proc.kill()
+            await proc.wait()
+            logger.warning("git ls-remote timed out for %s", url)
+            return None
+        if proc.returncode == 0:
+            return True
+        stderr_text = stderr.decode(errors="replace") if stderr else ""
+        if "not found" in stderr_text.lower() or "does not exist" in stderr_text.lower():
+            return False
+        logger.warning("git ls-remote uncertain for %s: %s", url, stderr_text)
+        return None
+    except Exception as e:
+        logger.warning("git ls-remote failed for %s: %s", url, e)
+        return None
+
+
+async def _svn_probe(url: str, timeout: int) -> bool | None:
+    """Probe URL via svn ls. Returns True/False/None."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "svn", "ls", url,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            await proc.kill()
+            await proc.wait()
+            logger.warning("svn ls timed out for %s", url)
+            return None
+        if proc.returncode == 0:
+            return True
+        return False
+    except Exception as e:
+        logger.warning("svn ls failed for %s: %s", url, e)
+        return None
+
+
+async def _hg_probe(url: str, timeout: int) -> bool | None:
+    """Probe URL via hg identify. Returns True/False/None."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "hg", "identify", url,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            await proc.kill()
+            await proc.wait()
+            logger.warning("hg identify timed out for %s", url)
+            return None
+        if proc.returncode == 0:
+            return True
+        return False
+    except Exception as e:
+        logger.warning("hg identify failed for %s: %s", url, e)
+        return None
+
+
+async def _fossil_probe(url: str, timeout: int) -> bool | None:
+    """Probe URL via HTTP GET + fossil footer regex. Returns True/False/None."""
+    import httpx
+    import re
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url)
+        if resp.status_code != 200:
+            return False
+        if re.search(
+            r'footer"?>\s*this page was generated in about\s*(\d+\.\d+)s\s*by\s*fossil',
+            resp.text,
+            re.I,
+        ):
+            return True
+        return False
+    except Exception as e:
+        logger.warning("Fossil check failed for %s: %s", url, e)
+        return None
+
+
+async def _check_vcs(
+    url: str,
+    timeout: int,
+    github_token: str | None = None,
+) -> bool | None:
+    """Probe whether URL points to a git/svn/hg/fossil repository.
+
+    Runs four probes sequentially with early-exit on first success.
+
+    Returns:
+        True  — at least one VCS tool confirmed the URL is its repo type.
+        False — no VCS tool confirmed; at least one definitively said "not a repo".
+        None  — all probes were inconclusive (timeout, transport error).
+                Caller should treat as network error / preserve cache.
+    """
+    probes: list[tuple[str, Callable[[], Awaitable[bool | None]]]] = [
+        ("git", lambda: _git_probe(url, timeout, github_token)),
+        ("svn", lambda: _svn_probe(url, timeout)),
+        ("hg", lambda: _hg_probe(url, timeout)),
+        ("fossil", lambda: _fossil_probe(url, timeout)),
+    ]
+    saw_false = False
+    for _name, run in probes:
+        result = await run()
+        if result is True:
+            return True
+        if result is False:
+            saw_false = True
+    return False if saw_false else None
+
+
 async def validate_github_token(token: str) -> bool:
     """Validate a GitHub token by checking /rate_limit endpoint."""
     try:
@@ -195,7 +324,7 @@ async def validate_url(
         return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
 
     try:
-        git_result = await _git_ls_remote(final_url, timeout, github_token=github_token)
+        git_result = await _check_vcs(final_url, timeout, github_token=github_token)
     except Exception:
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR, final_url=final_url)
     if git_result is None:
