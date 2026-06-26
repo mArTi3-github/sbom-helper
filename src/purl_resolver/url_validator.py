@@ -148,7 +148,7 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            await proc.kill()
+            proc.kill()
             await proc.wait()
             logger.warning("git ls-remote timed out for %s", url)
             return None
@@ -175,7 +175,7 @@ async def _svn_probe(url: str, timeout: int) -> bool | None:
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            await proc.kill()
+            proc.kill()
             await proc.wait()
             logger.warning("svn ls timed out for %s", url)
             return None
@@ -198,7 +198,7 @@ async def _hg_probe(url: str, timeout: int) -> bool | None:
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            await proc.kill()
+            proc.kill()
             await proc.wait()
             logger.warning("hg identify timed out for %s", url)
             return None

@@ -198,7 +198,7 @@ class TestGitProbe:
         with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
             result = await _git_probe("https://github.com/psf/requests", 5)
             assert result is None
-            mock_exec.return_value.kill.assert_awaited_once()
+            mock_exec.return_value.kill.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_github_token_rewrites_url(self):
@@ -241,7 +241,7 @@ class TestSvnProbe:
         with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
             result = await _svn_probe("https://example.com/svn-repo", 5)
             assert result is None
-            mock_exec.return_value.kill.assert_awaited_once()
+            mock_exec.return_value.kill.assert_called_once()
 
 
 class TestHgProbe:
@@ -268,7 +268,7 @@ class TestHgProbe:
         with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
             result = await _hg_probe("https://example.com/hg-repo", 5)
             assert result is None
-            mock_exec.return_value.kill.assert_awaited_once()
+            mock_exec.return_value.kill.assert_called_once()
 
 
 class TestFossilProbe:
