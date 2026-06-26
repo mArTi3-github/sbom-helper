@@ -14,7 +14,7 @@ RUN addgroup --system --gid 1001 app && \
     adduser --system --uid 1001 --gid 1001 app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git openssl && \
+    apt-get install -y --no-install-recommends git subversion mercurial openssl && \
     rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
@@ -44,7 +44,7 @@ RUN addgroup --system --gid 1001 app && \
     adduser --system --uid 1001 --gid 1001 app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git openssl && \
+    apt-get install -y --no-install-recommends git subversion mercurial openssl && \
     rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
