@@ -15,6 +15,7 @@ from purl_resolver.service import PurlResolutionService
 from purl_resolver.settings_store import AppSettings
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.url_validator import UrlValidationOutput, UrlValidationResult
+from purl_resolver.validation_service import UrlValidationService
 
 
 def _url_output(result: UrlValidationResult, final_url: str | None = None) -> UrlValidationOutput:
@@ -469,6 +470,47 @@ class TestValidateExistingRefs:
             await pipeline.process(sbom, validate_existing_refs=True)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs[0]["url"] == "https://github.com/psf/requests"
+
+    @pytest.mark.asyncio
+    async def test_validate_existing_refs_delegates_to_validation_service(
+        self,
+        fake_resolvers,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        mock_validation = AsyncMock(spec=UrlValidationService)
+        mock_validation.validate_url = AsyncMock(
+            return_value=_url_output(UrlValidationResult.VALID),
+        )
+        pipeline = SbomEnrichmentPipeline(
+            storage=storage,
+            resolvers=fake_resolvers,
+            settings_store=None,
+            validation_service=mock_validation,
+            resolution_service=PurlResolutionService(storage, fake_resolvers),
+        )
+        await pipeline.process(sbom, validate_existing_refs=True)
+        mock_validation.validate_url.assert_called_once_with(
+            "https://github.com/psf/requests",
+            timeout=5,
+            github_token=None,
+            skip_connectivity_check=True,
+        )
 
 
 class TestFileUrlInvalidation:

@@ -9,6 +9,7 @@ from purl_resolver.schemas import ResolveResponse
 from purl_resolver.service import PurlResolutionService
 from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.url_validator import UrlValidationOutput, UrlValidationResult
+from purl_resolver.validation_service import UrlValidationService
 
 
 def _url_output(result: UrlValidationResult, final_url: str | None = None) -> UrlValidationOutput:
@@ -727,3 +728,59 @@ class TestFreshResolverValidation:
         assert result.response.repository_url == "https://github.com/new/repo"
         mock_storage.store.assert_called_once()
         assert mock_storage.store.call_args[0][0].repository_url == "https://github.com/new/repo"
+
+
+class TestValidationServiceDelegation:
+    """Verify delegation to UrlValidationService when injected."""
+
+    @pytest.mark.asyncio
+    async def test_cached_url_delegates_to_validation_service(self, mock_storage, mock_settings_store):
+        mock_storage.lookup.return_value = _cached_response(days_ago=3)
+        mock_validation = AsyncMock(spec=UrlValidationService)
+        mock_validation.validate_url = AsyncMock(return_value=_url_output(UrlValidationResult.VALID))
+
+        result = await PurlResolutionService(
+            mock_storage, [], settings_store=mock_settings_store,
+            validation_service=mock_validation,
+        ).resolve_purl("pkg:pypi/requests")
+
+        assert result.response is not None
+        mock_validation.validate_url.assert_called_once()
+        mock_validation.validate_url.assert_called_with(
+            "https://github.com/psf/requests",
+            mock_settings_store.load().url_validation_timeout,
+            github_token=mock_settings_store.load().github_token,
+            skip_connectivity_check=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_fresh_resolve_delegates_to_validation_service(self, mock_storage, mock_settings_store):
+        mock_storage.lookup = AsyncMock(return_value=None)
+        mock_validation = AsyncMock(spec=UrlValidationService)
+        mock_validation.validate_url = AsyncMock(return_value=_url_output(UrlValidationResult.VALID))
+        resolver = AsyncMock()
+        resolver.name = "test_resolver"
+        resolver.resolve = AsyncMock(return_value=AsyncMock(
+            repository_url="https://github.com/valid/repo",
+            repository_type="git",
+            repository_kind="vcs",
+            confidence="high",
+            evidence=["test"],
+            warnings=[],
+            version_reference=None,
+        ))
+
+        result = await PurlResolutionService(
+            mock_storage, [resolver], settings_store=mock_settings_store,
+            validation_service=mock_validation,
+        ).resolve_purl("pkg:npm/archy@1.0.0")
+
+        assert result.response is not None
+        assert result.response.repository_url == "https://github.com/valid/repo"
+        mock_validation.validate_url.assert_called_once()
+        mock_validation.validate_url.assert_called_with(
+            "https://github.com/valid/repo",
+            mock_settings_store.load().url_validation_timeout,
+            github_token=mock_settings_store.load().github_token,
+            skip_connectivity_check=True,
+        )
