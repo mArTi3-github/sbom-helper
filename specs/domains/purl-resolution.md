@@ -23,6 +23,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
 - `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
+- `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url_with_retry()` with SettingsStore injection; consumed by `PurlResolutionService` and `SbomEnrichmentPipeline`
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
 
@@ -159,7 +160,7 @@ Client                    API Layer (router)         Service Layer             p
 - `validate_url_with_retry(url, timeout, github_token=None, settings_store=None, skip_connectivity_check=False) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
 - `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
 - `ensure_connectivity(github_token=None) → bool` — connectivity probe against `github.com`; raises `ConnectionError` on failure
-- `_RateLimitTracker` — class-level in-memory counter; after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
+- `_RateLimitTracker` — instance-based in-memory counter with `asyncio.Lock` (module-level singleton `_rate_limit_tracker`); after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
 - `_check_vcs(url, timeout, github_token=None) → bool | None` — unified multi-VCS probe; runs git → svn → hg → fossil sequentially with early-exit on first success; aggregation: `True` if any probe is `True`, else `False` if any is `False`, else `None`; called with the resolved final URL by `validate_url()`
 - `_git_probe(url, timeout, github_token=None) → bool | None` — internal helper: `git ls-remote --exit-code <url>`; rewrites `github.com` URLs with `oauth2:token@` for authenticated calls
 - `_svn_probe(url, timeout) → bool | None` — internal helper: `svn ls <url>`; exit 0 → True, exit ≠0 → False
@@ -169,6 +170,15 @@ Client                    API Layer (router)         Service Layer             p
 - `_fossil_probe_footer(url, timeout) → bool | None` — internal helper (fallback): HTTP GET with `follow_redirects=True`; status 200 + footer regex match → True; status 200 without footer → False; non-200 → False; transport error → None
 - `UrlValidationResult` enum — `VALID`, `INVALID`, `NETWORK_ERROR`, `RATE_LIMITED`, `TOKEN_INVALID`
 - `UrlValidationOutput` dataclass — `result: UrlValidationResult`, `final_url: str | None = None`; `final_url` is `str(resp.url)` after redirects, `None` when HEAD did not execute (scheme error, cooldown, connectivity failure, HEAD exception)
+
+## UrlValidationService
+
+### Service Wrapper (`validation_service.py`)
+- `UrlValidationService` wraps `validate_url_with_retry()` with SettingsStore injection
+- `UrlValidationService.__init__(settings_store: SettingsStore)` — receives `SettingsStore` for token/cooldown/retry config
+- `UrlValidationService.validate_url(url, timeout, github_token=None, skip_connectivity_check=False) → UrlValidationOutput` — delegates to `validate_url_with_retry()` with the injected `settings_store`
+- Consumed by `PurlResolutionService` and `SbomEnrichmentPipeline` as an optional dependency; when not provided, callers fall back to direct `validate_url_with_retry()` calls
+- Decouples URL validation setup from resolution orchestration; single point for validation configuration changes
 
 ## Invariants
 
@@ -214,6 +224,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Docker provides VCS tools**: `git`, `subversion`, `mercurial` are installed in both `dev` and `prod` stages of the Dockerfile; fossil uses HTTP (httpx) and requires no binary
 - **VCS subprocess timeouts are non-fatal**: `asyncio.TimeoutError` from any subprocess call is treated as `None` (uncertain) and logged as a warning; never raised to the caller
 - **GitHub token only affects git probe**: `_check_vcs()` rewrites `github.com` URLs to `oauth2:token@` form for the git probe only; svn/hg/fossil probes run without token rewriting
+- **UrlValidationService is optional**: `PurlResolutionService` and `SbomEnrichmentPipeline` accept an optional `validation_service: UrlValidationService | None` parameter; when `None`, callers fall back to direct `validate_url_with_retry()` calls with `settings_store` from their own constructor
 
 ## Configuration
 

@@ -183,7 +183,7 @@
 - **API Layer (routes/)** imports **csv_io** module for CSV parsing/rendering
 - **API Layer (routes/settings.py)** imports **Config Layer** (settings) and **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
 - **API Layer (routes/)** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
-- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`); dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), **Validation Service** (`validation_service.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`, `validation_service`); dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`PurlResolutionService`), **SBOM Module** (`sbom/`), **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), and **Resolver Layer** (`resolver/interface.py`); receives dependencies including `PurlResolutionService` via constructor injection
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
@@ -210,9 +210,9 @@
 - Serve the Vue 3 SPA via `SPAStaticFiles` mounted at `/` in `main.py` (after all API routes); `SPAStaticFiles` falls back to `index.html` for any unmatched path, enabling Vue Router client-side routing
 
 ### Service Layer (`service.py`)
-- `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`)
+- `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`, `validation_service: UrlValidationService | None = None`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver chain (iterates resolvers, first success wins) → storage store; uses `resolver.name` property to tag stored records with the actual resolver identifier (e.g. `"purl2repo"`, `"libraries.io"`)
-- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if `resolved_at` is today; remove invalid tokens from settings automatically. Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result.
+- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if within cooldown window (trusted resolvers respect `revalidation_cooldown_hours`); remove invalid tokens from settings automatically. Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url_with_retry()` directly.
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `self._storage.store()`
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format; tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
@@ -221,7 +221,7 @@
 
 ### SBOM Enrichment Pipeline (`sbom_enrichment.py`)
 - Orchestrate the complete CycloneDX SBOM enrichment workflow in a single class
-- `SbomEnrichmentPipeline.__init__(storage, resolvers, settings_store)` — receives dependencies via constructor
+- `SbomEnrichmentPipeline.__init__(storage, resolvers, settings_store, validation_service=None)` — receives dependencies via constructor; `validation_service` is optional — when not provided, `validate_existing_refs` falls back to direct `validate_url_with_retry()`
 - `SbomEnrichmentPipeline.process(sbom_data) → SbomEnrichmentResult` — executes the pipeline: validate SBOM format → collect components → deduplicate PURLs → batch resolve → store pre-existing references → enrich SBOM → build report
 - Decouples HTTP layer (router) from domain orchestration logic
 - Testable without FastAPI TestClient — can be instantiated with mock storage and resolvers
@@ -280,7 +280,7 @@
 - `validate_url_with_retry(url, timeout, github_token=None, settings_store=None, skip_connectivity_check=False) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
 - `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
 - `ensure_connectivity(github_token=None) → bool` — connectivity probe against `github.com`; raises `ConnectionError` on failure
-- `_RateLimitTracker` — class-level in-memory counter; after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
+- `_RateLimitTracker` — instance-based in-memory counter with `asyncio.Lock` (module-level singleton `_rate_limit_tracker`); after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
 - `_check_vcs(url, timeout, github_token=None) → bool | None` — unified multi-VCS probe; runs git → svn → hg → fossil sequentially with early-exit on first success; aggregation: `True` if any probe is `True`, else `False` if any is `False`, else `None`; called with the resolved final URL by `validate_url()`
 - `_git_probe(url, timeout, github_token=None) → bool | None` — internal helper: `git ls-remote --exit-code <url>`; rewrites `github.com` URLs with `oauth2:token@` for authenticated calls
 - `_svn_probe(url, timeout) → bool | None` — internal helper: `svn ls <url>`; exit 0 → True, exit ≠0 → False
