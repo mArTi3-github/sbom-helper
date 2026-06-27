@@ -15,6 +15,7 @@ from .service import PurlResolutionService
 from .settings_store import SettingsStore
 from .storage.interface import Storage
 from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
+from .validation_service import UrlValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +56,13 @@ class SbomEnrichmentPipeline:
         resolvers: list[Resolver],
         resolution_service: PurlResolutionService,
         settings_store: SettingsStore | None = None,
+        validation_service: UrlValidationService | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers
         self._settings_store = settings_store
         self._resolution_service = resolution_service
+        self._validation_service = validation_service
 
     async def process(
         self,
@@ -82,13 +85,21 @@ class SbomEnrichmentPipeline:
                     continue
                 for ref in comp.existing_references:
                     if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
-                        voutput = await validate_url_with_retry(
-                            ref["url"],
-                            timeout=val_timeout,
-                            github_token=val_token,
-                            settings_store=self._settings_store,
-                            skip_connectivity_check=True,
-                        )
+                        if self._validation_service is not None:
+                            voutput = await self._validation_service.validate_url(
+                                ref["url"],
+                                timeout=val_timeout,
+                                github_token=val_token,
+                                skip_connectivity_check=True,
+                            )
+                        else:
+                            voutput = await validate_url_with_retry(
+                                ref["url"],
+                                timeout=val_timeout,
+                                github_token=val_token,
+                                settings_store=self._settings_store,
+                                skip_connectivity_check=True,
+                            )
                         if voutput.result == UrlValidationResult.INVALID:
                             comp.needs_enrichment = True
                             comp.existing_references = []

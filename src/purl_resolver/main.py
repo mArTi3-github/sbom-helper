@@ -31,6 +31,7 @@ from .service import PurlResolutionService
 from .settings_store import SettingsStore
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
+from .validation_service import UrlValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,12 @@ async def lifespan(app: FastAPI):
     logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
     app.state.resolvers = build_resolvers(settings, app_settings)
     app.state.db_admin_service = DbAdminService(app.state.storage)
+    app.state.validation_service = UrlValidationService(app.state.settings_store)
     app.state.resolution_service = PurlResolutionService(
         storage=app.state.storage,
         resolvers=app.state.resolvers,
         settings_store=app.state.settings_store,
+        validation_service=app.state.validation_service,
     )
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))

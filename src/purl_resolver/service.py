@@ -11,6 +11,7 @@ from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
 from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
+from .validation_service import UrlValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -25,43 +26,56 @@ class PurlResolutionService:
         storage: Storage,
         resolvers: list[Resolver],
         settings_store: SettingsStore | None = None,
+        validation_service: UrlValidationService | None = None,
     ) -> None:
         self._storage = storage
         self._resolvers = resolvers
         self._settings_store = settings_store
+        self._validation_service = validation_service
 
-    @staticmethod
-    async def _validate_cached_url(
-        cached: ResolveResponse,
-        settings_store: SettingsStore | None,
-        purl_key: str,
-        storage: Storage,
-    ) -> ResolveResponse | None:
-        if settings_store is None:
-            return cached
-
-        app_settings = settings_store.load()
+    def _is_within_cooldown(self, cached: ResolveResponse) -> bool:
+        if self._settings_store is None:
+            return True
+        app_settings = self._settings_store.load()
         if not app_settings.validate_db_urls:
-            return cached
-
+            return True
         cooldown_hours = app_settings.revalidation_cooldown_hours
         if cooldown_hours > 0 and cached.resolver in TRUSTED_RESOLVERS and cached.resolved_at:
             try:
                 resolved_date = datetime.fromisoformat(cached.resolved_at)
                 elapsed = datetime.now() - resolved_date
                 if elapsed.total_seconds() < cooldown_hours * 3600:
-                    return cached
+                    return True
             except (ValueError, TypeError):
                 pass
+        return False
 
+    async def _validate_cached_url(
+        self,
+        cached: ResolveResponse,
+        purl_key: str,
+    ) -> ResolveResponse | None:
+        if self._is_within_cooldown(cached):
+            return cached
+
+        app_settings = self._settings_store.load()
         github_token = app_settings.github_token
-        voutput = await validate_url_with_retry(
-            cached.repository_url,
-            app_settings.url_validation_timeout,
-            github_token=github_token,
-            settings_store=settings_store,
-            skip_connectivity_check=True,
-        )
+
+        if self._validation_service is not None:
+            voutput = await self._validation_service.validate_url(
+                cached.repository_url,
+                app_settings.url_validation_timeout,
+                github_token=github_token,
+                skip_connectivity_check=True,
+            )
+        else:
+            voutput = await validate_url_with_retry(
+                cached.repository_url,
+                app_settings.url_validation_timeout,
+                github_token=github_token,
+                settings_store=self._settings_store,
+                skip_connectivity_check=True,
+            )
 
         if voutput.result == UrlValidationResult.VALID:
             new_url = voutput.final_url or cached.repository_url
@@ -69,12 +83,12 @@ class PurlResolutionService:
                 logger.info("Updated repository URL for %s: %s -> %s", purl_key, cached.repository_url, new_url)
                 cached.repository_url = new_url
             try:
-                await storage.store(cached)
+                await self._storage.store(cached)
             except Exception:
                 logger.warning("Failed to update resolved_at for %s", purl_key, exc_info=True)
         elif voutput.result == UrlValidationResult.INVALID:
             try:
-                await storage.delete_purls([purl_key])
+                await self._storage.delete_purls([purl_key])
             except Exception:
                 logger.warning("Failed to delete invalid URL for %s", purl_key, exc_info=True)
             return None
@@ -97,9 +111,7 @@ class PurlResolutionService:
             cached = await self._storage.lookup(purl_key)
             if cached is not None:
                 logger.info("Cache hit for %s", purl_key)
-                cached = await self._validate_cached_url(
-                    cached, self._settings_store, purl_key, self._storage,
-                )
+                cached = await self._validate_cached_url(cached, purl_key)
             if cached is not None:
                 cached.found_by = "local_db"
                 return ResolveResult.ok(cached)
@@ -126,13 +138,21 @@ class PurlResolutionService:
             if self._settings_store is not None:
                 app_settings = self._settings_store.load()
                 if app_settings.validate_db_urls:
-                    voutput = await validate_url_with_retry(
-                        repo_url,
-                        app_settings.url_validation_timeout,
-                        github_token=app_settings.github_token,
-                        settings_store=self._settings_store,
-                        skip_connectivity_check=True,
-                    )
+                    if self._validation_service is not None:
+                        voutput = await self._validation_service.validate_url(
+                            repo_url,
+                            app_settings.url_validation_timeout,
+                            github_token=app_settings.github_token,
+                            skip_connectivity_check=True,
+                        )
+                    else:
+                        voutput = await validate_url_with_retry(
+                            repo_url,
+                            app_settings.url_validation_timeout,
+                            github_token=app_settings.github_token,
+                            settings_store=self._settings_store,
+                            skip_connectivity_check=True,
+                        )
                     if voutput.result == UrlValidationResult.INVALID:
                         logger.warning(
                             "Resolver %s returned invalid URL %s for %s, skipping",
