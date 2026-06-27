@@ -80,32 +80,35 @@ class UrlValidationOutput:
 
 
 class _RateLimitTracker:
-    _count: int = 0
-    _cooldown_until: float = 0.0
+    def __init__(self) -> None:
+        self._count: int = 0
+        self._cooldown_until: float = 0.0
+        self._lock: asyncio.Lock = asyncio.Lock()
 
-    @classmethod
-    def is_in_cooldown(cls) -> bool:
-        if cls._cooldown_until > 0 and time.time() >= cls._cooldown_until:
-            logger.info("Rate limit cooldown expired")
-            cls._count = 0
-            cls._cooldown_until = 0.0
-        return cls._cooldown_until > 0 and time.time() < cls._cooldown_until
+    async def is_in_cooldown(self) -> bool:
+        async with self._lock:
+            if self._cooldown_until > 0 and time.time() >= self._cooldown_until:
+                logger.info("Rate limit cooldown expired")
+                self._count = 0
+                self._cooldown_until = 0.0
+            return self._cooldown_until > 0 and time.time() < self._cooldown_until
 
-    @classmethod
-    def record_rate_limit(cls) -> None:
-        cls._count += 1
-        if cls._count >= _RATE_LIMIT_THRESHOLD:
-            cls._cooldown_until = time.time() + _RATE_LIMIT_COOLDOWN
-            logger.warning(
-                "Rate limit threshold reached (%d consecutive), "
-                "entering %ds cooldown",
-                cls._count, _RATE_LIMIT_COOLDOWN,
-            )
+    async def record_rate_limit(self) -> None:
+        async with self._lock:
+            self._count += 1
+            if self._count >= _RATE_LIMIT_THRESHOLD:
+                self._cooldown_until = time.time() + _RATE_LIMIT_COOLDOWN
+                logger.warning(
+                    "Rate limit threshold reached (%d consecutive), "
+                    "entering %ds cooldown",
+                    self._count, _RATE_LIMIT_COOLDOWN,
+                )
 
-    @classmethod
-    def reset(cls) -> None:
-        cls._count = 0
-        cls._cooldown_until = 0.0
+    def reset(self) -> None:
+        self._count = 0
+        self._cooldown_until = 0.0
+
+_rate_limit_tracker = _RateLimitTracker()
 
 
 def _is_rate_limited(status: int, headers: dict) -> bool:
@@ -373,7 +376,7 @@ async def validate_url(
     if not url.startswith(("http://", "https://")):
         return UrlValidationOutput(UrlValidationResult.INVALID)
 
-    if _RateLimitTracker.is_in_cooldown():
+    if await _rate_limit_tracker.is_in_cooldown():
         return UrlValidationOutput(UrlValidationResult.RATE_LIMITED)
 
     if not skip_connectivity_check:
@@ -393,14 +396,14 @@ async def validate_url(
         headers = dict(resp.headers)
         status = resp.status_code
     except Exception:
-        _RateLimitTracker.reset()
+        _rate_limit_tracker.reset()
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
     if _is_rate_limited(status, headers):
-        _RateLimitTracker.record_rate_limit()
+        await _rate_limit_tracker.record_rate_limit()
         return UrlValidationOutput(UrlValidationResult.RATE_LIMITED, final_url=final_url)
 
-    _RateLimitTracker.reset()
+    _rate_limit_tracker.reset()
 
     if status in (401, 403) and github_token:
         return UrlValidationOutput(UrlValidationResult.TOKEN_INVALID, final_url=final_url)

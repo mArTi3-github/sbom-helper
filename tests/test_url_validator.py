@@ -8,7 +8,6 @@ from purl_resolver.url_validator import (
     UrlValidationOutput,
     UrlValidationResult,
     _check_vcs,
-    _RateLimitTracker,
     ensure_connectivity,
     validate_github_token,
     validate_url,
@@ -18,11 +17,10 @@ from purl_resolver.url_validator import (
 
 @pytest.fixture(autouse=True)
 def reset_rate_limit_tracker():
-    _RateLimitTracker._count = 0
-    _RateLimitTracker._cooldown_until = 0.0
+    from purl_resolver.url_validator import _rate_limit_tracker
+    _rate_limit_tracker.reset()
     yield
-    _RateLimitTracker._count = 0
-    _RateLimitTracker._cooldown_until = 0.0
+    _rate_limit_tracker.reset()
 
 
 def _mock_response(status_code: int = 200, headers: dict | None = None) -> AsyncMock:
@@ -121,8 +119,9 @@ class TestValidateUrl:
     @pytest.mark.asyncio
     async def test_rate_limit_cooldown_skips_validation(self):
         import time
-        _RateLimitTracker._count = 5
-        _RateLimitTracker._cooldown_until = time.time() + 60
+        from purl_resolver.url_validator import _rate_limit_tracker
+        _rate_limit_tracker._count = 5
+        _rate_limit_tracker._cooldown_until = time.time() + 60
         result = await validate_url("https://github.com/psf/requests", timeout=5)
         assert result.result == UrlValidationResult.RATE_LIMITED
 
