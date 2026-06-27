@@ -122,6 +122,7 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
             logger.warning("git ls-remote timed out for %s", url)
             return None
         if proc.returncode == 0:
+            logger.info("git probe confirmed %s as git repository", url)
             return True
         stderr_text = stderr.decode(errors="replace") if stderr else ""
         if "not found" in stderr_text.lower() or "does not exist" in stderr_text.lower():
@@ -149,6 +150,7 @@ async def _svn_probe(url: str, timeout: int) -> bool | None:
             logger.warning("svn ls timed out for %s", url)
             return None
         if proc.returncode == 0:
+            logger.info("svn probe confirmed %s as svn repository", url)
             return True
         return False
     except Exception as e:
@@ -172,6 +174,7 @@ async def _hg_probe(url: str, timeout: int) -> bool | None:
             logger.warning("hg identify timed out for %s", url)
             return None
         if proc.returncode == 0:
+            logger.info("hg probe confirmed %s as hg repository", url)
             return True
         return False
     except Exception as e:
@@ -193,6 +196,7 @@ async def _fossil_probe(url: str, timeout: int) -> bool | None:
             resp.text,
             re.I,
         ):
+            logger.info("fossil probe confirmed %s as fossil repository", url)
             return True
         return False
     except Exception as e:
@@ -223,8 +227,10 @@ async def _check_vcs(
     ]
     saw_false = False
     for _name, run in probes:
+        logger.debug("Trying %s probe for %s", _name, url)
         result = await run()
         if result is True:
+            logger.debug("%s probe for %s succeeded", _name, url)
             return True
         if result is False:
             saw_false = True
