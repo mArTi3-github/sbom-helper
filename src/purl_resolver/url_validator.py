@@ -5,6 +5,8 @@ import ipaddress
 import logging
 import socket
 import time
+
+import httpx
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -125,14 +127,13 @@ async def _check_connectivity(github_token: str | None = None) -> bool:
     if await _is_private_url(_CONNECTIVITY_URL):
         return False
     try:
-        import httpx
         headers = {}
         if github_token:
             headers["Authorization"] = f"Bearer {github_token}"
         async with httpx.AsyncClient(timeout=_CONNECTIVITY_TIMEOUT) as client:
             resp = await client.head(_CONNECTIVITY_URL, headers=headers)
             return resp.status_code < 500
-    except Exception:
+    except httpx.RequestError:
         logger.warning("Connectivity probe to %s failed", _CONNECTIVITY_URL)
         return False
 
@@ -148,7 +149,6 @@ async def ensure_connectivity(github_token: str | None = None) -> bool:
 async def _head_request(url: str, timeout: int, github_token: str | None = None):
     if await _is_private_url(url):
         raise ConnectionError(f"Refusing HEAD request to private URL: {url}")
-    import httpx
     headers = {}
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
@@ -185,7 +185,7 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
             return False
         logger.warning("git ls-remote uncertain for %s: %s", url, stderr_text)
         return None
-    except Exception as e:
+    except (OSError, asyncio.TimeoutError) as e:
         logger.warning("git ls-remote failed for %s: %s", url, e)
         return None
 
@@ -209,7 +209,7 @@ async def _svn_probe(url: str, timeout: int) -> bool | None:
             logger.info("svn probe confirmed %s as svn repository", url)
             return True
         return False
-    except Exception as e:
+    except (OSError, asyncio.TimeoutError) as e:
         logger.warning("svn ls failed for %s: %s", url, e)
         return None
 
@@ -233,7 +233,7 @@ async def _hg_probe(url: str, timeout: int) -> bool | None:
             logger.info("hg probe confirmed %s as hg repository", url)
             return True
         return False
-    except Exception as e:
+    except (OSError, asyncio.TimeoutError) as e:
         logger.warning("hg identify failed for %s: %s", url, e)
         return None
 
@@ -248,7 +248,6 @@ async def _fossil_probe_xfer(url: str, timeout: int) -> bool | None:
     if await _is_private_url(url):
         logger.warning("Refusing xfer probe to private URL: %s", url)
         return None
-    import httpx
     from urllib.parse import urlsplit, urlunsplit
 
     probe_url = urlunsplit((*urlsplit(url)[:2], urlsplit(url).path.rstrip("/") + "/xfer", "", ""))
@@ -273,9 +272,7 @@ async def _fossil_probe_xfer(url: str, timeout: int) -> bool | None:
                 if resp.status_code in (401, 403):
                     return None
                 return False
-    except httpx.RequestError:
-        return None
-    except Exception as e:
+    except httpx.RequestError as e:
         logger.warning("Fossil xfer probe failed for %s: %s", url, e)
         return None
 
@@ -285,7 +282,6 @@ async def _fossil_probe_footer(url: str, timeout: int) -> bool | None:
     if await _is_private_url(url):
         logger.warning("Refusing footer probe to private URL: %s", url)
         return None
-    import httpx
     import re
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -303,7 +299,7 @@ async def _fossil_probe_footer(url: str, timeout: int) -> bool | None:
             logger.info("footer probe confirmed %s as fossil repository", url)
             return True
         return False
-    except Exception as e:
+    except httpx.RequestError as e:
         logger.warning("Fossil footer check failed for %s: %s", url, e)
         return None
 
@@ -363,7 +359,7 @@ async def validate_github_token(token: str) -> bool:
             github_token=token,
         )
         return result.status_code == 200
-    except Exception:
+    except (httpx.RequestError, ConnectionError):
         return False
 
 
@@ -382,7 +378,7 @@ async def validate_url(
     if not skip_connectivity_check:
         try:
             github_ok = await _check_connectivity(github_token=github_token)
-        except Exception:
+        except (httpx.RequestError, ConnectionError, OSError):
             return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
         if not github_ok:
@@ -395,7 +391,7 @@ async def validate_url(
             logger.info("URL redirected: %s -> %s", url, final_url)
         headers = dict(resp.headers)
         status = resp.status_code
-    except Exception:
+    except httpx.RequestError:
         _rate_limit_tracker.reset()
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
@@ -418,6 +414,7 @@ async def validate_url(
     try:
         git_result = await _check_vcs(final_url, timeout, github_token=github_token)
     except Exception:
+        logger.warning("VCS check failed unexpectedly for %s", final_url, exc_info=True)
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR, final_url=final_url)
     if git_result is None:
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR, final_url=final_url)

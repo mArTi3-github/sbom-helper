@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from purl_resolver.url_validator import (
@@ -83,7 +84,7 @@ class TestValidateUrl:
     async def test_head_connection_error_returns_network_error(self):
         with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
              patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
-            mock_head.side_effect = Exception("Connection refused")
+            mock_head.side_effect = httpx.RequestError("Connection refused")
             result = await validate_url("https://example.com/repo", timeout=5)
             assert result.result == UrlValidationResult.NETWORK_ERROR
 
@@ -231,7 +232,7 @@ class TestValidateGithubToken:
     @pytest.mark.asyncio
     async def test_network_error_returns_false(self):
         with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
-            mock_head.side_effect = Exception("Connection refused")
+            mock_head.side_effect = httpx.RequestError("Connection refused")
             result = await validate_github_token("ghp_test")
             assert result is False
 

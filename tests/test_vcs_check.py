@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from purl_resolver.url_validator import UrlValidationResult
@@ -378,7 +379,7 @@ class TestFossilProbeXfer:
     async def test_request_error_returns_none(self):
         from purl_resolver.url_validator import _fossil_probe_xfer
         mock_cm = _make_streaming_response(200, "text/html")
-        mock_cm.__aenter__.side_effect = TimeoutError
+        mock_cm.__aenter__.side_effect = httpx.TimeoutException("test")
         with _patch_private(), patch("httpx.AsyncClient.stream", return_value=mock_cm):
             result = await _fossil_probe_xfer("https://example.com/fossil", 5)
             assert result is None
@@ -449,7 +450,7 @@ class TestFossilProbeFooter:
     async def test_http_exception_returns_none(self):
         from purl_resolver.url_validator import _fossil_probe_footer
         with _patch_private(), patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.side_effect = TimeoutError
+            mock_get.side_effect = httpx.TimeoutException("test")
             result = await _fossil_probe_footer("https://example.com/fossil", 5)
             assert result is None
 

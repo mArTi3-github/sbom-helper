@@ -48,5 +48,5 @@ def normalize(components: PurlComponents) -> str:
 def safe_normalize(purl: str) -> str:
     try:
         return normalize(validate(purl))
-    except Exception:
+    except (ValueError, PurlValidationError):
         return purl
