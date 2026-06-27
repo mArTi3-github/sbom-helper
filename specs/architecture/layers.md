@@ -285,7 +285,9 @@
 - `_git_probe(url, timeout, github_token=None) → bool | None` — internal helper: `git ls-remote --exit-code <url>`; rewrites `github.com` URLs with `oauth2:token@` for authenticated calls
 - `_svn_probe(url, timeout) → bool | None` — internal helper: `svn ls <url>`; exit 0 → True, exit ≠0 → False
 - `_hg_probe(url, timeout) → bool | None` — internal helper: `hg identify <url>`; exit 0 → True, exit ≠0 → False
-- `_fossil_probe(url, timeout) → bool | None` — internal helper: HTTP GET with `follow_redirects=True`; status 200 + footer regex match → True; status 200 without footer → False; non-200 → False; transport error → None
+- `_fossil_probe(url, timeout) → bool | None` — combined probe: tries the authoritative /xfer protocol probe first (`_fossil_probe_xfer`), falls back to HTML footer regex (`_fossil_probe_footer`) when the xfer probe is uncertain (None)
+- `_fossil_probe_xfer(url, timeout) → bool | None` — internal helper: minimal POST to `<url>/xfer` with `Content-Type: application/x-fossil-debug`; checks response Content-Type for `application/x-fossil` / `application/x-fossil-debug`; 401/403 → None; other → False; transport error → None
+- `_fossil_probe_footer(url, timeout) → bool | None` — internal helper (fallback): HTTP GET with `follow_redirects=True`; status 200 + footer regex match → True; status 200 without footer → False; non-200 → False; transport error → None
 - `UrlValidationResult` enum — `VALID`, `INVALID`, `NETWORK_ERROR`, `RATE_LIMITED`, `TOKEN_INVALID`
 - `UrlValidationOutput` dataclass — `result: UrlValidationResult`, `final_url: str | None = None`; `final_url` is `str(resp.url)` after redirects, `None` when HEAD did not execute (scheme error, cooldown, connectivity failure, HEAD exception)
 

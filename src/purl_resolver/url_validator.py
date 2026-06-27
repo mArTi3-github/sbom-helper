@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
+import socket
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     from .settings_store import SettingsStore
@@ -17,6 +20,49 @@ _CONNECTIVITY_URL = "https://github.com"
 _CONNECTIVITY_TIMEOUT = 2
 _RATE_LIMIT_THRESHOLD = 5
 _RATE_LIMIT_COOLDOWN = 60
+
+_PRIVATE_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.0.2.0/24"),
+    ipaddress.ip_network("192.88.99.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("198.51.100.0/24"),
+    ipaddress.ip_network("203.0.113.0/24"),
+    ipaddress.ip_network("224.0.0.0/4"),
+    ipaddress.ip_network("240.0.0.0/4"),
+    ipaddress.ip_network("255.255.255.255/32"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+    ipaddress.ip_network("ff00::/8"),
+]
+
+
+async def _is_private_url(url: str) -> bool:
+    """Resolve hostname and check if it points to a private/reserved IP range."""
+    host = urlsplit(url).hostname
+    if not host:
+        return False
+    try:
+        ips = await asyncio.wait_for(
+            asyncio.to_thread(socket.getaddrinfo, host, None),
+            timeout=5.0,
+        )
+    except (socket.gaierror, asyncio.TimeoutError):
+        return False
+    for _, _, _, _, sockaddr in ips:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if any(ip in net for net in _PRIVATE_NETWORKS):
+            logger.warning("URL %s resolves to private IP %s", url, ip)
+            return True
+    return False
 
 
 class UrlValidationResult(Enum):
@@ -73,6 +119,8 @@ def _is_rate_limited(status: int, headers: dict) -> bool:
 
 
 async def _check_connectivity(github_token: str | None = None) -> bool:
+    if await _is_private_url(_CONNECTIVITY_URL):
+        return False
     try:
         import httpx
         headers = {}
@@ -95,12 +143,17 @@ async def ensure_connectivity(github_token: str | None = None) -> bool:
 
 
 async def _head_request(url: str, timeout: int, github_token: str | None = None):
+    if await _is_private_url(url):
+        raise ConnectionError(f"Refusing HEAD request to private URL: {url}")
     import httpx
     headers = {}
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        return await client.head(url, headers=headers)
+        resp = await client.head(url, headers=headers)
+    if await _is_private_url(str(resp.url)):
+        raise ConnectionError(f"HEAD redirect target is private: {resp.url}")
+    return resp
 
 
 async def _git_probe(url: str, timeout: int, github_token: str | None = None) -> bool | None:
@@ -182,26 +235,87 @@ async def _hg_probe(url: str, timeout: int) -> bool | None:
         return None
 
 
-async def _fossil_probe(url: str, timeout: int) -> bool | None:
-    """Probe URL via HTTP GET + fossil footer regex. Returns True/False/None."""
+async def _fossil_probe_xfer(url: str, timeout: int) -> bool | None:
+    """Probe URL via Fossil sync protocol (/xfer endpoint). Returns True/False/None.
+
+    Sends a minimal POST to <url>/xfer with Content-Type set to
+    application/x-fossil-debug. A live Fossil server will respond with
+    a fossil-specific Content-Type, confirming this is a Fossil sync endpoint.
+    """
+    if await _is_private_url(url):
+        logger.warning("Refusing xfer probe to private URL: %s", url)
+        return None
+    import httpx
+    from urllib.parse import urlsplit, urlunsplit
+
+    probe_url = urlunsplit((*urlsplit(url)[:2], urlsplit(url).path.rstrip("/") + "/xfer", "", ""))
+
+    headers = {
+        "Content-Type": "application/x-fossil-debug",
+        "Accept": "application/x-fossil-debug",
+        "User-Agent": "fossil-probe/1.0",
+    }
+    body = b"# fossil-probe\n"
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            async with client.stream("POST", probe_url, headers=headers, content=body) as resp:
+                if await _is_private_url(str(resp.url)):
+                    logger.warning("xfer probe redirected to private URL: %s", resp.url)
+                    return None
+                ctype = (resp.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+                if ctype in {"application/x-fossil", "application/x-fossil-debug"}:
+                    logger.info("xfer probe confirmed %s as fossil repository", url)
+                    return True
+                if resp.status_code in (401, 403):
+                    return None
+                return False
+    except httpx.RequestError:
+        return None
+    except Exception as e:
+        logger.warning("Fossil xfer probe failed for %s: %s", url, e)
+        return None
+
+
+async def _fossil_probe_footer(url: str, timeout: int) -> bool | None:
+    """Probe URL via HTTP GET + fossil footer regex (fallback). Returns True/False/None."""
+    if await _is_private_url(url):
+        logger.warning("Refusing footer probe to private URL: %s", url)
+        return None
     import httpx
     import re
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             resp = await client.get(url)
+        if await _is_private_url(str(resp.url)):
+            logger.warning("footer probe redirected to private URL: %s", resp.url)
+            return None
         if resp.status_code != 200:
             return False
         if re.search(
-            r'footer"?>\s*this page was generated in about\s*(\d+\.\d+)s\s*by\s*fossil',
+            r"this page was generated in about\s+\d+(?:\.\d+)?s\s+by\s+fossil\b",
             resp.text,
             re.I,
         ):
-            logger.info("fossil probe confirmed %s as fossil repository", url)
+            logger.info("footer probe confirmed %s as fossil repository", url)
             return True
         return False
     except Exception as e:
-        logger.warning("Fossil check failed for %s: %s", url, e)
+        logger.warning("Fossil footer check failed for %s: %s", url, e)
         return None
+
+
+async def _fossil_probe(url: str, timeout: int) -> bool | None:
+    """Probe URL via Fossil sync protocol, falling back to HTML footer regex.
+
+    Tries the authoritative /xfer protocol probe first. If it returns None
+    (uncertain — auth required, proxy issue), falls back to the weaker
+    HTML footer regex heuristic.
+    """
+    xfer_result = await _fossil_probe_xfer(url, timeout)
+    if xfer_result is not None:
+        return xfer_result
+    return await _fossil_probe_footer(url, timeout)
 
 
 async def _check_vcs(
