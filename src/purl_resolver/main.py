@@ -67,6 +67,8 @@ async def lifespan(app: FastAPI):
     if spa_dir.is_dir():
         app.mount("/", SPAStaticFiles(directory=str(spa_dir), html=True), name="spa")
         logger.info("Serving SPA from %s", spa_dir)
+    else:
+        logger.warning("No SPA directory found — frontend will not be served")
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
     yield

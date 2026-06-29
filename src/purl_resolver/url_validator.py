@@ -104,7 +104,7 @@ class _RateLimitTracker:
                 logger.warning(
                     "Rate limit threshold reached (%d consecutive), "
                     "entering %ds cooldown",
-                    self._count, _RATE_LIMIT_COOLDOWN,
+                    self._count, cooldown,
                 )
 
     def reset(self) -> None:
@@ -135,7 +135,7 @@ async def _check_connectivity(
         return False
     try:
         headers = {}
-        if github_token:
+        if github_token and "github.com" in probe_url:
             headers["Authorization"] = f"Bearer {github_token}"
         async with httpx.AsyncClient(timeout=probe_timeout) as client:
             resp = await client.head(probe_url, headers=headers)
