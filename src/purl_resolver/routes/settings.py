@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from ..settings_store import SettingsStore
 from ..url_validator import validate_github_token
+from ..config import settings
+from ..resolver.factory import build_resolvers
 
 router = APIRouter()
 
@@ -43,10 +45,6 @@ class SettingsUpdate(BaseModel):
 def _rebuild_resolvers(request: Request) -> None:
     store: SettingsStore = request.app.state.settings_store
     app_settings = store.load()
-
-    from ..config import settings
-    from ..resolver.factory import build_resolvers
-
     request.app.state.resolvers = build_resolvers(settings, app_settings)
 
 
