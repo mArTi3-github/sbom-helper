@@ -195,7 +195,7 @@
               Target URL used to check internet access before URL validation. Set to empty to disable the probe.
             </div>
           </div>
-          <input type="text" v-model="connectivityUrl" @blur="debouncedAutoSave({ connectivity_url: connectivityUrl || undefined })" class="txt-input">
+          <input type="text" v-model="connectivityUrl" @blur="debouncedAutoSave({ connectivity_url: connectivityUrl })" class="txt-input">
         </div>
         <div class="setting-row">
           <div>

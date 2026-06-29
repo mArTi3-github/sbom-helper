@@ -129,6 +129,8 @@ async def _check_connectivity(
     url: str | None = None,
     timeout: int | None = None,
 ) -> bool:
+    if url is not None and url == "":
+        return True
     probe_url = url or _CONNECTIVITY_URL
     probe_timeout = timeout or _CONNECTIVITY_TIMEOUT
     if await _is_private_url(probe_url):
