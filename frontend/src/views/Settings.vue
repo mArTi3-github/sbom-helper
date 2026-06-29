@@ -272,9 +272,9 @@ function showToast(text: string, isError: boolean) {
   toastTimer = setTimeout(() => { toast.value = null; toastTimer = null }, isError ? 5000 : 3000)
 }
 
-function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
+function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | null = null
-  return ((...args: unknown[]) => {
+  return ((...args: Parameters<T>) => {
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => { timer = null; fn(...args) }, ms)
   }) as T
