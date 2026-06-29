@@ -57,21 +57,21 @@ def _reconfigure_logging(request: Request) -> None:
 @router.get("/api/v1/settings")
 async def get_settings(request: Request) -> JSONResponse:
     store: SettingsStore = request.app.state.settings_store
-    settings = store.load()
+    app_settings = store.load()
     return JSONResponse(content={
-        "validate_db_urls": settings.validate_db_urls,
-        "url_validation_timeout": settings.url_validation_timeout,
-        "revalidation_cooldown_hours": settings.revalidation_cooldown_hours,
-        "retry_max_attempts": settings.retry_max_attempts,
-        "retry_base_cooldown_seconds": settings.retry_base_cooldown_seconds,
-        "log_level": settings.log_level,
-        "librariesio_enabled": settings.librariesio_enabled,
-        "ecosystems_enabled": settings.ecosystems_enabled,
-        "ecosystems_max_requests_per_second": settings.ecosystems_max_requests_per_second,
+        "validate_db_urls": app_settings.validate_db_urls,
+        "url_validation_timeout": app_settings.url_validation_timeout,
+        "revalidation_cooldown_hours": app_settings.revalidation_cooldown_hours,
+        "retry_max_attempts": app_settings.retry_max_attempts,
+        "retry_base_cooldown_seconds": app_settings.retry_base_cooldown_seconds,
+        "log_level": app_settings.log_level,
+        "librariesio_enabled": app_settings.librariesio_enabled,
+        "ecosystems_enabled": app_settings.ecosystems_enabled,
+        "ecosystems_max_requests_per_second": app_settings.ecosystems_max_requests_per_second,
         "token_set": {
-            "github_token": settings.github_token is not None,
-            "librariesio_api_key": settings.librariesio_api_key is not None,
-            "ecosystems_api_key": settings.ecosystems_api_key is not None,
+            "github_token": app_settings.github_token is not None,
+            "librariesio_api_key": app_settings.librariesio_api_key is not None,
+            "ecosystems_api_key": app_settings.ecosystems_api_key is not None,
         },
     })
 
