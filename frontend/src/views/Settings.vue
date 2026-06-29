@@ -282,6 +282,7 @@ function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
 
 function autoSave(partial: SettingsUpdate) {
   store.save(partial)
+    .then(() => store.load())
     .then(() => {
       showToast('Settings saved', false)
       if ('github_token' in partial) githubTokenInput.value = ''
@@ -336,7 +337,11 @@ async function clearEcosystemsKey() {
 }
 
 onMounted(async () => {
-  await store.load()
+  try {
+    await store.load()
+  } catch {
+    showToast('Failed to load settings', true)
+  }
   loading.value = false
 })
 

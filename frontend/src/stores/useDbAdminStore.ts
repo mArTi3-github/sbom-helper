@@ -224,11 +224,13 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
   function goToPage(p: number) {
     if (p < 1 || p > totalPages.value) return
     page.value = p
+    fetchData()
   }
 
   function changePageSize(size: number) {
     pageSize.value = size
     page.value = 1
+    fetchData()
   }
 
   function showSuccess(msg: string) {

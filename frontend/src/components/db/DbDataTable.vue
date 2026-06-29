@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { useDbAdminStore } from '../../stores/useDbAdminStore'
 import { safeUrl } from '../../composables/useDownload'
 import type { ResolveResponse } from '../../types/api'
@@ -168,10 +168,6 @@ async function handleExport() {
 function onPageSizeChange() {
   store.changePageSize(localPageSize.value)
 }
-
-watch(() => store.page, () => {
-  store.fetchData()
-})
 
 onMounted(() => {
   localPageSize.value = store.pageSize
