@@ -1,4 +1,4 @@
-import { request, requestBlob } from './client'
+import { apiFetch } from './client'
 import type { PurlListResponse, PurlUpdateRequest, DeleteResponse, ImportResponse } from '../types/api'
 
 export interface PurlListParams {
@@ -29,12 +29,12 @@ function buildPurlQuery(params: PurlListParams): URLSearchParams {
 
 export function listPurls(params: PurlListParams): Promise<PurlListResponse> {
   const query = buildPurlQuery(params)
-  return request<PurlListResponse>(`/api/v1/db/purls?${query.toString()}`)
+  return apiFetch<PurlListResponse>(`/api/v1/db/purls?${query.toString()}`)
 }
 
 export function updatePurl(purl: string, body: PurlUpdateRequest): Promise<{ ok: boolean }> {
   const encoded = encodeURIComponent(purl).replace(/%2F/g, '/')
-  return request<{ ok: boolean }>(`/api/v1/db/purls/${encoded}`, {
+  return apiFetch<{ ok: boolean }>(`/api/v1/db/purls/${encoded}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -42,7 +42,7 @@ export function updatePurl(purl: string, body: PurlUpdateRequest): Promise<{ ok:
 }
 
 export function deletePurls(purls: string[]): Promise<DeleteResponse> {
-  return request<DeleteResponse>('/api/v1/db/purls', {
+  return apiFetch<DeleteResponse>('/api/v1/db/purls', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ purls }),
@@ -53,16 +53,16 @@ export function importCsv(file: File, strategy: 'upsert' | 'skip_existing'): Pro
   const formData = new FormData()
   formData.append('file', file)
   formData.append('strategy', strategy)
-  return request<ImportResponse>('/api/v1/db/import', {
+  return apiFetch<ImportResponse>('/api/v1/db/import', {
     method: 'POST',
     body: formData,
   })
 }
 
 export function exportSelectedCsv(purls: string[]): Promise<Blob> {
-  return requestBlob('/api/v1/db/export', {
+  return apiFetch<Blob>('/api/v1/db/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ purls }),
-  })
+  }, 'blob')
 }
