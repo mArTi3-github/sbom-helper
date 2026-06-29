@@ -246,85 +246,49 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { getSettings, updateSettings } from '../api/settings'
-import type { SettingsTokenSet, SettingsUpdate } from '../types/api'
+import { storeToRefs } from 'pinia'
+import { useSettingsStore } from '../stores/useSettingsStore'
+import type { SettingsUpdate } from '../types/api'
 
-const validateDbUrls = ref(false)
-const urlValidationTimeout = ref(5)
-const revalidationCooldownHours = ref(24)
-const retryMaxAttempts = ref(3)
-const retryBaseCooldownSeconds = ref(5)
-const logLevel = ref('INFO')
-const librariesioEnabled = ref(false)
-const ecosystemsEnabled = ref(false)
-const ecosystemsMaxRequestsPerSecond = ref(2)
-const batchSemaphoreLimit = ref(10)
-const connectivityUrl = ref('https://github.com')
-const connectivityTimeout = ref(2)
-const rateLimitCooldown = ref(60)
-const tokenSet = ref<SettingsTokenSet>({ github_token: false, librariesio_api_key: false, ecosystems_api_key: false })
+const store = useSettingsStore()
+const {
+  validateDbUrls, urlValidationTimeout, revalidationCooldownHours,
+  retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
+  librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
+  batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown,
+  tokenSet, loading,
+} = storeToRefs(store)
+
 const githubTokenInput = ref('')
 const librariesioKeyInput = ref('')
 const ecosystemsKeyInput = ref('')
-const loading = ref(true)
-const toast = ref<{ text: string; isError: boolean } | null>(null)
 
+const toast = ref<{ text: string; isError: boolean } | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 function showToast(text: string, isError: boolean) {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { text, isError }
-  toastTimer = setTimeout(() => {
-    toast.value = null
-    toastTimer = null
-  }, isError ? 5000 : 3000)
+  toastTimer = setTimeout(() => { toast.value = null; toastTimer = null }, isError ? 5000 : 3000)
 }
 
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | null = null
-  return ((...args: Parameters<T>) => {
+  return ((...args: unknown[]) => {
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      fn(...args)
-    }, ms)
+    timer = setTimeout(() => { timer = null; fn(...args) }, ms)
   }) as T
 }
 
-async function loadSettings() {
-  try {
-    const data = await getSettings()
-    validateDbUrls.value = data.validate_db_urls
-    urlValidationTimeout.value = data.url_validation_timeout
-    revalidationCooldownHours.value = data.revalidation_cooldown_hours
-    retryMaxAttempts.value = data.retry_max_attempts
-    retryBaseCooldownSeconds.value = data.retry_base_cooldown_seconds
-    logLevel.value = data.log_level
-    librariesioEnabled.value = data.librariesio_enabled
-    ecosystemsEnabled.value = data.ecosystems_enabled
-    ecosystemsMaxRequestsPerSecond.value = data.ecosystems_max_requests_per_second
-    batchSemaphoreLimit.value = data.batch_semaphore_limit
-    connectivityUrl.value = data.connectivity_url
-    connectivityTimeout.value = data.connectivity_timeout
-    rateLimitCooldown.value = data.rate_limit_cooldown
-    tokenSet.value = data.token_set
-  } catch {
-    showToast('Failed to load settings', true)
-  }
-}
-
-async function autoSave(partial: Partial<SettingsUpdate>) {
-  try {
-    await updateSettings(partial)
-    showToast('Settings saved', false)
-    if ('github_token' in partial) githubTokenInput.value = ''
-    if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
-    if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
-    await loadSettings()
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : 'unknown error'
-    showToast(`Failed to save: ${detail}`, true)
-  }
+function autoSave(partial: SettingsUpdate) {
+  store.save(partial)
+    .then(() => {
+      showToast('Settings saved', false)
+      if ('github_token' in partial) githubTokenInput.value = ''
+      if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
+      if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
+    })
+    .catch((err: Error) => showToast(`Failed to save: ${err.message}`, true))
 }
 
 const debouncedAutoSave = debounce(autoSave, 500)
@@ -332,53 +296,47 @@ const debouncedAutoSave = debounce(autoSave, 500)
 async function onGithubTokenBlur() {
   const value = githubTokenInput.value.trim()
   if (!value) return
-  await autoSave({ github_token: value })
+  await autoSave({ github_token: value } as SettingsUpdate)
 }
 
 async function onLibrariesIoKeyBlur() {
   const value = librariesioKeyInput.value.trim()
   if (!value) return
-  await autoSave({ librariesio_api_key: value })
+  await autoSave({ librariesio_api_key: value } as SettingsUpdate)
 }
 
 async function onEcosystemsKeyBlur() {
   const value = ecosystemsKeyInput.value.trim()
   if (!value) return
-  await autoSave({ ecosystems_api_key: value })
+  await autoSave({ ecosystems_api_key: value } as SettingsUpdate)
 }
 
 async function clearToken() {
   try {
-    await updateSettings({ github_token: null })
+    await store.clearToken('github_token')
     showToast('Token cleared', false)
-    await loadSettings()
-  } catch {
-    showToast('Failed to clear token', true)
-  }
+    await store.load()
+  } catch { showToast('Failed to clear token', true) }
 }
 
 async function clearLibrariesIoKey() {
   try {
-    await updateSettings({ librariesio_api_key: null })
+    await store.clearToken('librariesio_api_key')
     showToast('Libraries.io key cleared', false)
-    await loadSettings()
-  } catch {
-    showToast('Failed to clear key', true)
-  }
+    await store.load()
+  } catch { showToast('Failed to clear key', true) }
 }
 
 async function clearEcosystemsKey() {
   try {
-    await updateSettings({ ecosystems_api_key: null })
+    await store.clearToken('ecosystems_api_key')
     showToast('ecosyste.ms key cleared', false)
-    await loadSettings()
-  } catch {
-    showToast('Failed to clear key', true)
-  }
+    await store.load()
+  } catch { showToast('Failed to clear key', true) }
 }
 
 onMounted(async () => {
-  await loadSettings()
+  await store.load()
   loading.value = false
 })
 

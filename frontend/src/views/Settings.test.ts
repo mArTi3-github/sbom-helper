@@ -1,3 +1,4 @@
+import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import Settings from './Settings.vue'
@@ -39,6 +40,7 @@ function mountSettings(): VueWrapper {
 
 describe('Settings.vue', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     successUpdate.mockResolvedValue(defaultSettings)
     getSettingsMock.mockResolvedValue(defaultSettings)
