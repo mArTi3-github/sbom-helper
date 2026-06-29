@@ -3,17 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ServiceTokens:
-    github_token: str | None = None
 
 
 class AppSettings(BaseModel):
@@ -32,9 +26,6 @@ class AppSettings(BaseModel):
 
     def log_level_as_int(self) -> int:
         return getattr(logging, self.log_level.upper(), logging.INFO)
-
-    def service_tokens(self) -> ServiceTokens:
-        return ServiceTokens(github_token=self.github_token)
 
 
 class SettingsStore:

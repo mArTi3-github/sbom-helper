@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from purl_resolver.settings_store import AppSettings, ServiceTokens, SettingsStore
+from purl_resolver.settings_store import AppSettings, SettingsStore
 
 
 @pytest.fixture
@@ -61,39 +61,6 @@ class TestSettingsStoreSave:
         store = SettingsStore(path=nested)
         store.save(AppSettings())
         assert nested.exists()
-
-
-class TestServiceTokens:
-    def test_default_has_no_github_token(self):
-        t = ServiceTokens()
-        assert t.github_token is None
-
-    def test_with_github_token(self):
-        t = ServiceTokens(github_token="ghp_abc123")
-        assert t.github_token == "ghp_abc123"
-
-
-class TestAppSettingsServiceTokens:
-    def test_service_tokens_extracts_github_token(self):
-        s = AppSettings(github_token="ghp_xyz")
-        tokens = s.service_tokens()
-        assert isinstance(tokens, ServiceTokens)
-        assert tokens.github_token == "ghp_xyz"
-
-    def test_service_tokens_default_is_none(self):
-        s = AppSettings()
-        tokens = s.service_tokens()
-        assert tokens.github_token is None
-
-    def test_github_token_defaults_to_none(self):
-        s = AppSettings()
-        assert s.github_token is None
-
-    def test_github_token_roundtrip(self, store: SettingsStore):
-        original = AppSettings(github_token="ghp_test123")
-        store.save(original)
-        loaded = store.load()
-        assert loaded.github_token == "ghp_test123"
 
 
 class TestLibrariesIoSettings:
