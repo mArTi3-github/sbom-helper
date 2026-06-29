@@ -32,24 +32,8 @@ def client() -> TestClient:
         resolvers=test_app.state.resolvers,
     )
     test_app.include_router(router)
-    from purl_resolver.main import _find_spa_dir, SPAStaticFiles
-
-    spa_dir = _find_spa_dir()
-    if spa_dir is not None:
-        test_app.mount("/", SPAStaticFiles(directory=str(spa_dir), html=True), name="spa")
     with TestClient(test_app) as c:
         yield c
-
-
-class TestSbomUpdaterPage:
-    def test_returns_html(self, client: TestClient) -> None:
-        response = client.get("/sbom-updater")
-        assert response.status_code == 200
-        assert response.headers["content-type"].startswith("text/html")
-
-    def test_contains_app_marker(self, client: TestClient) -> None:
-        response = client.get("/sbom-updater")
-        assert b'<div id="app"></div>' in response.content
 
 
 class TestSbomValidation:

@@ -63,6 +63,11 @@ async def lifespan(app: FastAPI):
         validation_service=app.state.validation_service,
     )
 
+    spa_dir = pathlib.Path("/app/frontend/dist")
+    if spa_dir.is_dir():
+        app.mount("/", SPAStaticFiles(directory=str(spa_dir), html=True), name="spa")
+        logger.info("Serving SPA from %s", spa_dir)
+
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
     yield
     if pool is not None:
@@ -71,22 +76,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="sbom-helper", lifespan=lifespan)
 app.include_router(router)
-
-
-def _find_spa_dir() -> pathlib.Path | None:
-    docker_dir = pathlib.Path("/app/frontend/dist")
-    if docker_dir.is_dir():
-        return docker_dir
-    src_dir = pathlib.Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-    if src_dir.is_dir():
-        return src_dir
-    logger.warning("No SPA directory found in any location — frontend will not be served")
-    return None
-
-
-SPA_DIR = _find_spa_dir()
-if SPA_DIR is not None:
-    app.mount("/", SPAStaticFiles(directory=str(SPA_DIR), html=True), name="spa")
 
 
 def main() -> None:
