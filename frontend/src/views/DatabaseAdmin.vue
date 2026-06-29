@@ -266,56 +266,37 @@ pkg:pypi/flask@2.3.0,https://github.com/pallets/flask,medium,import-csv</pre>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { usePagination } from '../composables/usePagination'
-import { listPurls, updatePurl, deletePurls, importCsv, exportSelectedCsv as apiExportCsv } from '../api/db'
-import type { PurlListParams } from '../api/db'
-import { ApiError } from '../api/client'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useDbAdminStore } from '../stores/useDbAdminStore'
 import { safeUrl } from '../composables/useDownload'
 import type { ResolveResponse } from '../types/api'
 import ModalDialog from '../components/ModalDialog.vue'
 import FileUploadZone from '../components/FileUploadZone.vue'
 
-const { page, pageSize, total, totalPages, goToPage, changePageSize } = usePagination()
+const store = useDbAdminStore()
+const {
+  loading, errorMessage, successMessage,
+  search, resolver, confidence, dateFrom, dateTo,
+  sortBy, sortOrder,
+  page, totalPages, total, pageSize,
+  rows: allRows,
+  selectedPurls: selectedRows,
+  allSelected, someSelected,
+  editingPurl: editingRow,
+  editingValues,
+  showImportModal, importFile, importStrategy, importResults, importLoading, importError,
+} = storeToRefs(store)
 
-const search = ref('')
-const resolver = ref('')
-const confidence = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
+// Destructure store actions (non-reactive)
+const {
+  toggleRow, startEdit, saveEdit, cancelEdit,
+  handleImportFile, handleImportUpload, closeImportModal,
+  goToPage, applyFilters, resetFilters, setSort,
+  fetchData, changePageSize,
+} = store
 
-const sortBy = ref('resolved_at')
-const sortOrder = ref('desc')
-
-const allRows = ref<ResolveResponse[]>([])
-const selectedRows = ref(new Set<string>())
-const editingRow = ref<string | null>(null)
-const editingValues = ref<{ purl?: string; repository_url?: string }>({})
-
-const loading = ref(false)
-const errorMessage = ref<string | null>(null)
-const successMessage = ref<string | null>(null)
-
-const showImportModal = ref(false)
-const importFile = ref<File | null>(null)
-const importStrategy = ref<'upsert' | 'skip_existing'>('upsert')
-const importResults = ref<{ imported: number; skipped: number; errors: { row: number; error: string }[] } | null>(null)
-const importLoading = ref(false)
-const importError = ref<string | null>(null)
-
-const localPageSize = ref(50)
-
-let successTimer: ReturnType<typeof setTimeout> | null = null
-
-function showSuccess(msg: string) {
-  if (successTimer) clearTimeout(successTimer)
-  successMessage.value = msg
-  successTimer = setTimeout(() => { successMessage.value = null }, 3000)
-}
-
-const allSelected = computed(() => allRows.value.length > 0 && selectedRows.value.size === allRows.value.length)
-const someSelected = computed(() => selectedRows.value.size > 0 && selectedRows.value.size < allRows.value.length)
-
+const localPageSize = ref(pageSize.value)
 const visiblePages = computed(() => {
   const pages: (number | string)[] = []
   const tp = totalPages.value
@@ -334,7 +315,7 @@ const visiblePages = computed(() => {
 })
 
 function joinArray(arr: string[] | null | undefined): string {
-  if (!arr || arr.length === 0) return '—'
+  if (!arr || arr.length === 0) return '\u2014'
   return arr.join('; ')
 }
 
@@ -344,128 +325,39 @@ function truncate(val: string, max = 80): string {
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return '—'
+  if (!iso) return '\u2014'
   const d = new Date(iso)
   const pad = (n: number) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-async function fetchData() {
-  loading.value = true
-  errorMessage.value = null
-  try {
-    const params: PurlListParams = {
-      page: page.value,
-      page_size: pageSize.value,
-      search: search.value || undefined,
-      resolver: resolver.value || undefined,
-      confidence: confidence.value || undefined,
-      date_from: dateFrom.value || undefined,
-      date_to: dateTo.value || undefined,
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value,
-    }
-    const data = await listPurls(params)
-    allRows.value = data.rows
-    total.value = data.total
-    selectedRows.value = new Set()
-    editingRow.value = null
-    editingValues.value = {}
-  } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      errorMessage.value = e.message
-    } else if (e instanceof Error) {
-      errorMessage.value = 'Network error: could not reach the server.'
-    } else {
-      errorMessage.value = 'An unexpected error occurred.'
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-function applyFilters() {
-  page.value = 1
-  fetchData()
-}
-
-function resetFilters() {
-  search.value = ''
-  resolver.value = ''
-  confidence.value = ''
-  dateFrom.value = ''
-  dateTo.value = ''
-  sortBy.value = 'resolved_at'
-  sortOrder.value = 'desc'
-  page.value = 1
-  fetchData()
-}
-
-function setSort(column: string) {
-  if (sortBy.value === column) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortBy.value = column
-    sortOrder.value = 'asc'
-  }
-  fetchData()
-}
-
 function toggleSelectAll(event: Event) {
-  const checked = (event.target as HTMLInputElement).checked
-  if (checked) {
-    selectedRows.value = new Set(allRows.value.map(r => r.purl))
-  } else {
-    selectedRows.value = new Set()
-  }
+  store.toggleSelectAll((event.target as HTMLInputElement).checked)
 }
 
-function toggleRow(purl: string) {
-  const newSet = new Set(selectedRows.value)
-  if (newSet.has(purl)) {
-    newSet.delete(purl)
-  } else {
-    newSet.add(purl)
-  }
-  selectedRows.value = newSet
+async function deleteRow(purl: string) {
+  if (!confirm(`Delete record "${purl}"? This cannot be undone.`)) return
+  await store.deleteRow(purl)
 }
 
-function startEdit(row: ResolveResponse) {
-  editingRow.value = row.purl
-  editingValues.value = { purl: row.purl, repository_url: row.repository_url || '' }
+async function deleteSelected() {
+  const count = selectedRows.value.size
+  if (count === 0) return
+  if (!confirm(`Delete ${count} selected record(s)? This cannot be undone.`)) return
+  await store.deleteSelected()
 }
 
-function cancelEdit() {
-  editingRow.value = null
-  editingValues.value = {}
-}
-
-async function saveEdit(row: ResolveResponse) {
-  if (editingRow.value !== row.purl) return
-  const body: { purl?: string | null; repository_url?: string | null } = {}
-  if (editingValues.value.purl !== undefined && editingValues.value.purl !== row.purl) {
-    body.purl = editingValues.value.purl || null
-  }
-  if (editingValues.value.repository_url !== undefined && editingValues.value.repository_url !== (row.repository_url || '')) {
-    body.repository_url = editingValues.value.repository_url || null
-  }
-  if (Object.keys(body).length === 0) {
-    cancelEdit()
-    return
-  }
-  try {
-    await updatePurl(row.purl, body)
-    cancelEdit()
-    showSuccess('Record updated successfully')
-    await fetchData()
-  } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      errorMessage.value = e.message
-    } else {
-      errorMessage.value = 'Failed to update record'
-    }
-    cancelEdit()
-  }
+async function exportCsv() {
+  const blob = await store.exportCsv()
+  if (!blob) return
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'purls_export.csv'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 function handleCellDblclick(row: ResolveResponse, field: 'purl' | 'repository_url', event: MouseEvent) {
@@ -487,91 +379,6 @@ function handleCellKeydown(event: KeyboardEvent, row: ResolveResponse) {
   } else if (event.key === 'Escape') {
     cancelEdit()
   }
-}
-
-async function deleteRow(purl: string) {
-  if (!confirm(`Delete record "${purl}"? This cannot be undone.`)) return
-  try {
-    await deletePurls([purl])
-    showSuccess('Record deleted')
-    await fetchData()
-  } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      errorMessage.value = e.message
-    } else {
-      errorMessage.value = 'Failed to delete record'
-    }
-  }
-}
-
-async function deleteSelected() {
-  const count = selectedRows.value.size
-  if (count === 0) return
-  if (!confirm(`Delete ${count} selected record(s)? This cannot be undone.`)) return
-  try {
-    await deletePurls(Array.from(selectedRows.value))
-    showSuccess(`${count} record(s) deleted`)
-    await fetchData()
-  } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      errorMessage.value = e.message
-    } else {
-      errorMessage.value = 'Failed to delete records'
-    }
-  }
-}
-
-async function exportCsv() {
-  if (selectedRows.value.size === 0) return
-  try {
-    const blob = await apiExportCsv(Array.from(selectedRows.value))
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'purls_export.csv'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    showSuccess('CSV exported successfully')
-  } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      errorMessage.value = e.message
-    } else {
-      errorMessage.value = 'Failed to export CSV'
-    }
-  }
-}
-
-function handleImportFile(file: File) {
-  importFile.value = file
-  importResults.value = null
-}
-
-async function handleImportUpload() {
-  if (!importFile.value) return
-  importLoading.value = true
-  importResults.value = null
-  try {
-    const result = await importCsv(importFile.value, importStrategy.value)
-    importResults.value = result
-    await fetchData()
-  } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      importError.value = e.message
-    } else {
-      importError.value = 'Failed to import CSV'
-    }
-  } finally {
-    importLoading.value = false
-  }
-}
-
-function closeImportModal() {
-  showImportModal.value = false
-  importFile.value = null
-  importResults.value = null
-  importError.value = null
 }
 
 function onPageSizeChange() {

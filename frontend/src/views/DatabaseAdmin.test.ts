@@ -1,3 +1,4 @@
+import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import DatabaseAdmin from './DatabaseAdmin.vue'
@@ -49,6 +50,7 @@ function mountAdmin() {
 
 describe('DatabaseAdmin.vue', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     listPurlsMock.mockResolvedValue(defaultListResponse)
     updatePurlMock.mockResolvedValue({ ok: true })
