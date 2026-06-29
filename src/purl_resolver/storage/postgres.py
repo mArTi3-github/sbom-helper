@@ -83,12 +83,8 @@ class PostgresCache(Storage):
                 result.repository_type,
                 result.repository_kind,
                 result.confidence,
-                result.evidence
-    if isinstance(result.evidence, str)
-    else json.dumps(result.evidence),
-    result.warnings
-    if isinstance(result.warnings, str)
-    else json.dumps(result.warnings),
+                json.dumps(result.evidence),
+                json.dumps(result.warnings),
                 result.version_reference,
                 result.resolver or "purl2repo",
             )
