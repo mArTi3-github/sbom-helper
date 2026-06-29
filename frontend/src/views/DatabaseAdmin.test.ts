@@ -2,6 +2,9 @@ import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import DatabaseAdmin from './DatabaseAdmin.vue'
+import DbFilterPanel from '../components/db/DbFilterPanel.vue'
+import DbDataTable from '../components/db/DbDataTable.vue'
+import DbImportModal from '../components/db/DbImportModal.vue'
 import { ApiError } from '../api/client'
 import type { ResolveResponse, PurlListResponse } from '../types/api'
 
@@ -79,9 +82,10 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
     listPurlsMock.mockClear()
 
-    await wrapper.find('#search').setValue('requests')
-    await wrapper.find('#resolver').setValue('purl2repo')
-    await wrapper.findAll('.filter-actions button').find((b) => b.text() === 'Apply')!.trigger('click')
+    const fp = wrapper.findComponent(DbFilterPanel)
+    await fp.find('#search').setValue('requests')
+    await fp.find('#resolver').setValue('purl2repo')
+    await fp.findAll('.filter-actions button').find((b) => b.text() === 'Apply')!.trigger('click')
     await flushPromises()
 
     expect(listPurlsMock).toHaveBeenCalledTimes(1)
@@ -94,13 +98,14 @@ describe('DatabaseAdmin.vue', () => {
   it('resets all filters on Reset click', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    await wrapper.find('#search').setValue('requests')
-    await wrapper.find('#confidence').setValue('high')
-    await wrapper.findAll('.filter-actions button').find((b) => b.text() === 'Reset')!.trigger('click')
+    const fp = wrapper.findComponent(DbFilterPanel)
+    await fp.find('#search').setValue('requests')
+    await fp.find('#confidence').setValue('high')
+    await fp.findAll('.filter-actions button').find((b) => b.text() === 'Reset')!.trigger('click')
     await flushPromises()
 
-    expect((wrapper.find('#search').element as HTMLInputElement).value).toBe('')
-    expect((wrapper.find('#confidence').element as HTMLSelectElement).value).toBe('')
+    expect((fp.find('#search').element as HTMLInputElement).value).toBe('')
+    expect((fp.find('#confidence').element as HTMLSelectElement).value).toBe('')
     const params = listPurlsMock.mock.calls[listPurlsMock.mock.calls.length - 1][0] as Record<string, unknown>
     expect(params.search).toBeUndefined()
     expect(params.confidence).toBeUndefined()
@@ -113,7 +118,8 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
     listPurlsMock.mockClear()
 
-    const purlHeader = wrapper.findAll('th.col-sortable').find((th) => th.text().includes('PURL'))!
+    const dt = wrapper.findComponent(DbDataTable)
+    const purlHeader = dt.findAll('th.col-sortable').find((th) => th.text().includes('PURL'))!
     await purlHeader.trigger('click')
     await flushPromises()
     let params = listPurlsMock.mock.calls[0][0] as Record<string, unknown>
@@ -131,7 +137,8 @@ describe('DatabaseAdmin.vue', () => {
   it('toggles individual row selection', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    const firstRowCheckbox = wrapper.findAll('tbody tr input[type="checkbox"]')[0]
+    const dt = wrapper.findComponent(DbDataTable)
+    const firstRowCheckbox = dt.findAll('tbody tr input[type="checkbox"]')[0]
     await firstRowCheckbox.trigger('change')
     await flushPromises()
 
@@ -142,7 +149,8 @@ describe('DatabaseAdmin.vue', () => {
   it('selects all rows when header checkbox is clicked', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    const headerCheckbox = wrapper.find('thead input[type="checkbox"]')
+    const dt = wrapper.findComponent(DbDataTable)
+    const headerCheckbox = dt.find('thead input[type="checkbox"]')
     await headerCheckbox.setValue(true)
     await flushPromises()
 
@@ -162,7 +170,8 @@ describe('DatabaseAdmin.vue', () => {
     const wrapper = mountAdmin()
     await flushPromises()
 
-    const firstRow = wrapper.findAll('tbody tr')[0]
+    const dt = wrapper.findComponent(DbDataTable)
+    const firstRow = dt.findAll('tbody tr')[0]
     const purlCell = firstRow.findAll('td')[1]
     await purlCell.trigger('dblclick')
     await flushPromises()
@@ -180,7 +189,8 @@ describe('DatabaseAdmin.vue', () => {
   it('cancels edit mode on Escape key without saving', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    const firstRow = wrapper.findAll('tbody tr')[0]
+    const dt = wrapper.findComponent(DbDataTable)
+    const firstRow = dt.findAll('tbody tr')[0]
     await firstRow.findAll('td')[1].trigger('dblclick')
     await flushPromises()
 
@@ -190,13 +200,14 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
 
     expect(updatePurlMock).not.toHaveBeenCalled()
-    expect(wrapper.find('input.inline-edit').exists()).toBe(false)
+    expect(dt.find('input.inline-edit').exists()).toBe(false)
   })
 
   it('saves inline edit on blur', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    const firstRow = wrapper.findAll('tbody tr')[0]
+    const dt = wrapper.findComponent(DbDataTable)
+    const firstRow = dt.findAll('tbody tr')[0]
     await firstRow.findAll('td')[1].trigger('dblclick')
     await flushPromises()
 
@@ -212,7 +223,8 @@ describe('DatabaseAdmin.vue', () => {
   it('deletes a single row when confirm returns true', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    const delBtn = wrapper.findAll('tbody tr')[0].findAll('button').find((b) => b.text() === 'Del')!
+    const dt = wrapper.findComponent(DbDataTable)
+    const delBtn = dt.findAll('tbody tr')[0].findAll('button').find((b) => b.text() === 'Del')!
     await delBtn.trigger('click')
     await flushPromises()
 
@@ -225,7 +237,8 @@ describe('DatabaseAdmin.vue', () => {
     vi.mocked(window.confirm).mockReturnValueOnce(false)
     const wrapper = mountAdmin()
     await flushPromises()
-    const delBtn = wrapper.findAll('tbody tr')[0].findAll('button').find((b) => b.text() === 'Del')!
+    const dt = wrapper.findComponent(DbDataTable)
+    const delBtn = dt.findAll('tbody tr')[0].findAll('button').find((b) => b.text() === 'Del')!
     await delBtn.trigger('click')
     await flushPromises()
 
@@ -235,7 +248,8 @@ describe('DatabaseAdmin.vue', () => {
   it('bulk deletes selected rows', async () => {
     const wrapper = mountAdmin()
     await flushPromises()
-    const rowCheckboxes = wrapper.findAll('tbody tr input[type="checkbox"]')
+    const dt = wrapper.findComponent(DbDataTable)
+    const rowCheckboxes = dt.findAll('tbody tr input[type="checkbox"]')
     await rowCheckboxes[0].setValue(true)
     await rowCheckboxes[1].setValue(true)
     await flushPromises()
@@ -285,7 +299,8 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
 
     const file = new File(['purl,repository_url\npkg:pypi/x@1,https://github.com/x'], 'import.csv', { type: 'text/csv' })
-    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    const importModal = wrapper.findComponent(DbImportModal)
+    await importModal.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
     await flushPromises()
 
     const uploadBtn = document.querySelector('.modal-body .toolbar button') as HTMLElement
@@ -303,7 +318,8 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
 
     const file = new File(['purl,repository_url\npkg:pypi/x@1,https://github.com/x'], 'import.csv', { type: 'text/csv' })
-    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    const importModal = wrapper.findComponent(DbImportModal)
+    await importModal.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
     await flushPromises()
 
     const skipRadio = document.querySelector('input[type="radio"][value="skip_existing"]') as HTMLInputElement
@@ -327,7 +343,8 @@ describe('DatabaseAdmin.vue', () => {
     await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Import CSV'))!.trigger('click')
     await flushPromises()
     const file = new File(['bad'], 'bad.csv', { type: 'text/csv' })
-    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    const importModal = wrapper.findComponent(DbImportModal)
+    await importModal.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
     await flushPromises()
     const uploadBtn = document.querySelector('.modal-body .toolbar button') as HTMLElement
     uploadBtn.click()
@@ -343,7 +360,8 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
     listPurlsMock.mockClear()
 
-    const nextBtn = wrapper.findAll('.pagination-controls button').find((b) => b.text().includes('Next'))!
+    const dt = wrapper.findComponent(DbDataTable)
+    const nextBtn = dt.findAll('.pagination-controls button').find((b) => b.text().includes('Next'))!
     await nextBtn.trigger('click')
     await flushPromises()
 
@@ -358,11 +376,12 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
 
     // navigate to page 2 first so the page reset on size change actually triggers a fetch
-    await wrapper.findAll('.pagination-controls button').find((b) => b.text().includes('Next'))!.trigger('click')
+    const dt = wrapper.findComponent(DbDataTable)
+    await dt.findAll('.pagination-controls button').find((b) => b.text().includes('Next'))!.trigger('click')
     await flushPromises()
     listPurlsMock.mockClear()
 
-    const pageSizeSelect = wrapper.find('.pagination-size select')
+    const pageSizeSelect = dt.find('.pagination-size select')
     await pageSizeSelect.setValue('100')
     await flushPromises()
 
