@@ -13,6 +13,10 @@ const defaultSettings: SettingsResponse = {
   librariesio_enabled: false,
   ecosystems_enabled: false,
   ecosystems_max_requests_per_second: 2,
+  batch_semaphore_limit: 10,
+  connectivity_url: 'https://github.com',
+  connectivity_timeout: 2,
+  rate_limit_cooldown: 60,
   token_set: { github_token: false, librariesio_api_key: false, ecosystems_api_key: false },
 }
 

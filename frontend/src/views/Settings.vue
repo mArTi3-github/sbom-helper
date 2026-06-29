@@ -178,6 +178,46 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Network & Performance</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Batch concurrency limit</div>
+            <div class="setting-desc">
+              Maximum number of parallel PURL resolution requests in a batch (1–100). Default: 10.
+            </div>
+          </div>
+          <input type="number" v-model.number="batchSemaphoreLimit" min="1" max="100" @change="debouncedAutoSave({ batch_semaphore_limit: batchSemaphoreLimit })" class="num-input">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Connectivity probe URL</div>
+            <div class="setting-desc">
+              Target URL used to check internet access before URL validation. Set to empty to disable the probe.
+            </div>
+          </div>
+          <input type="text" v-model="connectivityUrl" @blur="debouncedAutoSave({ connectivity_url: connectivityUrl || undefined })" class="txt-input">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Connectivity probe timeout (seconds)</div>
+            <div class="setting-desc">
+              Timeout for the connectivity HEAD request (1–30 seconds). Default: 2.
+            </div>
+          </div>
+          <input type="number" v-model.number="connectivityTimeout" min="1" max="30" @change="debouncedAutoSave({ connectivity_timeout: connectivityTimeout })" class="num-input">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Rate-limit cooldown (seconds)</div>
+            <div class="setting-desc">
+              How long to pause URL validation after consecutive rate-limited responses (1–600 seconds). Default: 60.
+            </div>
+          </div>
+          <input type="number" v-model.number="rateLimitCooldown" min="1" max="600" @change="debouncedAutoSave({ rate_limit_cooldown: rateLimitCooldown })" class="num-input">
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Logging</div>
         <div class="setting-row">
           <div>
@@ -218,6 +258,10 @@ const logLevel = ref('INFO')
 const librariesioEnabled = ref(false)
 const ecosystemsEnabled = ref(false)
 const ecosystemsMaxRequestsPerSecond = ref(2)
+const batchSemaphoreLimit = ref(10)
+const connectivityUrl = ref('https://github.com')
+const connectivityTimeout = ref(2)
+const rateLimitCooldown = ref(60)
 const tokenSet = ref<SettingsTokenSet>({ github_token: false, librariesio_api_key: false, ecosystems_api_key: false })
 const githubTokenInput = ref('')
 const librariesioKeyInput = ref('')
@@ -259,6 +303,10 @@ async function loadSettings() {
     librariesioEnabled.value = data.librariesio_enabled
     ecosystemsEnabled.value = data.ecosystems_enabled
     ecosystemsMaxRequestsPerSecond.value = data.ecosystems_max_requests_per_second
+    batchSemaphoreLimit.value = data.batch_semaphore_limit
+    connectivityUrl.value = data.connectivity_url
+    connectivityTimeout.value = data.connectivity_timeout
+    rateLimitCooldown.value = data.rate_limit_cooldown
     tokenSet.value = data.token_set
   } catch {
     showToast('Failed to load settings', true)
@@ -472,6 +520,18 @@ h1 {
 }
 
 .num-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.txt-input {
+  width: 240px;
+  padding: 0.5rem;
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+}
+.txt-input:focus {
   outline: none;
   border-color: var(--color-primary);
 }

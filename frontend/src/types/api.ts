@@ -37,6 +37,10 @@ export interface SettingsResponse {
   librariesio_enabled: boolean
   ecosystems_enabled: boolean
   ecosystems_max_requests_per_second: number
+  batch_semaphore_limit: number
+  connectivity_url: string
+  connectivity_timeout: number
+  rate_limit_cooldown: number
   token_set: SettingsTokenSet
 }
 
@@ -53,6 +57,10 @@ export interface SettingsUpdate {
   retry_max_attempts?: number
   retry_base_cooldown_seconds?: number
   log_level?: string
+  batch_semaphore_limit?: number
+  connectivity_url?: string
+  connectivity_timeout?: number
+  rate_limit_cooldown?: number
 }
 
 export interface ImageItem {

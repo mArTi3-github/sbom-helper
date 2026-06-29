@@ -207,7 +207,8 @@ class PurlResolutionService:
         purls: list[str],
         resolver: str = "",
     ) -> dict[str, ResolveResponse]:
-        semaphore = asyncio.Semaphore(_BATCH_SEMAPHORE_LIMIT)
+        batch_limit = self._settings_store.load().batch_semaphore_limit if self._settings_store else _BATCH_SEMAPHORE_LIMIT
+        semaphore = asyncio.Semaphore(batch_limit)
 
         async def _resolve_one(original: str) -> tuple[str, ResolveResponse | None]:
             async with semaphore:

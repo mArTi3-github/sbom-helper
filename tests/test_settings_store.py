@@ -24,6 +24,22 @@ class TestAppSettingsDefaults:
         assert s.validate_db_urls is False
         assert s.url_validation_timeout == 5
 
+    def test_batch_semaphore_limit_default(self):
+        s = AppSettings()
+        assert s.batch_semaphore_limit == 10
+
+    def test_connectivity_url_default(self):
+        s = AppSettings()
+        assert s.connectivity_url == "https://github.com"
+
+    def test_connectivity_timeout_default(self):
+        s = AppSettings()
+        assert s.connectivity_timeout == 2
+
+    def test_rate_limit_cooldown_default(self):
+        s = AppSettings()
+        assert s.rate_limit_cooldown == 60
+
 
 class TestSettingsStoreLoad:
     def test_file_missing_creates_with_defaults(self, store: SettingsStore, tmp_settings_file: Path):

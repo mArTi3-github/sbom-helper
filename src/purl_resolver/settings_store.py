@@ -23,6 +23,10 @@ class AppSettings(BaseModel):
     retry_max_attempts: int = Field(default=3, ge=1, le=10)
     retry_base_cooldown_seconds: float = Field(default=5.0, ge=0.5, le=120.0)
     log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+    batch_semaphore_limit: int = Field(default=10, ge=1, le=100)
+    connectivity_url: str = Field(default="https://github.com")
+    connectivity_timeout: int = Field(default=2, ge=1, le=30)
+    rate_limit_cooldown: int = Field(default=60, ge=1, le=600)
 
     def log_level_as_int(self) -> int:
         return getattr(logging, self.log_level.upper(), logging.INFO)

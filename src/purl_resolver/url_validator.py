@@ -95,11 +95,12 @@ class _RateLimitTracker:
                 self._cooldown_until = 0.0
             return self._cooldown_until > 0 and time.time() < self._cooldown_until
 
-    async def record_rate_limit(self) -> None:
+    async def record_rate_limit(self, cooldown: int | None = None) -> None:
+        cooldown = cooldown or _RATE_LIMIT_COOLDOWN
         async with self._lock:
             self._count += 1
             if self._count >= _RATE_LIMIT_THRESHOLD:
-                self._cooldown_until = time.time() + _RATE_LIMIT_COOLDOWN
+                self._cooldown_until = time.time() + cooldown
                 logger.warning(
                     "Rate limit threshold reached (%d consecutive), "
                     "entering %ds cooldown",
@@ -123,18 +124,24 @@ def _is_rate_limited(status: int, headers: dict) -> bool:
     return False
 
 
-async def _check_connectivity(github_token: str | None = None) -> bool:
-    if await _is_private_url(_CONNECTIVITY_URL):
+async def _check_connectivity(
+    github_token: str | None = None,
+    url: str | None = None,
+    timeout: int | None = None,
+) -> bool:
+    probe_url = url or _CONNECTIVITY_URL
+    probe_timeout = timeout or _CONNECTIVITY_TIMEOUT
+    if await _is_private_url(probe_url):
         return False
     try:
         headers = {}
         if github_token:
             headers["Authorization"] = f"Bearer {github_token}"
-        async with httpx.AsyncClient(timeout=_CONNECTIVITY_TIMEOUT) as client:
-            resp = await client.head(_CONNECTIVITY_URL, headers=headers)
+        async with httpx.AsyncClient(timeout=probe_timeout) as client:
+            resp = await client.head(probe_url, headers=headers)
             return resp.status_code < 500
     except httpx.RequestError:
-        logger.warning("Connectivity probe to %s failed", _CONNECTIVITY_URL)
+        logger.warning("Connectivity probe to %s failed", probe_url)
         return False
 
 
@@ -368,6 +375,9 @@ async def validate_url(
     timeout: int,
     github_token: str | None = None,
     skip_connectivity_check: bool = False,
+    connectivity_url: str | None = None,
+    connectivity_timeout: int | None = None,
+    rate_limit_cooldown: int | None = None,
 ) -> UrlValidationOutput:
     if not url.startswith(("http://", "https://")):
         return UrlValidationOutput(UrlValidationResult.INVALID)
@@ -377,7 +387,7 @@ async def validate_url(
 
     if not skip_connectivity_check:
         try:
-            github_ok = await _check_connectivity(github_token=github_token)
+            github_ok = await _check_connectivity(github_token=github_token, url=connectivity_url, timeout=connectivity_timeout)
         except (httpx.RequestError, ConnectionError, OSError):
             return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
@@ -396,7 +406,7 @@ async def validate_url(
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
     if _is_rate_limited(status, headers):
-        await _rate_limit_tracker.record_rate_limit()
+        await _rate_limit_tracker.record_rate_limit(cooldown=rate_limit_cooldown)
         return UrlValidationOutput(UrlValidationResult.RATE_LIMITED, final_url=final_url)
 
     _rate_limit_tracker.reset()
@@ -430,11 +440,17 @@ async def validate_url_with_retry(
     github_token: str | None = None,
     settings_store: SettingsStore | None = None,
     skip_connectivity_check: bool = False,
+    connectivity_url: str | None = None,
+    connectivity_timeout: int | None = None,
+    rate_limit_cooldown: int | None = None,
 ) -> UrlValidationOutput:
     voutput = await validate_url(
         url, timeout,
         github_token=github_token,
         skip_connectivity_check=skip_connectivity_check,
+        connectivity_url=connectivity_url,
+        connectivity_timeout=connectivity_timeout,
+        rate_limit_cooldown=rate_limit_cooldown,
     )
 
     if voutput.result == UrlValidationResult.TOKEN_INVALID and settings_store is not None:
@@ -448,6 +464,9 @@ async def validate_url_with_retry(
             url, timeout,
             github_token=None,
             skip_connectivity_check=skip_connectivity_check,
+            connectivity_url=connectivity_url,
+            connectivity_timeout=connectivity_timeout,
+            rate_limit_cooldown=rate_limit_cooldown,
         )
 
     return voutput

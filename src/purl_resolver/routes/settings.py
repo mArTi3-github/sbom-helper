@@ -40,6 +40,10 @@ class SettingsUpdate(BaseModel):
     retry_max_attempts: int | None = Field(None, ge=1, le=10)
     retry_base_cooldown_seconds: float | None = Field(None, ge=0.5, le=120.0)
     log_level: str | None = Field(None, pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+    batch_semaphore_limit: int | None = Field(None, ge=1, le=100)
+    connectivity_url: str | None = None
+    connectivity_timeout: int | None = Field(None, ge=1, le=30)
+    rate_limit_cooldown: int | None = Field(None, ge=1, le=600)
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -68,6 +72,10 @@ async def get_settings(request: Request) -> JSONResponse:
         "librariesio_enabled": app_settings.librariesio_enabled,
         "ecosystems_enabled": app_settings.ecosystems_enabled,
         "ecosystems_max_requests_per_second": app_settings.ecosystems_max_requests_per_second,
+        "batch_semaphore_limit": app_settings.batch_semaphore_limit,
+        "connectivity_url": app_settings.connectivity_url,
+        "connectivity_timeout": app_settings.connectivity_timeout,
+        "rate_limit_cooldown": app_settings.rate_limit_cooldown,
         "token_set": {
             "github_token": app_settings.github_token is not None,
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
@@ -128,6 +136,10 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "librariesio_enabled": updated.librariesio_enabled,
         "ecosystems_enabled": updated.ecosystems_enabled,
         "ecosystems_max_requests_per_second": updated.ecosystems_max_requests_per_second,
+        "batch_semaphore_limit": updated.batch_semaphore_limit,
+        "connectivity_url": updated.connectivity_url,
+        "connectivity_timeout": updated.connectivity_timeout,
+        "rate_limit_cooldown": updated.rate_limit_cooldown,
         "token_set": {
             "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,
