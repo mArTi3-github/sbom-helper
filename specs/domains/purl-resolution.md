@@ -23,7 +23,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
 - `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
-- `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url_with_retry()` with SettingsStore injection; consumed by `PurlResolutionService` and `SbomEnrichmentPipeline`
+- `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url_with_retry()` with SettingsStore injection; consumed by `PurlResolutionService` and accessed by `SbomEnrichmentPipeline` through `PurlResolutionService.validation_service` property
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
 
@@ -177,7 +177,7 @@ Client                    API Layer (router)         Service Layer             p
 - `UrlValidationService` wraps `validate_url_with_retry()` with SettingsStore injection
 - `UrlValidationService.__init__(settings_store: SettingsStore)` — receives `SettingsStore` for token/cooldown/retry config
 - `UrlValidationService.validate_url(url, timeout, github_token=None, skip_connectivity_check=False) → UrlValidationOutput` — delegates to `validate_url_with_retry()` with the injected `settings_store`
-- Consumed by `PurlResolutionService` and `SbomEnrichmentPipeline` as an optional dependency; when not provided, callers fall back to direct `validate_url_with_retry()` calls
+- Consumed by `PurlResolutionService` as an optional dependency; when not provided, callers fall back to direct `validate_url_with_retry()` calls. `SbomEnrichmentPipeline` accesses `validation_service` through `PurlResolutionService.validation_service` property.
 - Decouples URL validation setup from resolution orchestration; single point for validation configuration changes
 
 ## Invariants
@@ -224,7 +224,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Docker provides VCS tools**: `git`, `subversion`, `mercurial` are installed in both `dev` and `prod` stages of the Dockerfile; fossil uses HTTP (httpx) and requires no binary
 - **VCS subprocess timeouts are non-fatal**: `asyncio.TimeoutError` from any subprocess call is treated as `None` (uncertain) and logged as a warning; never raised to the caller
 - **GitHub token only affects git probe**: `_check_vcs()` rewrites `github.com` URLs to `oauth2:token@` form for the git probe only; svn/hg/fossil probes run without token rewriting
-- **UrlValidationService is optional**: `PurlResolutionService` and `SbomEnrichmentPipeline` accept an optional `validation_service: UrlValidationService | None` parameter; when `None`, callers fall back to direct `validate_url_with_retry()` calls with `settings_store` from their own constructor
+- **UrlValidationService is optional**: `PurlResolutionService` accepts an optional `validation_service: UrlValidationService | None` parameter; when `None`, callers fall back to direct `validate_url_with_retry()` calls with `settings_store` from their own constructor. `SbomEnrichmentPipeline` accesses `validation_service` through `PurlResolutionService.validation_service` property
 
 ## Configuration
 
