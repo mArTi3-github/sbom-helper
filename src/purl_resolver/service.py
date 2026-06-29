@@ -33,6 +33,14 @@ class PurlResolutionService:
         self._settings_store = settings_store
         self._validation_service = validation_service
 
+    @property
+    def settings_store(self) -> SettingsStore | None:
+        return self._settings_store
+
+    @property
+    def validation_service(self) -> UrlValidationService | None:
+        return self._validation_service
+
     def _is_within_cooldown(self, cached: ResolveResponse) -> bool:
         if self._settings_store is None:
             return True

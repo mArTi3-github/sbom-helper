@@ -78,9 +78,6 @@ async def resolve_sbom_endpoint(
         )
 
     pipeline = SbomEnrichmentPipeline(
-        storage=request.app.state.storage,
-        resolvers=request.app.state.resolvers,
-        settings_store=getattr(request.app.state, "settings_store", None),
         resolution_service=request.app.state.resolution_service,
     )
 

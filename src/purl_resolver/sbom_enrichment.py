@@ -4,7 +4,6 @@ import logging
 from dataclasses import dataclass
 
 from .purl_utils import normalize, validate
-from .resolver.interface import Resolver
 from .sbom import SOURCE_REF_TYPES
 from .sbom.collector import SbomComponent, collect_components
 from .sbom.enricher import enrich_sbom
@@ -12,10 +11,7 @@ from .sbom.parser import CycloneDXParser
 from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import PurlResolutionService
-from .settings_store import SettingsStore
-from .storage.interface import Storage
 from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
-from .validation_service import UrlValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -52,17 +48,9 @@ class SbomEnrichmentPipeline:
 
     def __init__(
         self,
-        storage: Storage,
-        resolvers: list[Resolver],
         resolution_service: PurlResolutionService,
-        settings_store: SettingsStore | None = None,
-        validation_service: UrlValidationService | None = None,
     ) -> None:
-        self._storage = storage
-        self._resolvers = resolvers
-        self._settings_store = settings_store
         self._resolution_service = resolution_service
-        self._validation_service = validation_service
 
     async def process(
         self,
@@ -77,7 +65,7 @@ class SbomEnrichmentPipeline:
         components = collect_components(sbom_data)
 
         if validate_existing_refs:
-            app_settings = self._settings_store.load() if self._settings_store else None
+            app_settings = self._resolution_service.settings_store.load() if self._resolution_service.settings_store else None
             val_timeout = app_settings.url_validation_timeout if app_settings else 5
             val_token = app_settings.github_token if app_settings else None
             for comp in components:
@@ -85,8 +73,8 @@ class SbomEnrichmentPipeline:
                     continue
                 for ref in comp.existing_references:
                     if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
-                        if self._validation_service is not None:
-                            voutput = await self._validation_service.validate_url(
+                        if self._resolution_service.validation_service is not None:
+                            voutput = await self._resolution_service.validation_service.validate_url(
                                 ref["url"],
                                 timeout=val_timeout,
                                 github_token=val_token,
@@ -97,7 +85,7 @@ class SbomEnrichmentPipeline:
                                 ref["url"],
                                 timeout=val_timeout,
                                 github_token=val_token,
-                                settings_store=self._settings_store,
+                                settings_store=self._resolution_service.settings_store,
                                 skip_connectivity_check=True,
                             )
                         if voutput.result == UrlValidationResult.INVALID:

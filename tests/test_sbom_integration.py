@@ -269,9 +269,6 @@ class TestValidateExistingRefs:
         }
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch(
@@ -311,9 +308,6 @@ class TestValidateExistingRefs:
         original_refs = list(sbom["components"][0].get("externalReferences", []))
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch(
@@ -349,9 +343,6 @@ class TestValidateExistingRefs:
         }
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
@@ -382,9 +373,6 @@ class TestValidateExistingRefs:
         original_refs = list(sbom["components"][0].get("externalReferences", []))
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch(
@@ -419,9 +407,6 @@ class TestValidateExistingRefs:
         }
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch(
@@ -457,9 +442,6 @@ class TestValidateExistingRefs:
         }
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
             resolution_service=PurlResolutionService(storage, fake_resolvers),
         )
         with patch(
@@ -498,11 +480,9 @@ class TestValidateExistingRefs:
             return_value=_url_output(UrlValidationResult.VALID),
         )
         pipeline = SbomEnrichmentPipeline(
-            storage=storage,
-            resolvers=fake_resolvers,
-            settings_store=None,
-            validation_service=mock_validation,
-            resolution_service=PurlResolutionService(storage, fake_resolvers),
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers, validation_service=mock_validation,
+            ),
         )
         await pipeline.process(sbom, validate_existing_refs=True)
         mock_validation.validate_url.assert_called_once_with(
@@ -581,9 +561,6 @@ class TestFileUrlInvalidation:
             ],
         }
         pipeline = SbomEnrichmentPipeline(
-            storage=storage_with_file_url,
-            resolvers=fake_empty_resolvers,
-            settings_store=settings_store_with_validation,
             resolution_service=PurlResolutionService(
                 storage_with_file_url,
                 fake_empty_resolvers,
