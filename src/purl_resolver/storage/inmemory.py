@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from ..schemas import ResolveResponse
 from .interface import PurlFilters, PurlRow, Storage, UpsertRow
 
@@ -52,6 +54,18 @@ class InMemoryCache(Storage):
             return False
         if filters.confidence and filters.confidence != r.confidence:
             return False
+        if filters.date_from and r.resolved_at:
+            try:
+                if date.fromisoformat(r.resolved_at[:10]) < filters.date_from:
+                    return False
+            except (ValueError, TypeError):
+                pass
+        if filters.date_to and r.resolved_at:
+            try:
+                if date.fromisoformat(r.resolved_at[:10]) >= filters.date_to:
+                    return False
+            except (ValueError, TypeError):
+                pass
         return True
 
     async def count_purls(self, filters: PurlFilters) -> int:
