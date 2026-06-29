@@ -143,3 +143,26 @@ class TestEcosystemsSettings:
 
         loaded = store.load()
         assert loaded.ecosystems_max_requests_per_second == 5.0
+
+
+class TestSettingsStoreCache:
+
+    def test_load_returns_cached_value_after_first_read(self, store: SettingsStore, tmp_settings_file: Path):
+        import json
+        tmp_settings_file.write_text(json.dumps({"validate_db_urls": True}))
+        first = store.load()
+        assert first.validate_db_urls is True
+
+        tmp_settings_file.write_text(json.dumps({"validate_db_urls": False}))
+        second = store.load()
+        assert second.validate_db_urls is True, "Should return cached value, not re-read file"
+
+    def test_save_invalidates_cache(self, store: SettingsStore, tmp_settings_file: Path):
+        import json
+        tmp_settings_file.write_text(json.dumps({"validate_db_urls": True}))
+        first = store.load()
+        assert first.validate_db_urls is True
+
+        store.save(AppSettings(validate_db_urls=False))
+        second = store.load()
+        assert second.validate_db_urls is False, "Should re-read file after save"
