@@ -7,7 +7,7 @@
       <div class="csv-ref-content">
         <p>The CSV file must have a header row. Comma (<code>,</code>) delimiter. UTF-8 encoding (BOM handled automatically).</p>
         <p>Required columns:</p>
-        <ul><li><code>purl</code> — Package URL</li><li><code>repository_url</code> — Repository URL</li></ul>
+        <ul><li><code>purl</code> — Package URL in format "scheme:type/namespace/name" (the part before "@"). The field "namespace" is optional</li><li><code>repository_url</code> — Repository URL</li></ul>
         <p>Optional columns:</p>
         <ul>
           <li><code>repository_type</code> — e.g. <code>github</code>, <code>gitlab</code></li>
