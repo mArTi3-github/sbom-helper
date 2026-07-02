@@ -5,6 +5,8 @@ import logging
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from ..settings_store import SettingsStore
@@ -44,7 +46,7 @@ class SettingsUpdate(BaseModel):
     connectivity_url: str | None = None
     connectivity_timeout: int | None = Field(None, ge=1, le=30)
     rate_limit_cooldown: int | None = Field(None, ge=1, le=600)
-    json_indent: int | None = Field(None, ge=1, le=4)
+    json_indent: Literal[1, 2, 4] | None = Field(None)
 
 
 def _rebuild_resolvers(request: Request) -> None:

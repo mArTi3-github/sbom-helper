@@ -5,6 +5,8 @@ import logging
 import os
 from pathlib import Path
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -27,7 +29,7 @@ class AppSettings(BaseModel):
     connectivity_url: str = Field(default="https://github.com")
     connectivity_timeout: int = Field(default=2, ge=1, le=30)
     rate_limit_cooldown: int = Field(default=60, ge=1, le=600)
-    json_indent: int = Field(default=4, ge=1, le=4)
+    json_indent: Literal[1, 2, 4] = Field(default=4)
 
     def log_level_as_int(self) -> int:
         return getattr(logging, self.log_level.upper(), logging.INFO)
