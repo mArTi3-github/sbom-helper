@@ -137,7 +137,8 @@ async def _check_connectivity(
         return False
     try:
         headers = {}
-        if github_token and "github.com" in probe_url:
+        hostname = urlsplit(probe_url).hostname
+        if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")):
             headers["Authorization"] = f"Bearer {github_token}"
         async with httpx.AsyncClient(timeout=probe_timeout) as client:
             resp = await client.head(probe_url, headers=headers)
@@ -159,7 +160,8 @@ async def _head_request(url: str, timeout: int, github_token: str | None = None)
     if await _is_private_url(url):
         raise ConnectionError(f"Refusing HEAD request to private URL: {url}")
     headers = {}
-    if github_token:
+    hostname = urlsplit(url).hostname
+    if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")):
         headers["Authorization"] = f"Bearer {github_token}"
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         resp = await client.head(url, headers=headers)
@@ -172,7 +174,8 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
     """Probe URL via git ls-remote. Returns True/False/None."""
     try:
         git_url = url
-        if github_token and "github.com" in url and url.startswith("https://"):
+        hostname = urlsplit(url).hostname
+        if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")) and url.startswith("https://"):
             git_url = f"https://oauth2:{github_token}@{url[len('https://'):]}"
         proc = await asyncio.create_subprocess_exec(
             "git", "ls-remote", "--exit-code", git_url,
