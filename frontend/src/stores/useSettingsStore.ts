@@ -17,6 +17,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const connectivityUrl = ref('https://github.com')
   const connectivityTimeout = ref(2)
   const rateLimitCooldown = ref(60)
+  const jsonIndent = ref(4)
   const tokenSet = ref({ github_token: false, librariesio_api_key: false, ecosystems_api_key: false })
   const githubToken = ref('')
   const librariesioKey = ref('')
@@ -43,6 +44,7 @@ export const useSettingsStore = defineStore('settings', () => {
       connectivityUrl.value = data.connectivity_url
       connectivityTimeout.value = data.connectivity_timeout
       rateLimitCooldown.value = data.rate_limit_cooldown
+      jsonIndent.value = data.json_indent
       tokenSet.value = data.token_set
     } catch {
       throw new Error('Failed to load settings')
@@ -65,7 +67,7 @@ export const useSettingsStore = defineStore('settings', () => {
     validateDbUrls, urlValidationTimeout, revalidationCooldownHours,
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
-    batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown,
+    batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown, jsonIndent,
     tokenSet, githubToken, librariesioKey, ecosystemsKey, loading,
     hasAnyToken, load, save, clearToken,
   }

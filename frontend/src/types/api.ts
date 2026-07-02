@@ -41,6 +41,7 @@ export interface SettingsResponse {
   connectivity_url: string
   connectivity_timeout: number
   rate_limit_cooldown: number
+  json_indent: number
   token_set: SettingsTokenSet
 }
 
@@ -61,6 +62,7 @@ export interface SettingsUpdate {
   connectivity_url?: string
   connectivity_timeout?: number
   rate_limit_cooldown?: number
+  json_indent?: number
 }
 
 export interface ImageItem {
