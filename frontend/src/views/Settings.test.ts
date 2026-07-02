@@ -18,6 +18,7 @@ const defaultSettings: SettingsResponse = {
   connectivity_url: 'https://github.com',
   connectivity_timeout: 2,
   rate_limit_cooldown: 60,
+  json_indent: 4,
   token_set: { github_token: false, librariesio_api_key: false, ecosystems_api_key: false },
 }
 
