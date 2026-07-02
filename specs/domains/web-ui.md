@@ -9,7 +9,7 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/views/PurlResolver.vue` — PURL resolver page: input, resolve button, result card with confidence/evidence
 - `frontend/src/views/SbomUpdater.vue` — SBOM-updater page: file upload, options, ignore patterns editor, results summary and table
 - `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete
-- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, GitHub token, ecosyste.ms, Libraries.io cards
+- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, GitHub token, ecosyste.ms, Libraries.io cards
 - `frontend/src/views/ImagesListConverter.vue` — Images List Converter page: file upload, conversion status card, images table, download
 - `frontend/src/views/NotFound.vue` — 404 catch-all page
 - `frontend/src/router/index.ts` — Vue Router configuration (5 routes + catch-all)
@@ -135,7 +135,7 @@ User                   Browser (Vue SPA)             API Layer
 - Loading spinner is shown during server-side processing
 - Results table displays: PURL (normalized), status (Found/Not found/Removed/Ignored), repository URL (clickable), found_by, resolver
 - Summary cards show: total PURLs, found, not found, skipped, removed, ignored
-- "Скачать обогащённый SBOM" button triggers JSON file download (via `useDownload` composable)
+- "Скачать обогащённый SBOM" button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled)
 - All states (empty, loading, success, partial, error, network failure) have distinct visual representations
 
 ### DB-Admin Page
@@ -163,6 +163,7 @@ User                   Browser (Vue SPA)             API Layer
 - Settings are loaded from `GET /api/v1/settings` on page mount
 - Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
 - Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error)
+- JSON Format card: select controls `json_indent` (1 space, 2 spaces, 4 spaces; default 4); description explains the setting affects downloaded SBOM and Images List files
 - Component is covered by `frontend/src/views/Settings.test.ts` (Vitest) with tests for auto-save, debounce, blur logic, success/error toast, and clear-token behaviour
 
 ### Images List Converter Page
@@ -175,7 +176,7 @@ User                   Browser (Vue SPA)             API Layer
 - Results table displays columns: Имя образа, Версия, Заполнены компоненты, Заполнено поле name, Заполнено поле Properties
 - Completeness flags use ✅ (green) when condition is met, ❌ (red) when not; empty cells only when condition is met and flag is positive
 - Version cell shows ❌ inline when version is missing
-- "Скачать список образов" button triggers JSON file download (via `useDownload` composable)
+- "Скачать список образов" button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled)
 - All states (empty, loading, success, error, network failure) have distinct visual representations
 
 ### Global

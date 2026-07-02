@@ -259,6 +259,7 @@ Client                    API Layer (router)         Service Layer             p
 | `retry_max_attempts` | `3` | Maximum HTTP request attempts per resolver (1–10). Applied to ecosyste.ms and libraries.io on timeout, 429, and 5xx errors. |
 | `retry_base_cooldown_seconds` | `5.0` | Base wait time between retries; actual wait = cooldown × (attempt − 1). Range: 0.5–120. |
 | `log_level` | `"INFO"` | Application log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `json_indent` | `4` | Number of spaces for JSON indentation in downloaded files (1, 2, or 4) |
 
 ## Database Schema
 

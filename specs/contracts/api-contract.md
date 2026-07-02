@@ -301,7 +301,8 @@ Return current application settings.
     "github_token": false,
     "librariesio_api_key": false,
     "ecosystems_api_key": false
-  }
+  },
+  "json_indent": 4
 }
 ```
 
@@ -317,6 +318,7 @@ Return current application settings.
 - `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
+- `json_indent`: integer — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`; default: `4`)
 
 ---
 
@@ -355,6 +357,7 @@ Both fields optional. Only provided fields are updated.
 - `retry_max_attempts`: optional int — maximum HTTP retry attempts for fallback resolvers (1–10).
 - `retry_base_cooldown_seconds`: optional float — base wait between retries in seconds (0.5–120).
 - `log_level`: optional string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+- `json_indent`: optional int — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`).
 
 #### Response (200)
 
