@@ -44,6 +44,7 @@ class SettingsUpdate(BaseModel):
     connectivity_url: str | None = None
     connectivity_timeout: int | None = Field(None, ge=1, le=30)
     rate_limit_cooldown: int | None = Field(None, ge=1, le=600)
+    json_indent: int | None = Field(None, ge=1, le=4)
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -76,6 +77,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "connectivity_url": app_settings.connectivity_url,
         "connectivity_timeout": app_settings.connectivity_timeout,
         "rate_limit_cooldown": app_settings.rate_limit_cooldown,
+        "json_indent": app_settings.json_indent,
         "token_set": {
             "github_token": app_settings.github_token is not None,
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
@@ -140,6 +142,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "connectivity_url": updated.connectivity_url,
         "connectivity_timeout": updated.connectivity_timeout,
         "rate_limit_cooldown": updated.rate_limit_cooldown,
+        "json_indent": updated.json_indent,
         "token_set": {
             "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,
