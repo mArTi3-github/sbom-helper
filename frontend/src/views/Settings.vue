@@ -237,6 +237,23 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title">JSON Format</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">JSON indent size</div>
+            <div class="setting-desc">
+              Number of spaces used when indenting JSON in downloaded files (SBOM, Images List).
+            </div>
+          </div>
+          <select v-model.number="jsonIndent" @change="debouncedAutoSave({ json_indent: jsonIndent })" class="select-input">
+            <option :value="1">1 space</option>
+            <option :value="2">2 spaces</option>
+            <option :value="4">4 spaces</option>
+          </select>
+        </div>
+      </div>
+
       <div v-if="toast" :class="['toast', toast.isError ? 'toast-err' : 'toast-ok']">
         {{ toast.text }}
       </div>
@@ -256,7 +273,7 @@ const {
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown,
-  tokenSet, loading,
+  tokenSet, loading, jsonIndent,
 } = storeToRefs(store)
 
 const githubTokenInput = ref('')
