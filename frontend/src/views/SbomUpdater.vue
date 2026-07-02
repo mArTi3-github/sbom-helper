@@ -128,6 +128,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import { getIgnorePatterns, saveIgnorePatterns, resolveSbom } from '../api/sbom'
 import { ApiError } from '../api/client'
+import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson, safeUrl } from '../composables/useDownload'
 import type { IgnorePatternItem, SbomResponse } from '../types/api'
 
@@ -225,7 +226,8 @@ async function handleProcess() {
 
 function downloadResult() {
   if (!enrichedSbom.value || !selectedFile.value) return
-  downloadJson(enrichedSbom.value, selectedFile.value.name.replace(/\.json$/, '') + '_enriched.json')
+  const store = useSettingsStore()
+  downloadJson(enrichedSbom.value, selectedFile.value.name.replace(/\.json$/, '') + '_enriched.json', store.jsonIndent)
 }
 
 function statusLabel(status: string): string {

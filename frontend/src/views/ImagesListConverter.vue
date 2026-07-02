@@ -77,6 +77,7 @@ import { ref } from 'vue'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import { convertImagesList } from '../api/images'
 import { ApiError } from '../api/client'
+import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
 import type { ImagesListResponse } from '../types/api'
 
@@ -120,7 +121,8 @@ async function handleConvert() {
 
 function downloadResult() {
   if (!imagesListData.value || !selectedFile.value) return
-  downloadJson(imagesListData.value, selectedFile.value.name.replace(/\.json$/, '') + '_images_list.json')
+  const store = useSettingsStore()
+  downloadJson(imagesListData.value, selectedFile.value.name.replace(/\.json$/, '') + '_images_list.json', store.jsonIndent)
 }
 </script>
 
