@@ -52,10 +52,10 @@
           <div>
             <div class="setting-label">Re-validation cooldown (hours)</div>
             <div class="setting-desc">
-              When set to 24 (default), URLs cached by trusted resolvers
-              (purl2repo, ecosyste.ms, libraries.io) are re-validated at most once per day.
-              Entries from imports or manual edits are always re-validated regardless of cooldown.
-              Set to 0 to disable cooldown and always validate.
+              This setting controls how long a successfully validated URL remains
+              in the validation cache before being re-checked. All validated URLs
+              are treated equally regardless of origin (resolver, import, or database).
+              Set to 0 to disable the cache and always re-validate.
             </div>
           </div>
           <input type="number" v-model.number="revalidationCooldownHours" min="0" max="720" @change="debouncedAutoSave({ revalidation_cooldown_hours: revalidationCooldownHours })" class="num-input">

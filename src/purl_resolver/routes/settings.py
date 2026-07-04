@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from ..settings_store import SettingsStore
 from ..url_validator import validate_github_token
+from ..validation_service import UrlValidationService
 from ..config import settings
 from ..resolver.factory import build_resolvers
 
@@ -134,6 +135,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
 
     return JSONResponse(content={
         "validate_db_urls": updated.validate_db_urls,
+        "validate_sbom_refs": updated.validate_sbom_refs,
         "url_validation_timeout": updated.url_validation_timeout,
         "revalidation_cooldown_hours": updated.revalidation_cooldown_hours,
         "retry_max_attempts": updated.retry_max_attempts,
@@ -153,3 +155,10 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
             "ecosystems_api_key": updated.ecosystems_api_key is not None,
         },
     })
+
+
+@router.post("/api/v1/settings/clear-validation-cache")
+async def clear_validation_cache(request: Request) -> JSONResponse:
+    vs: UrlValidationService = request.app.state.validation_service
+    vs.clear_cache()
+    return JSONResponse(status_code=200, content={"status": "ok"})

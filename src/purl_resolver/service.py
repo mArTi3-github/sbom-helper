@@ -61,10 +61,10 @@ class PurlResolutionService:
             if new_url != cached.repository_url:
                 logger.info("Updated repository URL for %s: %s -> %s", purl_key, cached.repository_url, new_url)
                 cached.repository_url = new_url
-            try:
-                await self._storage.store(cached)
-            except Exception:
-                logger.warning("Failed to update stored URL for %s", purl_key, exc_info=True)
+                try:
+                    await self._storage.store(cached)
+                except Exception:
+                    logger.warning("Failed to update stored URL for %s", purl_key, exc_info=True)
             return cached
 
         if voutput.result == UrlValidationResult.INVALID:

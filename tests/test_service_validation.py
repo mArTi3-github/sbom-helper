@@ -110,6 +110,19 @@ class TestValidationIntegration:
             validation_service=mock_validation_service,
         ).resolve_purl("pkg:pypi/requests")
         assert result.response is not None
+        mock_storage.store.assert_not_called()
+        mock_storage.delete_purls.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_valid_url_with_redirect_stores(self, mock_storage, mock_settings_store, mock_validation_service):
+        mock_storage.lookup.return_value = _cached_response(days_ago=3)
+        mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.VALID, final_url="https://github.com/psf/requests-v2")
+        result = await PurlResolutionService(
+            mock_storage, [],
+            settings_store=mock_settings_store,
+            validation_service=mock_validation_service,
+        ).resolve_purl("pkg:pypi/requests")
+        assert result.response is not None
         mock_storage.store.assert_called_once()
         mock_storage.delete_purls.assert_not_called()
 

@@ -64,27 +64,28 @@ class SbomEnrichmentPipeline:
         components = collect_components(sbom_data)
 
         settings = self._resolution_service.settings_store
-        if settings and settings.load().validate_sbom_refs:
+        if settings:
             app_settings = settings.load()
-            val_timeout = app_settings.url_validation_timeout
-            val_token = app_settings.github_token
-            for comp in components:
-                if comp.needs_enrichment:
-                    continue
-                for ref in comp.existing_references:
-                    if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
-                        vs = self._resolution_service.validation_service
-                        if vs is not None:
-                            voutput = await vs.validate_url(ref["url"], timeout=val_timeout, github_token=val_token)
-                        else:
-                            voutput = await validate_url_with_retry(
-                                ref["url"], timeout=val_timeout, github_token=val_token,
-                            )
-                        if voutput.result == UrlValidationResult.INVALID:
-                            comp.needs_enrichment = True
-                            comp.existing_references = []
-                        elif voutput.final_url and voutput.final_url != ref["url"]:
-                            ref["url"] = voutput.final_url
+            if app_settings.validate_sbom_refs:
+                val_timeout = app_settings.url_validation_timeout
+                val_token = app_settings.github_token
+                for comp in components:
+                    if comp.needs_enrichment:
+                        continue
+                    for ref in comp.existing_references:
+                        if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
+                            vs = self._resolution_service.validation_service
+                            if vs is not None:
+                                voutput = await vs.validate_url(ref["url"], timeout=val_timeout, github_token=val_token)
+                            else:
+                                voutput = await validate_url_with_retry(
+                                    ref["url"], timeout=val_timeout, github_token=val_token,
+                                )
+                            if voutput.result == UrlValidationResult.INVALID:
+                                comp.needs_enrichment = True
+                                comp.existing_references = []
+                            elif voutput.final_url and voutput.final_url != ref["url"]:
+                                ref["url"] = voutput.final_url
                         break
 
         # --- Ignore patterns filtering ---
