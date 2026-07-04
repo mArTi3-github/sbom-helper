@@ -517,8 +517,7 @@ class TestValidateUrlUsesCheckVcs:
     @pytest.mark.asyncio
     async def test_check_vcs_true_returns_valid(self):
         from purl_resolver.url_validator import validate_url
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = MagicMock(status_code=200, headers={}, url="https://example.com/repo")
             result = await validate_url("https://example.com/repo", timeout=5)
@@ -527,8 +526,7 @@ class TestValidateUrlUsesCheckVcs:
     @pytest.mark.asyncio
     async def test_check_vcs_false_returns_invalid(self):
         from purl_resolver.url_validator import validate_url
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=False):
             mock_head.return_value = MagicMock(status_code=200, headers={}, url="https://example.com/repo")
             result = await validate_url("https://example.com/repo", timeout=5)
@@ -537,8 +535,7 @@ class TestValidateUrlUsesCheckVcs:
     @pytest.mark.asyncio
     async def test_check_vcs_none_returns_network_error(self):
         from purl_resolver.url_validator import validate_url
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=None):
             mock_head.return_value = MagicMock(status_code=200, headers={}, url="https://example.com/repo")
             result = await validate_url("https://example.com/repo", timeout=5)

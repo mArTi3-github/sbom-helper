@@ -9,6 +9,7 @@ from ..config import sbom_settings
 from ..sbom.parser import SbomParseError
 from ..sbom_enrichment import SbomEnrichmentPipeline
 from ..schemas import ResolveRequest
+from ..settings_store import SettingsStore
 from ..url_validator import ensure_connectivity
 
 router = APIRouter()
@@ -17,7 +18,12 @@ router = APIRouter()
 @router.post("/api/v1/resolve")
 async def resolve_endpoint(body: ResolveRequest, request: Request) -> JSONResponse:
     try:
-        await ensure_connectivity()
+        settings: SettingsStore = request.app.state.settings_store
+        app_settings = settings.load()
+        await ensure_connectivity(
+            url=app_settings.connectivity_url,
+            timeout=app_settings.connectivity_timeout,
+        )
     except ConnectionError as e:
         return JSONResponse(
             status_code=503,
@@ -70,7 +76,12 @@ async def resolve_sbom_endpoint(
             parsed_patterns = None
 
     try:
-        await ensure_connectivity()
+        settings: SettingsStore = request.app.state.settings_store
+        app_settings = settings.load()
+        await ensure_connectivity(
+            url=app_settings.connectivity_url,
+            timeout=app_settings.connectivity_timeout,
+        )
     except ConnectionError as e:
         return JSONResponse(
             status_code=503,

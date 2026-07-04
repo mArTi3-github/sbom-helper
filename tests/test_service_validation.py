@@ -319,7 +319,6 @@ class TestValidateCachedUrl:
             cached.repository_url, 5,
             github_token="ghp_invalid",
             settings_store=settings_store,
-            skip_connectivity_check=True,
         )
 
     @pytest.mark.asyncio
@@ -750,7 +749,6 @@ class TestValidationServiceDelegation:
             "https://github.com/psf/requests",
             mock_settings_store.load().url_validation_timeout,
             github_token=mock_settings_store.load().github_token,
-            skip_connectivity_check=True,
         )
 
     @pytest.mark.asyncio
@@ -782,5 +780,4 @@ class TestValidationServiceDelegation:
             "https://github.com/valid/repo",
             mock_settings_store.load().url_validation_timeout,
             github_token=mock_settings_store.load().github_token,
-            skip_connectivity_check=True,
         )

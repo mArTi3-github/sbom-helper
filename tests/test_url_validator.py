@@ -41,8 +41,7 @@ def _mock_head(status_code: int = 200, headers: dict | None = None):
 class TestValidateUrl:
     @pytest.mark.asyncio
     async def test_valid_url(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/psf/requests", timeout=5)
@@ -50,40 +49,35 @@ class TestValidateUrl:
 
     @pytest.mark.asyncio
     async def test_head_404_returns_invalid(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(404)
             result = await validate_url("https://github.com/deleted/repo", timeout=5)
             assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
     async def test_head_403_without_rate_limit_headers_returns_invalid(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(403, {"x-github-media-type": "v3"})
             result = await validate_url("https://github.com/private/repo", timeout=5)
             assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
     async def test_head_403_with_rate_limit_remaining_zero_returns_rate_limited(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(403, {"x-ratelimit-remaining": "0"})
             result = await validate_url("https://github.com/psf/requests", timeout=5)
             assert result.result == UrlValidationResult.RATE_LIMITED
 
     @pytest.mark.asyncio
     async def test_head_429_returns_rate_limited(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_head(429)
             result = await validate_url("https://github.com/psf/requests", timeout=5)
             assert result.result == UrlValidationResult.RATE_LIMITED
 
     @pytest.mark.asyncio
     async def test_head_connection_error_returns_network_error(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.side_effect = httpx.RequestError("Connection refused")
             result = await validate_url("https://example.com/repo", timeout=5)
             assert result.result == UrlValidationResult.NETWORK_ERROR
@@ -94,15 +88,8 @@ class TestValidateUrl:
         assert result.result == UrlValidationResult.INVALID
 
     @pytest.mark.asyncio
-    async def test_connectivity_probe_fails_returns_network_error(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
-            result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result.result == UrlValidationResult.NETWORK_ERROR
-
-    @pytest.mark.asyncio
     async def test_git_ls_remote_fails_returns_invalid(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=False):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://github.com/deleted/repo", timeout=5)
@@ -110,8 +97,7 @@ class TestValidateUrl:
 
     @pytest.mark.asyncio
     async def test_git_ls_remote_timeout_returns_network_error(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=None):
             mock_head.return_value = _mock_head(200)
             result = await validate_url("https://example.com/repo", timeout=5)
@@ -136,8 +122,7 @@ class TestUrlValidationOutputDataclass:
 class TestValidateUrlRedirectCapture:
     @pytest.mark.asyncio
     async def test_captures_final_url(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_resp = _mock_head(200)
             mock_resp.url = "https://github.com/psf/requests"
@@ -148,8 +133,7 @@ class TestValidateUrlRedirectCapture:
 
     @pytest.mark.asyncio
     async def test_captures_redirect_target(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock) as mock_vcs:
             mock_resp = _mock_head(200)
             mock_resp.url = "https://github.com/psf/requests"
@@ -169,8 +153,7 @@ class TestValidateUrlRedirectCapture:
 class TestValidateUrlWithToken:
     @pytest.mark.asyncio
     async def test_token_passed_to_head_request(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_test")
@@ -178,8 +161,7 @@ class TestValidateUrlWithToken:
 
     @pytest.mark.asyncio
     async def test_head_request_with_bearer_token(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_test")
@@ -188,8 +170,7 @@ class TestValidateUrlWithToken:
 
     @pytest.mark.asyncio
     async def test_git_ls_remote_with_token_in_url(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock) as mock_vcs:
             mock_head.return_value = _mock_head(200)
             mock_vcs.return_value = True
@@ -200,8 +181,7 @@ class TestValidateUrlWithToken:
 
     @pytest.mark.asyncio
     async def test_token_invalid_response(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
             result = await validate_url("https://github.com/psf/requests", timeout=5, github_token="ghp_invalid")
             assert result.result == UrlValidationResult.TOKEN_INVALID
@@ -215,16 +195,14 @@ class TestTokenInvalidResult:
 class TestValidateGithubToken:
     @pytest.mark.asyncio
     async def test_valid_token_returns_true(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_response(200)
             result = await validate_github_token("ghp_valid")
             assert result is True
 
     @pytest.mark.asyncio
     async def test_invalid_token_returns_false(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_response(401)
             result = await validate_github_token("ghp_invalid")
             assert result is False
@@ -240,50 +218,44 @@ class TestValidateGithubToken:
 class TestEnsureConnectivity:
     @pytest.mark.asyncio
     async def test_success_returns_true(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True):
+        with patch("purl_resolver.url_validator.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.head.return_value.status_code = 200
             result = await ensure_connectivity()
             assert result is True
 
     @pytest.mark.asyncio
     async def test_failure_raises_connection_error(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
-            with pytest.raises(ConnectionError, match="Cannot reach"):
+        with patch("purl_resolver.url_validator.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.head.side_effect = httpx.RequestError("fail")
+            with pytest.raises(ConnectionError, match="Cannot reach https://github.com"):
                 await ensure_connectivity()
 
     @pytest.mark.asyncio
-    async def test_failure_raises_with_token(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=False):
-            with pytest.raises(ConnectionError):
-                await ensure_connectivity(github_token="ghp_test")
-
-
-class TestValidateUrlSkipConnectivity:
-    @pytest.mark.asyncio
-    async def test_skip_connectivity_check_skips_probe(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True) as mock_conn, \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
-             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
-            mock_head.return_value = _mock_head(200)
-            result = await validate_url("https://github.com/psf/requests", timeout=5, skip_connectivity_check=True)
-            assert result.result == UrlValidationResult.VALID
-            mock_conn.assert_not_called()
+    async def test_success_with_custom_url_and_timeout(self):
+        with patch("purl_resolver.url_validator.httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.head.return_value.status_code = 200
+            result = await ensure_connectivity(url="https://gitlab.com", timeout=5)
+            assert result is True
+            mock_client.assert_called_once_with(timeout=5)
+            call_url = mock_client.return_value.__aenter__.return_value.head.call_args[0][0]
+            assert call_url == "https://gitlab.com"
 
     @pytest.mark.asyncio
-    async def test_default_still_checks_connectivity(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True) as mock_conn, \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
-             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
-            mock_head.return_value = _mock_head(200)
-            result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result.result == UrlValidationResult.VALID
-            mock_conn.assert_called_once()
+    async def test_empty_url_returns_true(self):
+        result = await ensure_connectivity(url="")
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_private_url_raises_error(self):
+        with patch("purl_resolver.url_validator._is_private_url", new_callable=AsyncMock, return_value=True):
+            with pytest.raises(ConnectionError, match="private address"):
+                await ensure_connectivity()
 
 
 class TestValidateUrlWithRetry:
     @pytest.mark.asyncio
     async def test_valid_passes_through(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(200)
             output = await validate_url_with_retry("https://github.com/psf/requests", timeout=5)
@@ -297,8 +269,7 @@ class TestValidateUrlWithRetry:
                 from purl_resolver.settings_store import AppSettings
                 return AppSettings()
 
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             first_call = True
 
@@ -319,8 +290,7 @@ class TestValidateUrlWithRetry:
 
     @pytest.mark.asyncio
     async def test_token_invalid_without_settings_store_does_not_retry(self):
-        with patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
             mock_head.return_value = _mock_response(401, {"x-github-media-type": "v3"})
             output = await validate_url_with_retry(
                 "https://github.com/psf/requests", timeout=5,

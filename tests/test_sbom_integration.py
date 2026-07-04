@@ -12,7 +12,7 @@ from purl_resolver.router import router
 from purl_resolver.sbom_enrichment import SbomEnrichmentPipeline
 from purl_resolver.schemas import ResolveResponse
 from purl_resolver.service import PurlResolutionService
-from purl_resolver.settings_store import AppSettings
+from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.url_validator import UrlValidationOutput, UrlValidationResult
 from purl_resolver.validation_service import UrlValidationService
@@ -26,6 +26,7 @@ def _url_output(result: UrlValidationResult, final_url: str | None = None) -> Ur
 def client() -> TestClient:
     test_app = FastAPI()
     test_app.state.storage = InMemoryCache()
+    test_app.state.settings_store = SettingsStore()
     test_app.state.resolvers = [Purl2RepoResolver()]
     test_app.state.resolution_service = PurlResolutionService(
         storage=test_app.state.storage,
@@ -473,7 +474,6 @@ class TestValidateExistingRefs:
             "https://github.com/psf/requests",
             timeout=5,
             github_token=None,
-            skip_connectivity_check=True,
         )
 
 
@@ -615,14 +615,12 @@ class TestConnectivityPreCheck:
         settings_store = MagicMock()
         settings_store.load.return_value = AppSettings(validate_db_urls=True, url_validation_timeout=5)
         client.app.state.settings_store = settings_store
-        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, return_value=True), \
-             patch("purl_resolver.url_validator._check_connectivity", new_callable=AsyncMock) as mock_conn:
+        with patch("purl_resolver.routes.resolve.ensure_connectivity", new_callable=AsyncMock, return_value=True):
             response = client.post(
                 "/api/v1/resolve/sbom",
                 files={"file": ("test.json", json.dumps(sbom), "application/json")},
             )
         assert response.status_code == 200
-        mock_conn.assert_not_called()
 
     def test_single_resolve_fails_when_connectivity_down(self, client: TestClient) -> None:
         with patch(
