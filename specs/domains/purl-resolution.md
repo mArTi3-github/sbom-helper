@@ -156,10 +156,10 @@ Client                    API Layer (router)         Service Layer             p
 
 ### URL Validator (`url_validator.py`)
 - Validates repository URLs via HTTP HEAD + multi-VCS probe to verify the URL exists and is reachable
-- `validate_url(url, timeout, github_token=None, skip_connectivity_check=False) → UrlValidationOutput` — performs HEAD (with `follow_redirects=True`), captures the final URL after all 3xx redirects via `str(resp.url)`, then runs `_check_vcs()` against the final URL; returns `UrlValidationOutput(result, final_url)`
-- `validate_url_with_retry(url, timeout, github_token=None, settings_store=None, skip_connectivity_check=False) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
+- `validate_url(url, timeout, github_token=None) → UrlValidationOutput` — performs HEAD (with `follow_redirects=True`), captures the final URL after all 3xx redirects via `str(resp.url)`, then runs `_check_vcs()` against the final URL; returns `UrlValidationOutput(result, final_url)`
+- `validate_url_with_retry(url, timeout, github_token=None, settings_store=None) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
 - `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
-- `ensure_connectivity(github_token=None) → bool` — connectivity probe against `github.com`; raises `ConnectionError` on failure
+- `ensure_connectivity(github_token=None, url=None, timeout=None) → bool` — connectivity probe against configurable URL (default `https://github.com`); raises `ConnectionError` on failure
 - `_RateLimitTracker` — instance-based in-memory counter with `asyncio.Lock` (module-level singleton `_rate_limit_tracker`); after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
 - `_check_vcs(url, timeout, github_token=None) → bool | None` — unified multi-VCS probe; runs git → svn → hg → fossil sequentially with early-exit on first success; aggregation: `True` if any probe is `True`, else `False` if any is `False`, else `None`; called with the resolved final URL by `validate_url()`
 - `_git_probe(url, timeout, github_token=None) → bool | None` — internal helper: `git ls-remote --exit-code <url>`; rewrites `github.com` URLs with `oauth2:token@` for authenticated calls
@@ -176,7 +176,7 @@ Client                    API Layer (router)         Service Layer             p
 ### Service Wrapper (`validation_service.py`)
 - `UrlValidationService` wraps `validate_url_with_retry()` with SettingsStore injection
 - `UrlValidationService.__init__(settings_store: SettingsStore)` — receives `SettingsStore` for token/cooldown/retry config
-- `UrlValidationService.validate_url(url, timeout, github_token=None, skip_connectivity_check=False) → UrlValidationOutput` — delegates to `validate_url_with_retry()` with the injected `settings_store`
+- `UrlValidationService.validate_url(url, timeout, github_token=None) → UrlValidationOutput` — delegates to `validate_url_with_retry()` with the injected `settings_store`
 - Consumed by `PurlResolutionService` as an optional dependency; when not provided, callers fall back to direct `validate_url_with_retry()` calls. `SbomEnrichmentPipeline` accesses `validation_service` through `PurlResolutionService.validation_service` property.
 - Decouples URL validation setup from resolution orchestration; single point for validation configuration changes
 
