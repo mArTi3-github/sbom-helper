@@ -78,7 +78,6 @@ class SbomEnrichmentPipeline:
                                 ref["url"],
                                 timeout=val_timeout,
                                 github_token=val_token,
-                                skip_connectivity_check=True,
                             )
                         else:
                             voutput = await validate_url_with_retry(
@@ -86,7 +85,6 @@ class SbomEnrichmentPipeline:
                                 timeout=val_timeout,
                                 github_token=val_token,
                                 settings_store=self._resolution_service.settings_store,
-                                skip_connectivity_check=True,
                             )
                         if voutput.result == UrlValidationResult.INVALID:
                             comp.needs_enrichment = True

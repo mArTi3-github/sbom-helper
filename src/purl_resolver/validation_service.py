@@ -15,11 +15,9 @@ class UrlValidationService:
         url: str,
         timeout: int,
         github_token: str | None = None,
-        skip_connectivity_check: bool = False,
     ) -> UrlValidationOutput:
         return await validate_url_with_retry(
             url, timeout,
             github_token=github_token,
             settings_store=self._settings_store,
-            skip_connectivity_check=skip_connectivity_check,
         )

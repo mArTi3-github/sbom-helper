@@ -74,7 +74,6 @@ class PurlResolutionService:
                 cached.repository_url,
                 app_settings.url_validation_timeout,
                 github_token=github_token,
-                skip_connectivity_check=True,
             )
         else:
             voutput = await validate_url_with_retry(
@@ -82,7 +81,6 @@ class PurlResolutionService:
                 app_settings.url_validation_timeout,
                 github_token=github_token,
                 settings_store=self._settings_store,
-                skip_connectivity_check=True,
             )
 
         if voutput.result == UrlValidationResult.VALID:
@@ -151,7 +149,6 @@ class PurlResolutionService:
                             repo_url,
                             app_settings.url_validation_timeout,
                             github_token=app_settings.github_token,
-                            skip_connectivity_check=True,
                         )
                     else:
                         voutput = await validate_url_with_retry(
@@ -159,7 +156,6 @@ class PurlResolutionService:
                             app_settings.url_validation_timeout,
                             github_token=app_settings.github_token,
                             settings_store=self._settings_store,
-                            skip_connectivity_check=True,
                         )
                     if voutput.result == UrlValidationResult.INVALID:
                         logger.warning(
