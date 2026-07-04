@@ -151,3 +151,21 @@ When `_validate_cached_url()` confirms a URL is valid via cache hit or via actua
 - Cache is **permissive**: expired entries are not deleted on `get()` — only ignored. Physical cleanup via `expire()`.
 - `revalidation_cooldown_hours` is the **single source of truth** for both cache TTL and cleanup threshold.
 - Setting `revalidation_cooldown_hours = 0` disables cache entirely — every validation hits the network.
+
+## Logging Terminology
+
+Two distinct caches exist in the system:
+
+| Cache | Storage | Content | Log prefix | API `found_by` |
+|---|---|---|---|---|
+| **Resolution cache** | PostgreSQL | PURL → `ResolveResponse` | `"Resolution cache hit/miss for ..."` | `"local_db"` |
+| **Validation cache** | DiskCache | url → `validated_at` timestamp | `"Validation cache hit/miss for ..."` | — (internal only) |
+
+Existing log and API messages updated:
+
+- `service.py:119`: `"Cache hit for %s"` → `"Resolution cache hit for %s"` (disambiguates from validation cache)
+- `service.py:122`: `found_by = "local_db"` — unchanged (API contract, value is correct)
+- New log in `UrlValidationService.validate_url()`:
+  - `"Validation cache hit for %s"` (debug level) — cache returned VALID without network
+  - `"Validation cache miss for %s"` (debug level) — cache miss, performing full validation
+  - `"Cached validation result for %s"` (debug level) — successfully validated URL stored in cache
