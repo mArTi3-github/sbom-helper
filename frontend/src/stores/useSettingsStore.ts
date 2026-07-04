@@ -5,6 +5,7 @@ import type { SettingsUpdate } from '../types/api'
 
 export const useSettingsStore = defineStore('settings', () => {
   const validateDbUrls = ref(false)
+  const validateSbomRefs = ref(false)
   const urlValidationTimeout = ref(5)
   const revalidationCooldownHours = ref(24)
   const retryMaxAttempts = ref(3)
@@ -32,6 +33,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const data = await getSettings()
       validateDbUrls.value = data.validate_db_urls
+      validateSbomRefs.value = data.validate_sbom_refs
       urlValidationTimeout.value = data.url_validation_timeout
       revalidationCooldownHours.value = data.revalidation_cooldown_hours
       retryMaxAttempts.value = data.retry_max_attempts
@@ -64,7 +66,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return {
-    validateDbUrls, urlValidationTimeout, revalidationCooldownHours,
+    validateDbUrls, validateSbomRefs, urlValidationTimeout, revalidationCooldownHours,
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown, jsonIndent,

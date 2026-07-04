@@ -12,3 +12,7 @@ export function updateSettings(body: SettingsUpdate): Promise<SettingsResponse> 
     body: JSON.stringify(body),
   })
 }
+
+export function clearValidationCache(): Promise<{ status: string }> {
+  return apiFetch('/api/v1/settings/clear-validation-cache', { method: 'POST' })
+}

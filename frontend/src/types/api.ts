@@ -29,6 +29,7 @@ export interface SettingsTokenSet {
 
 export interface SettingsResponse {
   validate_db_urls: boolean
+  validate_sbom_refs: boolean
   url_validation_timeout: number
   revalidation_cooldown_hours: number
   retry_max_attempts: number
@@ -47,6 +48,7 @@ export interface SettingsResponse {
 
 export interface SettingsUpdate {
   validate_db_urls?: boolean
+  validate_sbom_refs?: boolean
   url_validation_timeout?: number
   github_token?: string | null
   librariesio_enabled?: boolean

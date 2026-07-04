@@ -10,10 +10,6 @@
         <input type="checkbox" v-model="removeUnresolved" />
         <span>Удалять ненайденные компоненты без подкомпонентов</span>
       </label>
-      <label class="checkbox-row">
-        <input type="checkbox" v-model="validateRefs" />
-        <span>Проверять существующие VCS-ссылки в SBOM</span>
-      </label>
     </div>
 
     <div class="card">
@@ -134,7 +130,6 @@ import type { IgnorePatternItem, SbomResponse } from '../types/api'
 
 const selectedFile = ref<File | null>(null)
 const removeUnresolved = ref(false)
-const validateRefs = ref(false)
 const processing = ref(false)
 const error = ref<string | null>(null)
 const result = ref<SbomResponse | null>(null)
@@ -203,7 +198,6 @@ async function handleProcess() {
     const res = await resolveSbom(
       selectedFile.value,
       removeUnresolved.value,
-      validateRefs.value,
       collectPatterns(),
       abortController.signal,
     )

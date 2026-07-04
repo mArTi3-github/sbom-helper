@@ -27,6 +27,20 @@
         </div>
         <div class="setting-row">
           <div>
+            <div class="setting-label">Validate pre-existing URLs from SBOM</div>
+            <div class="setting-desc">
+              When enabled, existing VCS and source-distribution URLs found in SBOM
+              files are verified before enrichment. Invalid URLs trigger re-resolution
+              of the component.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" v-model="validateSbomRefs" @change="debouncedAutoSave({ validate_sbom_refs: validateSbomRefs })">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
             <div class="setting-label">Validation timeout (seconds)</div>
             <div class="setting-desc">
               Timeout for each HTTP HEAD and git ls-remote check (1-60 seconds).
@@ -45,6 +59,23 @@
             </div>
           </div>
           <input type="number" v-model.number="revalidationCooldownHours" min="0" max="720" @change="debouncedAutoSave({ revalidation_cooldown_hours: revalidationCooldownHours })" class="num-input">
+        </div>
+        <div class="setting-row info-row">
+          <div class="setting-desc">
+            URLs returned by resolvers are always validated before being returned.
+            Validation results are cached and reused across all contexts
+            (local database, SBOM enrichment) within the configured cooldown period.
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Clear validation cache</div>
+            <div class="setting-desc">
+              Remove all cached URL validation results. The next validation for each
+              URL will perform a full check.
+            </div>
+          </div>
+          <button class="btn-secondary" @click="onClearValidationCache">Clear cache</button>
         </div>
       </div>
 
@@ -265,11 +296,12 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../stores/useSettingsStore'
+import { clearValidationCache } from '../api/settings'
 import type { SettingsUpdate } from '../types/api'
 
 const store = useSettingsStore()
 const {
-  validateDbUrls, urlValidationTimeout, revalidationCooldownHours,
+  validateDbUrls, validateSbomRefs, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown,
@@ -351,6 +383,15 @@ async function clearEcosystemsKey() {
     showToast('ecosyste.ms key cleared', false)
     await store.load()
   } catch { showToast('Failed to clear key', true) }
+}
+
+async function onClearValidationCache() {
+  try {
+    await clearValidationCache()
+    showToast('Validation cache cleared', false)
+  } catch {
+    showToast('Failed to clear validation cache', true)
+  }
 }
 
 onMounted(async () => {
