@@ -45,7 +45,6 @@ async def resolve_sbom_endpoint(
     request: Request,
     file: UploadFile = File(...),
     remove_unresolved_no_subcomponents: bool = Form(False),
-    validate_existing_refs: bool = Form(False),
     ignore_patterns: str = Form(None),
 ) -> JSONResponse:
     raw = await file.read()
@@ -96,7 +95,6 @@ async def resolve_sbom_endpoint(
         result = await pipeline.process(
             data,
             remove_unresolved_no_subcomponents=remove_unresolved_no_subcomponents,
-            validate_existing_refs=validate_existing_refs,
             ignore_patterns=parsed_patterns,
         )
     except SbomParseError as e:

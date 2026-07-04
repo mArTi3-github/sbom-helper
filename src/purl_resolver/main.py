@@ -32,6 +32,7 @@ from .settings_store import SettingsStore
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
 from .validation_service import UrlValidationService
+from .url_validation_cache import UrlValidationCache
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,14 @@ async def lifespan(app: FastAPI):
 
     app_settings = app.state.settings_store.load()
     logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
+
+    VALIDATION_CACHE_DIR = "/app/data/url_cache"
+    validation_cache = UrlValidationCache(VALIDATION_CACHE_DIR)
+    app.state.validation_cache = validation_cache
+
     app.state.resolvers = build_resolvers(settings, app_settings)
     app.state.db_admin_service = DbAdminService(app.state.storage)
-    app.state.validation_service = UrlValidationService(app.state.settings_store)
+    app.state.validation_service = UrlValidationService(app.state.settings_store, validation_cache)
     app.state.resolution_service = PurlResolutionService(
         storage=app.state.storage,
         resolvers=app.state.resolvers,
@@ -71,9 +77,22 @@ async def lifespan(app: FastAPI):
         logger.warning("No SPA directory found — frontend will not be served")
 
     logger.info("Configured %d resolver(s)", len(app.state.resolvers))
-    yield
-    if pool is not None:
-        await pool.close()
+
+    async def _expire_url_cache():
+        while True:
+            await asyncio.sleep(86400)
+            current_settings = app.state.settings_store.load()
+            max_age = current_settings.revalidation_cooldown_hours * 3600
+            app.state.validation_cache.expire(max_age)
+
+    expire_task = asyncio.create_task(_expire_url_cache())
+
+    try:
+        yield
+    finally:
+        expire_task.cancel()
+        if pool is not None:
+            await pool.close()
 
 
 app = FastAPI(title="sbom-helper", lifespan=lifespan)

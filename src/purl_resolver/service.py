@@ -10,12 +10,10 @@ from .sbom.collector import SbomComponent
 from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
-from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
+from .url_validator import UrlValidationOutput, UrlValidationResult
 from .validation_service import UrlValidationService
 
 logger = logging.getLogger(__name__)
-
-TRUSTED_RESOLVERS: frozenset[str] = frozenset({"purl2repo", "ecosyste.ms", "libraries.io"})
 
 _BATCH_SEMAPHORE_LIMIT = 10
 
@@ -41,47 +39,22 @@ class PurlResolutionService:
     def validation_service(self) -> UrlValidationService | None:
         return self._validation_service
 
-    def _is_within_cooldown(self, cached: ResolveResponse) -> bool:
-        if self._settings_store is None:
-            return True
-        app_settings = self._settings_store.load()
-        if not app_settings.validate_db_urls:
-            return True
-        cooldown_hours = app_settings.revalidation_cooldown_hours
-        if cooldown_hours > 0 and cached.resolver in TRUSTED_RESOLVERS and cached.resolved_at:
-            try:
-                resolved_date = datetime.fromisoformat(cached.resolved_at)
-                elapsed = datetime.now() - resolved_date
-                if elapsed.total_seconds() < cooldown_hours * 3600:
-                    return True
-            except (ValueError, TypeError):
-                pass
-        return False
-
-    async def _validate_cached_url(
+    async def _validate_stored_url(
         self,
         cached: ResolveResponse,
         purl_key: str,
     ) -> ResolveResponse | None:
-        if self._is_within_cooldown(cached):
+        if self._validation_service is None:
+            return cached
+        app_settings = self._settings_store.load()
+        if not app_settings.validate_db_urls:
             return cached
 
-        app_settings = self._settings_store.load()
-        github_token = app_settings.github_token
-
-        if self._validation_service is not None:
-            voutput = await self._validation_service.validate_url(
-                cached.repository_url,
-                app_settings.url_validation_timeout,
-                github_token=github_token,
-            )
-        else:
-            voutput = await validate_url_with_retry(
-                cached.repository_url,
-                app_settings.url_validation_timeout,
-                github_token=github_token,
-                settings_store=self._settings_store,
-            )
+        voutput = await self._validation_service.validate_url(
+            cached.repository_url,
+            app_settings.url_validation_timeout,
+            github_token=app_settings.github_token,
+        )
 
         if voutput.result == UrlValidationResult.VALID:
             new_url = voutput.final_url or cached.repository_url
@@ -91,15 +64,18 @@ class PurlResolutionService:
             try:
                 await self._storage.store(cached)
             except Exception:
-                logger.warning("Failed to update resolved_at for %s", purl_key, exc_info=True)
-        elif voutput.result == UrlValidationResult.INVALID:
+                logger.warning("Failed to update stored URL for %s", purl_key, exc_info=True)
+            return cached
+
+        if voutput.result == UrlValidationResult.INVALID:
+            logger.warning("Cached URL %s is invalid for %s, deleting", cached.repository_url, purl_key)
             try:
                 await self._storage.delete_purls([purl_key])
             except Exception:
-                logger.warning("Failed to delete invalid URL for %s", purl_key, exc_info=True)
+                logger.warning("Failed to delete invalid cached URL for %s", purl_key, exc_info=True)
             return None
 
-        return cached
+        return cached  # NETWORK_ERROR / RATE_LIMITED — keep
 
     async def resolve_purl(
         self,
@@ -116,14 +92,14 @@ class PurlResolutionService:
         try:
             cached = await self._storage.lookup(purl_key)
             if cached is not None:
-                logger.info("Cache hit for %s", purl_key)
-                cached = await self._validate_cached_url(cached, purl_key)
-            if cached is not None:
-                cached.found_by = "local_db"
-                return ResolveResult.ok(cached)
+                logger.info("Resolution cache hit for %s", purl_key)
+                validated = await self._validate_stored_url(cached, purl_key)
+                if validated is not None:
+                    validated.found_by = "local_db"
+                    return ResolveResult.ok(validated)
         except Exception:
             logger.warning(
-                "Cache lookup failed for %s, falling through to resolver",
+                "Resolution cache lookup failed for %s, falling through to resolver",
                 purl_key,
                 exc_info=True,
             )
@@ -141,26 +117,18 @@ class PurlResolutionService:
 
             repo_url = resolution.repository_url
 
-            if self._settings_store is not None:
+            if self._validation_service is not None:
                 app_settings = self._settings_store.load()
                 if app_settings.validate_db_urls:
-                    if self._validation_service is not None:
-                        voutput = await self._validation_service.validate_url(
-                            repo_url,
-                            app_settings.url_validation_timeout,
-                            github_token=app_settings.github_token,
-                        )
-                    else:
-                        voutput = await validate_url_with_retry(
-                            repo_url,
-                            app_settings.url_validation_timeout,
-                            github_token=app_settings.github_token,
-                            settings_store=self._settings_store,
-                        )
+                    voutput = await self._validation_service.validate_url(
+                        repo_url,
+                        app_settings.url_validation_timeout,
+                        github_token=app_settings.github_token,
+                    )
                     if voutput.result == UrlValidationResult.INVALID:
                         logger.warning(
-                            "Resolver %s returned invalid URL %s for %s, skipping",
-                            r.name, repo_url, purl,
+                            "URL %s from resolver %s is invalid, skipping",
+                            repo_url, r.name,
                         )
                         continue
                     if voutput.result in (UrlValidationResult.NETWORK_ERROR, UrlValidationResult.RATE_LIMITED):

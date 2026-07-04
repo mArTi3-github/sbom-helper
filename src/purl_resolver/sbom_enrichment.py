@@ -56,7 +56,6 @@ class SbomEnrichmentPipeline:
         self,
         sbom_data: dict,
         remove_unresolved_no_subcomponents: bool = False,
-        validate_existing_refs: bool = False,
         ignore_patterns: list[dict[str, str]] | None = None,
     ) -> SbomEnrichmentResult:
         """Parse, collect, deduplicate, resolve, enrich, and report."""
@@ -64,27 +63,22 @@ class SbomEnrichmentPipeline:
 
         components = collect_components(sbom_data)
 
-        if validate_existing_refs:
-            app_settings = self._resolution_service.settings_store.load() if self._resolution_service.settings_store else None
-            val_timeout = app_settings.url_validation_timeout if app_settings else 5
-            val_token = app_settings.github_token if app_settings else None
+        settings = self._resolution_service.settings_store
+        if settings and settings.load().validate_sbom_refs:
+            app_settings = settings.load()
+            val_timeout = app_settings.url_validation_timeout
+            val_token = app_settings.github_token
             for comp in components:
                 if comp.needs_enrichment:
                     continue
                 for ref in comp.existing_references:
                     if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
-                        if self._resolution_service.validation_service is not None:
-                            voutput = await self._resolution_service.validation_service.validate_url(
-                                ref["url"],
-                                timeout=val_timeout,
-                                github_token=val_token,
-                            )
+                        vs = self._resolution_service.validation_service
+                        if vs is not None:
+                            voutput = await vs.validate_url(ref["url"], timeout=val_timeout, github_token=val_token)
                         else:
                             voutput = await validate_url_with_retry(
-                                ref["url"],
-                                timeout=val_timeout,
-                                github_token=val_token,
-                                settings_store=self._resolution_service.settings_store,
+                                ref["url"], timeout=val_timeout, github_token=val_token,
                             )
                         if voutput.result == UrlValidationResult.INVALID:
                             comp.needs_enrichment = True
