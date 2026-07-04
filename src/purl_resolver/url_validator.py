@@ -124,7 +124,7 @@ def _is_rate_limited(status: int, headers: dict) -> bool:
     return False
 
 
-async def _check_connectivity(
+async def ensure_connectivity(
     github_token: str | None = None,
     url: str | None = None,
     timeout: int | None = None,
@@ -134,7 +134,7 @@ async def _check_connectivity(
     probe_url = url or _CONNECTIVITY_URL
     probe_timeout = timeout or _CONNECTIVITY_TIMEOUT
     if await _is_private_url(probe_url):
-        return False
+        raise ConnectionError(f"Probe URL resolves to a private address: {probe_url}")
     try:
         headers = {}
         hostname = urlsplit(probe_url).hostname
@@ -142,17 +142,12 @@ async def _check_connectivity(
             headers["Authorization"] = f"Bearer {github_token}"
         async with httpx.AsyncClient(timeout=probe_timeout) as client:
             resp = await client.head(probe_url, headers=headers)
-            return resp.status_code < 500
+            ok = resp.status_code < 500
     except httpx.RequestError:
         logger.warning("Connectivity probe to %s failed", probe_url)
-        return False
-
-
-async def ensure_connectivity(github_token: str | None = None) -> bool:
-    """Check connectivity once before batch processing. Raises on failure."""
-    ok = await _check_connectivity(github_token=github_token)
+        ok = False
     if not ok:
-        raise ConnectionError(f"Cannot reach {_CONNECTIVITY_URL}")
+        raise ConnectionError(f"Cannot reach {probe_url}")
     return True
 
 
@@ -379,9 +374,6 @@ async def validate_url(
     url: str,
     timeout: int,
     github_token: str | None = None,
-    skip_connectivity_check: bool = False,
-    connectivity_url: str | None = None,
-    connectivity_timeout: int | None = None,
     rate_limit_cooldown: int | None = None,
 ) -> UrlValidationOutput:
     if not url.startswith(("http://", "https://")):
@@ -389,15 +381,6 @@ async def validate_url(
 
     if await _rate_limit_tracker.is_in_cooldown():
         return UrlValidationOutput(UrlValidationResult.RATE_LIMITED)
-
-    if not skip_connectivity_check:
-        try:
-            github_ok = await _check_connectivity(github_token=github_token, url=connectivity_url, timeout=connectivity_timeout)
-        except (httpx.RequestError, ConnectionError, OSError):
-            return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
-
-        if not github_ok:
-            return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
 
     try:
         resp = await _head_request(url, timeout, github_token=github_token)
@@ -444,17 +427,11 @@ async def validate_url_with_retry(
     timeout: int,
     github_token: str | None = None,
     settings_store: SettingsStore | None = None,
-    skip_connectivity_check: bool = False,
-    connectivity_url: str | None = None,
-    connectivity_timeout: int | None = None,
     rate_limit_cooldown: int | None = None,
 ) -> UrlValidationOutput:
     voutput = await validate_url(
         url, timeout,
         github_token=github_token,
-        skip_connectivity_check=skip_connectivity_check,
-        connectivity_url=connectivity_url,
-        connectivity_timeout=connectivity_timeout,
         rate_limit_cooldown=rate_limit_cooldown,
     )
 
@@ -468,9 +445,6 @@ async def validate_url_with_retry(
         voutput = await validate_url(
             url, timeout,
             github_token=None,
-            skip_connectivity_check=skip_connectivity_check,
-            connectivity_url=connectivity_url,
-            connectivity_timeout=connectivity_timeout,
             rate_limit_cooldown=rate_limit_cooldown,
         )
 
