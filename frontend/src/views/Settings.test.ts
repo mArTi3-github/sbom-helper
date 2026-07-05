@@ -6,6 +6,7 @@ import type { SettingsResponse } from '../types/api'
 
 const defaultSettings: SettingsResponse = {
   validate_db_urls: false,
+  validate_sbom_refs: false,
   url_validation_timeout: 5,
   revalidation_cooldown_hours: 24,
   retry_max_attempts: 3,
