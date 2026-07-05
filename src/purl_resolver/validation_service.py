@@ -25,10 +25,10 @@ class UrlValidationService:
             max_age = app_settings.revalidation_cooldown_hours * 3600
             cached = self._cache.get(url, max_age)
             if cached is not None:
-                logger.debug("Validation cache hit for %s", url)
+                logger.info("Validation cache hit for %s", url)
                 return UrlValidationOutput(UrlValidationResult.VALID, final_url=None)
 
-        logger.debug("Validation cache miss for %s, performing full validation", url)
+        logger.info("Validation cache miss for %s, performing full validation", url)
         voutput = await validate_url_with_retry(
             url, timeout,
             github_token=github_token,
