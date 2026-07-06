@@ -237,16 +237,7 @@
           </div>
           <input type="number" v-model.number="connectivityTimeout" min="1" max="30" @change="debouncedAutoSave({ connectivity_timeout: connectivityTimeout })" class="num-input">
         </div>
-        <div class="setting-row">
-          <div>
-            <div class="setting-label">Rate-limit cooldown (seconds)</div>
-            <div class="setting-desc">
-              How long to pause URL validation after consecutive rate-limited responses (1–600 seconds). Default: 60.
-            </div>
-          </div>
-          <input type="number" v-model.number="rateLimitCooldown" min="1" max="600" @change="debouncedAutoSave({ rate_limit_cooldown: rateLimitCooldown })" class="num-input">
         </div>
-      </div>
 
       <div class="card">
         <div class="card-title">Logging</div>
@@ -304,7 +295,7 @@ const {
   validateDbUrls, validateSbomRefs, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
-  batchSemaphoreLimit, connectivityUrl, connectivityTimeout, rateLimitCooldown,
+  batchSemaphoreLimit, connectivityUrl, connectivityTimeout,
   tokenSet, loading, jsonIndent,
 } = storeToRefs(store)
 

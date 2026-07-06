@@ -41,7 +41,6 @@ export interface SettingsResponse {
   batch_semaphore_limit: number
   connectivity_url: string
   connectivity_timeout: number
-  rate_limit_cooldown: number
   json_indent: number
   token_set: SettingsTokenSet
 }
@@ -63,7 +62,6 @@ export interface SettingsUpdate {
   batch_semaphore_limit?: number
   connectivity_url?: string
   connectivity_timeout?: number
-  rate_limit_cooldown?: number
   json_indent?: number
 }
 
