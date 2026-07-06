@@ -36,10 +36,6 @@ class TestAppSettingsDefaults:
         s = AppSettings()
         assert s.connectivity_timeout == 2
 
-    def test_rate_limit_cooldown_default(self):
-        s = AppSettings()
-        assert s.rate_limit_cooldown == 60
-
 
 class TestSettingsStoreLoad:
     def test_file_missing_creates_with_defaults(self, store: SettingsStore, tmp_settings_file: Path):

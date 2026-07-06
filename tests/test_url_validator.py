@@ -16,14 +16,6 @@ from purl_resolver.url_validator import (
 )
 
 
-@pytest.fixture(autouse=True)
-def reset_rate_limit_tracker():
-    from purl_resolver.url_validator import _rate_limit_tracker
-    _rate_limit_tracker.reset()
-    yield
-    _rate_limit_tracker.reset()
-
-
 def _mock_response(status_code: int = 200, headers: dict | None = None) -> AsyncMock:
     resp = AsyncMock()
     resp.status_code = status_code
@@ -48,39 +40,28 @@ class TestValidateUrl:
             assert result.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
-    async def test_head_404_returns_invalid(self):
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+    async def test_head_404_ignored_validation_proceeds(self):
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(404)
             result = await validate_url("https://github.com/deleted/repo", timeout=5)
-            assert result.result == UrlValidationResult.INVALID
+            assert result.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
-    async def test_head_403_without_rate_limit_headers_returns_invalid(self):
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+    async def test_head_403_without_token_ignored(self):
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.return_value = _mock_head(403, {"x-github-media-type": "v3"})
             result = await validate_url("https://github.com/private/repo", timeout=5)
-            assert result.result == UrlValidationResult.INVALID
+            assert result.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
-    async def test_head_403_with_rate_limit_remaining_zero_returns_rate_limited(self):
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
-            mock_head.return_value = _mock_head(403, {"x-ratelimit-remaining": "0"})
-            result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result.result == UrlValidationResult.RATE_LIMITED
-
-    @pytest.mark.asyncio
-    async def test_head_429_returns_rate_limited(self):
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
-            mock_head.return_value = _mock_head(429)
-            result = await validate_url("https://github.com/psf/requests", timeout=5)
-            assert result.result == UrlValidationResult.RATE_LIMITED
-
-    @pytest.mark.asyncio
-    async def test_head_connection_error_returns_network_error(self):
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head:
+    async def test_head_connection_error_falls_back_and_vcs_probes(self):
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
             mock_head.side_effect = httpx.RequestError("Connection refused")
             result = await validate_url("https://example.com/repo", timeout=5)
-            assert result.result == UrlValidationResult.NETWORK_ERROR
+            assert result.result == UrlValidationResult.VALID
 
     @pytest.mark.asyncio
     async def test_file_url_returns_invalid(self):
@@ -104,13 +85,28 @@ class TestValidateUrl:
             assert result.result == UrlValidationResult.NETWORK_ERROR
 
     @pytest.mark.asyncio
-    async def test_rate_limit_cooldown_skips_validation(self):
-        import time
-        from purl_resolver.url_validator import _rate_limit_tracker
-        _rate_limit_tracker._count = 5
-        _rate_limit_tracker._cooldown_until = time.time() + 60
-        result = await validate_url("https://github.com/psf/requests", timeout=5)
-        assert result.result == UrlValidationResult.RATE_LIMITED
+    async def test_git_url_valid(self):
+        with patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
+            result = await validate_url("git://github.com/user/repo.git", timeout=5)
+            assert result.result == UrlValidationResult.VALID
+
+    @pytest.mark.asyncio
+    async def test_ssh_url_valid(self):
+        with patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
+            result = await validate_url("ssh://git@github.com/user/repo.git", timeout=5)
+            assert result.result == UrlValidationResult.VALID
+
+    @pytest.mark.asyncio
+    async def test_svn_url_valid(self):
+        with patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
+            result = await validate_url("svn://svn.example.com/repo", timeout=5)
+            assert result.result == UrlValidationResult.VALID
+
+    @pytest.mark.asyncio
+    async def test_ssh_url_private_network_returns_invalid(self):
+        with patch("purl_resolver.url_validator._is_private_url", new_callable=AsyncMock, return_value=True):
+            result = await validate_url("ssh://10.0.0.1/repo", timeout=5)
+            assert result.result == UrlValidationResult.INVALID
 
 
 class TestUrlValidationOutputDataclass:
