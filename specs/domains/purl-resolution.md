@@ -205,7 +205,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Rate limit protection**: after 5 consecutive rate-limited responses, all validation is skipped for 60 seconds, returning `RATE_LIMITED`
 - **Validation never crashes**: `validate_url()` and `validate_url_with_retry()` always return a `UrlValidationOutput`, never raise exceptions
-- **Non-http/https URLs are invalid immediately**: `validate_url()` returns `UrlValidationOutput(INVALID)` for any URL that does not start with `http://` or `https://` without making any network request
+- **Non-HTTP/HTTPS URLs skip redirect resolution**: URLs are validated by syntax (non-empty hostname) and SSRF guard (non-private IP) before VCS probes. HTTP/HTTPS URLs additionally undergo HEAD redirect resolution and token-invalidity detection (401/403). Non-HTTP/HTTPS URLs skip redirect resolution and go directly to VCS probes.
 - **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
 - **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **URL redirects are resolved on validation**: `validate_url()` and `validate_url_with_retry()` return `UrlValidationOutput` containing the final URL after all 3xx redirects; `final_url` is `str(resp.url)` from httpx with `follow_redirects=True`

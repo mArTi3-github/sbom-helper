@@ -29,7 +29,6 @@ class AppSettings(BaseModel):
     batch_semaphore_limit: int = Field(default=10, ge=1, le=100)
     connectivity_url: str = Field(default="https://github.com")
     connectivity_timeout: int = Field(default=2, ge=1, le=30)
-    rate_limit_cooldown: int = Field(default=60, ge=1, le=600)
     json_indent: Literal[1, 2, 4] = Field(default=4)
 
     def log_level_as_int(self) -> int:
