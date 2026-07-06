@@ -4,7 +4,6 @@ import asyncio
 import ipaddress
 import logging
 import socket
-import time
 
 import httpx
 from collections.abc import Awaitable, Callable
@@ -20,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 _CONNECTIVITY_URL = "https://github.com"
 _CONNECTIVITY_TIMEOUT = 2
-_RATE_LIMIT_THRESHOLD = 5
-_RATE_LIMIT_COOLDOWN = 60
 
 _PRIVATE_NETWORKS = [
     ipaddress.ip_network("0.0.0.0/8"),
@@ -79,49 +76,6 @@ class UrlValidationResult(Enum):
 class UrlValidationOutput:
     result: UrlValidationResult
     final_url: str | None = None
-
-
-class _RateLimitTracker:
-    def __init__(self) -> None:
-        self._count: int = 0
-        self._cooldown_until: float = 0.0
-        self._lock: asyncio.Lock = asyncio.Lock()
-
-    async def is_in_cooldown(self) -> bool:
-        async with self._lock:
-            if self._cooldown_until > 0 and time.time() >= self._cooldown_until:
-                logger.info("Rate limit cooldown expired")
-                self._count = 0
-                self._cooldown_until = 0.0
-            return self._cooldown_until > 0 and time.time() < self._cooldown_until
-
-    async def record_rate_limit(self, cooldown: int | None = None) -> None:
-        cooldown = cooldown or _RATE_LIMIT_COOLDOWN
-        async with self._lock:
-            self._count += 1
-            if self._count >= _RATE_LIMIT_THRESHOLD:
-                self._cooldown_until = time.time() + cooldown
-                logger.warning(
-                    "Rate limit threshold reached (%d consecutive), "
-                    "entering %ds cooldown",
-                    self._count, cooldown,
-                )
-
-    def reset(self) -> None:
-        self._count = 0
-        self._cooldown_until = 0.0
-
-_rate_limit_tracker = _RateLimitTracker()
-
-
-def _is_rate_limited(status: int, headers: dict) -> bool:
-    if status == 429:
-        return True
-    if status == 403:
-        remaining = headers.get("x-ratelimit-remaining") or headers.get("X-RateLimit-Remaining")
-        if remaining is not None and int(remaining) <= 0:
-            return True
-    return False
 
 
 async def ensure_connectivity(
@@ -374,40 +328,26 @@ async def validate_url(
     url: str,
     timeout: int,
     github_token: str | None = None,
-    rate_limit_cooldown: int | None = None,
 ) -> UrlValidationOutput:
-    if not url.startswith(("http://", "https://")):
+    hostname = urlsplit(url).hostname
+    if not hostname:
         return UrlValidationOutput(UrlValidationResult.INVALID)
 
-    if await _rate_limit_tracker.is_in_cooldown():
-        return UrlValidationOutput(UrlValidationResult.RATE_LIMITED)
+    if await _is_private_url(url):
+        return UrlValidationOutput(UrlValidationResult.INVALID)
 
-    try:
-        resp = await _head_request(url, timeout, github_token=github_token)
-        final_url = str(resp.url)
-        if final_url != url:
-            logger.info("URL redirected: %s -> %s", url, final_url)
-        headers = dict(resp.headers)
-        status = resp.status_code
-    except httpx.RequestError:
-        _rate_limit_tracker.reset()
-        return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR)
-
-    if _is_rate_limited(status, headers):
-        await _rate_limit_tracker.record_rate_limit(cooldown=rate_limit_cooldown)
-        return UrlValidationOutput(UrlValidationResult.RATE_LIMITED, final_url=final_url)
-
-    _rate_limit_tracker.reset()
-
-    if status in (401, 403) and github_token:
-        return UrlValidationOutput(UrlValidationResult.TOKEN_INVALID, final_url=final_url)
-
-    if status in (404, 405):
-        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
-    if status == 403:
-        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
-    if status >= 400:
-        return UrlValidationOutput(UrlValidationResult.INVALID, final_url=final_url)
+    final_url = url
+    if url.startswith(("http://", "https://")):
+        try:
+            resp = await _head_request(url, timeout, github_token=github_token)
+            if resp.status_code in (401, 403) and github_token:
+                return UrlValidationOutput(
+                    UrlValidationResult.TOKEN_INVALID,
+                    final_url=str(resp.url),
+                )
+            final_url = str(resp.url)
+        except (httpx.RequestError, ConnectionError):
+            pass  # graceful degradation — keep original url
 
     try:
         git_result = await _check_vcs(final_url, timeout, github_token=github_token)
@@ -427,12 +367,10 @@ async def validate_url_with_retry(
     timeout: int,
     github_token: str | None = None,
     settings_store: SettingsStore | None = None,
-    rate_limit_cooldown: int | None = None,
 ) -> UrlValidationOutput:
     voutput = await validate_url(
         url, timeout,
         github_token=github_token,
-        rate_limit_cooldown=rate_limit_cooldown,
     )
 
     if voutput.result == UrlValidationResult.TOKEN_INVALID and settings_store is not None:
@@ -445,7 +383,6 @@ async def validate_url_with_retry(
         voutput = await validate_url(
             url, timeout,
             github_token=None,
-            rate_limit_cooldown=rate_limit_cooldown,
         )
 
     return voutput
