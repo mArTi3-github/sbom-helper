@@ -25,10 +25,12 @@ const defaultSettings: SettingsResponse = {
 
 const successUpdate = vi.fn().mockResolvedValue(defaultSettings)
 const getSettingsMock = vi.fn().mockResolvedValue(defaultSettings)
+const checkGithubTokenMock = vi.fn()
 
 vi.mock('../api/settings', () => ({
   getSettings: () => getSettingsMock(),
   updateSettings: (body: unknown) => successUpdate(body),
+  checkGithubToken: () => checkGithubTokenMock(),
 }))
 
 async function flush(ms = 0) {
@@ -179,5 +181,65 @@ describe('Settings.vue', () => {
     await flushPromises()
 
     expect(successUpdate).toHaveBeenCalledWith({ github_token: null })
+  })
+
+  it('shows validity section when token is set', async () => {
+    getSettingsMock.mockResolvedValueOnce({
+      ...defaultSettings,
+      token_set: { github_token: true, librariesio_api_key: false, ecosystems_api_key: false },
+    })
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const validitySection = wrapper.find('.validity-desc')
+    expect(validitySection.exists()).toBe(true)
+    expect(validitySection.text()).toContain('Check validity')
+  })
+
+  it('hides validity section when token is not set', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    expect(wrapper.find('.validity-desc').exists()).toBe(false)
+  })
+
+  it('sets validity to valid after successful token save', async () => {
+    getSettingsMock.mockResolvedValueOnce(defaultSettings)
+    successUpdate.mockResolvedValue({
+      ...defaultSettings,
+      token_set: { github_token: true, librariesio_api_key: false, ecosystems_api_key: false },
+    })
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    getSettingsMock.mockResolvedValue({
+      ...defaultSettings,
+      token_set: { github_token: true, librariesio_api_key: false, ecosystems_api_key: false },
+    })
+
+    const pwInputs = wrapper.findAll<HTMLInputElement>('input[type="password"]')
+    await pwInputs[0].setValue('ghp_new_token')
+    await pwInputs[0].trigger('blur')
+    await flushPromises()
+
+    const validitySection = wrapper.find('.validity-desc')
+    expect(validitySection.text()).toContain('valid')
+  })
+
+  it('calls checkGithubToken on button click', async () => {
+    checkGithubTokenMock.mockResolvedValue({ status: 'valid' })
+    getSettingsMock.mockResolvedValueOnce({
+      ...defaultSettings,
+      token_set: { github_token: true, librariesio_api_key: false, ecosystems_api_key: false },
+    })
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const checkBtn = wrapper.find('.validity-desc .btn-secondary')
+    expect(checkBtn.exists()).toBe(true)
+    await checkBtn.trigger('click')
+    await flushPromises()
+
+    expect(checkGithubTokenMock).toHaveBeenCalledTimes(1)
   })
 })

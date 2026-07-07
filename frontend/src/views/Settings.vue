@@ -115,6 +115,13 @@
               Status: <span :class="tokenSet.github_token ? 'status-set' : 'status-not-set'">{{ tokenSet.github_token ? 'set' : 'not set' }}</span>
               <button v-if="tokenSet.github_token" class="btn-danger btn-small" @click="clearToken">Clear token</button>
             </div>
+            <div v-if="tokenSet.github_token" class="setting-desc validity-desc">
+              Validity:
+              <span v-if="githubTokenValidity === 'valid'" class="status-valid">{{ githubTokenValidity }}</span>
+              <span v-else-if="githubTokenValidity === 'invalid'" class="status-invalid">{{ githubTokenValidity }}</span>
+              <span v-else>&mdash;</span>
+              <button class="btn-small btn-secondary" @click="onCheckGithubToken">Check validity</button>
+            </div>
           </div>
           <div class="input-right">
             <input type="password" :value="githubTokenInput" @input="githubTokenInput = ($event.target as HTMLInputElement).value" @blur="onGithubTokenBlur" placeholder="ghp_..." class="pw-input">
@@ -314,7 +321,7 @@ const {
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, connectivityUrl, connectivityTimeout,
-  tokenSet, loading, jsonIndent,
+  tokenSet, loading, jsonIndent, githubTokenValidity,
 } = storeToRefs(store)
 
 const githubTokenInput = ref('')
@@ -376,6 +383,15 @@ async function clearToken() {
     showToast('Token cleared', false)
     await store.load()
   } catch { showToast('Failed to clear token', true) }
+}
+
+async function onCheckGithubToken() {
+  try {
+    await store.checkGithubToken()
+    showToast('Token check complete', false)
+  } catch {
+    showToast('Failed to check token', true)
+  }
 }
 
 async function clearLibrariesIoKey() {
@@ -498,6 +514,32 @@ h1 {
 .status-not-set {
   font-weight: 600;
   color: var(--color-error);
+}
+
+.status-valid {
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.status-invalid {
+  font-weight: 600;
+  color: var(--color-error);
+}
+
+.validity-desc {
+  margin-top: 0.25rem;
+}
+
+.btn-secondary {
+  background: var(--color-bg-secondary, #e2e8f0);
+  color: var(--color-text, #1a202c);
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg-secondary-hover, #cbd5e1);
 }
 
 .toggle {
