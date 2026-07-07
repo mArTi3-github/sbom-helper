@@ -4,13 +4,13 @@ import logging
 from dataclasses import dataclass
 
 from .purl_utils import normalize, validate
-from .sbom import SOURCE_REF_TYPES
 from .sbom.collector import SbomComponent, collect_components
 from .sbom.enricher import enrich_sbom
 from .sbom.parser import CycloneDXParser
 from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import PurlResolutionService
+from .settings_store import AppSettings
 from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,53 @@ class SbomEnrichmentPipeline:
     ) -> None:
         self._resolution_service = resolution_service
 
+    async def _validate_external_references(
+        self,
+        components: list[SbomComponent],
+        app_settings: AppSettings,
+    ) -> None:
+        val_timeout = app_settings.url_validation_timeout
+        val_token = app_settings.github_token
+        behavior = app_settings.sbom_multiple_vcs_behavior
+
+        for comp in components:
+            if comp.ignored:
+                continue
+
+            vcs_refs: list[dict] = []
+            other_refs: list[dict] = []
+            for ref in comp.existing_references:
+                if ref.get("type") == "vcs" and ref.get("url"):
+                    vcs_refs.append(ref)
+                else:
+                    other_refs.append(ref)
+
+            valid_vcs: list[dict] = []
+            for ref in vcs_refs:
+                vs = self._resolution_service.validation_service
+                if vs is not None:
+                    voutput = await vs.validate_url(ref["url"], timeout=val_timeout, github_token=val_token)
+                else:
+                    voutput = await validate_url_with_retry(
+                        ref["url"], timeout=val_timeout, github_token=val_token,
+                    )
+                if voutput.result in (UrlValidationResult.INVALID, UrlValidationResult.NETWORK_ERROR):
+                    logger.info("Removed VCS ref %s for %s (reason=%s)", ref["url"], comp.purl, voutput.result.value)
+                    continue
+                if voutput.final_url and voutput.final_url != ref["url"]:
+                    ref["url"] = voutput.final_url
+                valid_vcs.append(ref)
+
+            if len(valid_vcs) >= 2 and behavior == "keep-first":
+                for extra in valid_vcs[1:]:
+                    logger.info("Removed extra valid VCS ref %s for %s (keep-first)", extra["url"], comp.purl)
+                valid_vcs = valid_vcs[:1]
+
+            comp.existing_references = other_refs + valid_vcs
+
+            if not valid_vcs:
+                comp.needs_enrichment = True
+
     async def process(
         self,
         sbom_data: dict,
@@ -67,26 +114,23 @@ class SbomEnrichmentPipeline:
         if settings:
             app_settings = settings.load()
             if app_settings.validate_sbom_refs:
-                val_timeout = app_settings.url_validation_timeout
-                val_token = app_settings.github_token
+                await self._validate_external_references(components, app_settings)
+                # Sync filtered existing_references back to SBOM data
+                # Components that go through validation but keep valid VCS refs
+                # (no enrichment needed) must have their filtered refs written back
                 for comp in components:
-                    if comp.needs_enrichment:
+                    if comp.ignored:
                         continue
-                    for ref in comp.existing_references:
-                        if ref.get("type") in SOURCE_REF_TYPES and ref.get("url"):
-                            vs = self._resolution_service.validation_service
-                            if vs is not None:
-                                voutput = await vs.validate_url(ref["url"], timeout=val_timeout, github_token=val_token)
-                            else:
-                                voutput = await validate_url_with_retry(
-                                    ref["url"], timeout=val_timeout, github_token=val_token,
-                                )
-                            if voutput.result == UrlValidationResult.INVALID:
-                                comp.needs_enrichment = True
-                                comp.existing_references = []
-                            elif voutput.final_url and voutput.final_url != ref["url"]:
-                                ref["url"] = voutput.final_url
-                        break
+                    obj: object = sbom_data
+                    for k in comp.path:
+                        if isinstance(k, int):
+                            assert isinstance(obj, list)
+                            obj = obj[k]
+                        else:
+                            assert isinstance(obj, dict)
+                            obj = obj[k]
+                    assert isinstance(obj, dict)
+                    obj["externalReferences"] = list(comp.existing_references)
 
         # --- Ignore patterns filtering ---
         if ignore_patterns:

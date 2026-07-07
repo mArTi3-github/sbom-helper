@@ -238,6 +238,18 @@ class TestValidateExistingRefs:
             validate_db_urls=True, validate_sbom_refs=True,
             url_validation_timeout=5,
             revalidation_cooldown_hours=24,
+            sbom_multiple_vcs_behavior="keep-first",
+        )
+        return store
+
+    @pytest.fixture
+    def settings_store_with_validation_keep_all(self) -> MagicMock:
+        store = MagicMock()
+        store.load.return_value = AppSettings(
+            validate_db_urls=True, validate_sbom_refs=True,
+            url_validation_timeout=5,
+            revalidation_cooldown_hours=24,
+            sbom_multiple_vcs_behavior="keep-all",
         )
         return store
 
@@ -367,7 +379,7 @@ class TestValidateExistingRefs:
         mock_validate.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_network_error_leaves_component(
+    async def test_network_error_removes_ref_and_triggers_reresolution(
         self,
         fake_resolvers,
         settings_store_with_validation,
@@ -383,12 +395,11 @@ class TestValidateExistingRefs:
                     "version": "2.31.0",
                     "purl": "pkg:pypi/requests@2.31.0",
                     "externalReferences": [
-                        {"type": "vcs", "url": "https://github.com/psf/requests"},
+                        {"type": "vcs", "url": "https://unknown-vcs.example.com/repo"},
                     ],
                 }
             ],
         }
-        original_refs = list(sbom["components"][0].get("externalReferences", []))
         storage = InMemoryCache()
         pipeline = SbomEnrichmentPipeline(
             resolution_service=PurlResolutionService(
@@ -403,7 +414,183 @@ class TestValidateExistingRefs:
         ):
             await pipeline.process(sbom)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
-        assert enriched_refs == original_refs
+        found_new_ref = any(
+            r.get("type") == "vcs" and "github.com" in (r.get("url") or "")
+            for r in enriched_refs
+        )
+        assert found_new_ref, (
+            "Expected NETWORK_ERROR ref to be removed and "
+            "re-resolution to add a new VCS ref, got: %s" % enriched_refs
+        )
+
+    @pytest.mark.asyncio
+    async def test_mixed_refs_non_vcs_preserved_when_vcs_invalid(
+        self,
+        fake_resolvers,
+        settings_store_with_validation,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "website", "url": "https://example.com"},
+                        {"type": "vcs", "url": "https://github.com/psf/requests-invalid"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation,
+            ),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.INVALID),
+        ):
+            await pipeline.process(sbom)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        website_refs = [r for r in enriched_refs if r["type"] == "website"]
+        assert len(website_refs) == 1, "Non-VCS ref should be preserved"
+        assert website_refs[0]["url"] == "https://example.com"
+
+    @pytest.mark.asyncio
+    async def test_multiple_vcs_keep_first_retains_only_first_valid(
+        self,
+        fake_resolvers,
+        settings_store_with_validation,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "website", "url": "https://example.com"},
+                        {"type": "vcs", "url": "https://github.com/psf/requests-first"},
+                        {"type": "vcs", "url": "https://github.com/psf/requests-second"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation,
+            ),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.VALID),
+        ):
+            await pipeline.process(sbom)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        vcs_refs = [r for r in enriched_refs if r["type"] == "vcs"]
+        assert len(vcs_refs) == 1, "Only one VCS ref should remain with keep-first"
+        assert vcs_refs[0]["url"] == "https://github.com/psf/requests-first"
+
+    @pytest.mark.asyncio
+    async def test_multiple_vcs_keep_all_retains_all_valid(
+        self,
+        fake_resolvers,
+        settings_store_with_validation_keep_all,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "website", "url": "https://example.com"},
+                        {"type": "vcs", "url": "https://github.com/psf/requests-first"},
+                        {"type": "vcs", "url": "https://github.com/psf/requests-second"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation_keep_all,
+            ),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.VALID),
+        ):
+            await pipeline.process(sbom)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        vcs_refs = [r for r in enriched_refs if r["type"] == "vcs"]
+        assert len(vcs_refs) == 2, "Both VCS refs should remain with keep-all"
+        assert vcs_refs[0]["url"] == "https://github.com/psf/requests-first"
+        assert vcs_refs[1]["url"] == "https://github.com/psf/requests-second"
+
+    @pytest.mark.asyncio
+    async def test_all_vcs_invalid_triggers_reresolution_with_keep_all(
+        self,
+        fake_resolvers,
+        settings_store_with_validation_keep_all,
+    ):
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": "https://github.com/psf/requests-invalid1"},
+                        {"type": "vcs", "url": "https://github.com/psf/requests-invalid2"},
+                    ],
+                }
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation_keep_all,
+            ),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.INVALID),
+        ):
+            await pipeline.process(sbom)
+        enriched_refs = sbom["components"][0].get("externalReferences", [])
+        found_new_ref = any(
+            r.get("type") == "vcs" and "github.com" in (r.get("url") or "")
+            for r in enriched_refs
+        )
+        assert found_new_ref, "Expected re-resolution when all VCS refs are invalid"
 
     @pytest.mark.asyncio
     async def test_redirect_updates_ref_url(
@@ -442,44 +629,6 @@ class TestValidateExistingRefs:
             await pipeline.process(sbom)
         enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert len(enriched_refs) == 1
-        assert enriched_refs[0]["url"] == "https://github.com/psf/requests"
-
-    @pytest.mark.asyncio
-    async def test_rate_limited_with_redirect_updates_ref_url(
-        self,
-        fake_resolvers,
-        settings_store_with_validation,
-    ):
-        sbom = {
-            "bomFormat": "CycloneDX",
-            "specVersion": "1.6",
-            "version": 1,
-            "components": [
-                {
-                    "type": "library",
-                    "name": "requests",
-                    "version": "2.31.0",
-                    "purl": "pkg:pypi/requests@2.31.0",
-                    "externalReferences": [
-                        {"type": "vcs", "url": "https://old-url.com/psf/requests"},
-                    ],
-                }
-            ],
-        }
-        storage = InMemoryCache()
-        pipeline = SbomEnrichmentPipeline(
-            resolution_service=PurlResolutionService(
-                storage, fake_resolvers,
-                settings_store=settings_store_with_validation,
-            ),
-        )
-        with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
-            new_callable=AsyncMock,
-            return_value=_url_output(UrlValidationResult.RATE_LIMITED, final_url="https://github.com/psf/requests"),
-        ):
-            await pipeline.process(sbom)
-        enriched_refs = sbom["components"][0].get("externalReferences", [])
         assert enriched_refs[0]["url"] == "https://github.com/psf/requests"
 
     @pytest.mark.asyncio

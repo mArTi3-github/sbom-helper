@@ -131,7 +131,7 @@ class PurlResolutionService:
                             repo_url, r.name,
                         )
                         continue
-                    if voutput.result in (UrlValidationResult.NETWORK_ERROR, UrlValidationResult.RATE_LIMITED):
+                    if voutput.result == UrlValidationResult.NETWORK_ERROR:
                         logger.warning(
                             "URL validation inconclusive for %s (resolver=%s, result=%s), accepting anyway",
                             repo_url, r.name, voutput.result.value,
@@ -194,20 +194,20 @@ class PurlResolutionService:
         for comp in components:
             if comp.needs_enrichment:
                 continue
-            for ref in comp.existing_references:
-                if ref.get("type") == "vcs" and ref.get("url"):
-                    purl_key = safe_normalize(comp.purl)
-                    try:
-                        existing = await self._storage.lookup(purl_key)
-                    except Exception:
-                        existing = None
-                    if existing is None:
-                        await self._storage.store(ResolveResponse(
-                            purl=purl_key,
-                            repository_url=ref["url"],
-                            evidence=["from SBOM externalReferences"],
-                            resolver=resolver,
-                        ))
-                    break
+            vcs_refs = [ref for ref in comp.existing_references if ref.get("type") == "vcs" and ref.get("url")]
+            if not vcs_refs:
+                continue
+            purl_key = safe_normalize(comp.purl)
+            try:
+                existing = await self._storage.lookup(purl_key)
+            except Exception:
+                existing = None
+            if existing is None:
+                await self._storage.store(ResolveResponse(
+                    purl=purl_key,
+                    repository_url=vcs_refs[0]["url"],
+                    evidence=["from SBOM externalReferences"],
+                    resolver=resolver,
+                ))
 
 

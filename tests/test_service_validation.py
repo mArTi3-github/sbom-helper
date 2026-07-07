@@ -152,18 +152,6 @@ class TestValidationIntegration:
         mock_storage.delete_purls.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_rate_limited_returns_cached(self, mock_storage, mock_settings_store, mock_validation_service):
-        mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.RATE_LIMITED)
-        result = await PurlResolutionService(
-            mock_storage, [],
-            settings_store=mock_settings_store,
-            validation_service=mock_validation_service,
-        ).resolve_purl("pkg:pypi/requests")
-        assert result.response is not None
-        mock_storage.store.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_validate_db_urls_false_skips_validation(self, mock_storage):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         settings_store = MagicMock()

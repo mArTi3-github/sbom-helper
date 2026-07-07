@@ -39,6 +39,24 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !validateSbomRefs }">
+          <div>
+            <div class="setting-label">Behavior when multiple valid VCS-links are found</div>
+            <div class="setting-desc">
+              When multiple VCS references are valid, choose whether to keep only the
+              first one or keep all of them in the SBOM.
+            </div>
+          </div>
+          <select
+            v-model="sbomMultipleVcsBehavior"
+            :disabled="!validateSbomRefs"
+            @change="debouncedAutoSave({ sbom_multiple_vcs_behavior: sbomMultipleVcsBehavior })"
+            class="select-input"
+          >
+            <option value="keep-first">keep only first</option>
+            <option value="keep-all">keep all</option>
+          </select>
+        </div>
         <div class="setting-row">
           <div>
             <div class="setting-label">Validation timeout (seconds)</div>
@@ -292,7 +310,7 @@ import type { SettingsUpdate } from '../types/api'
 
 const store = useSettingsStore()
 const {
-  validateDbUrls, validateSbomRefs, urlValidationTimeout, revalidationCooldownHours,
+  validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, connectivityUrl, connectivityTimeout,
@@ -447,6 +465,11 @@ h1 {
 
 .setting-row:last-of-type {
   border-bottom: none;
+}
+
+.setting-disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .setting-label {

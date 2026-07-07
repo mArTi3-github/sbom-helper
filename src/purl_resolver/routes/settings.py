@@ -33,6 +33,7 @@ async def validate_librariesio_key(api_key: str) -> bool:
 class SettingsUpdate(BaseModel):
     validate_db_urls: bool | None = None
     validate_sbom_refs: bool | None = None
+    sbom_multiple_vcs_behavior: str | None = Field(None, pattern="^(keep-first|keep-all)$")
     url_validation_timeout: int | None = Field(None, ge=1, le=60)
     github_token: str | None = None
     librariesio_enabled: bool | None = None
@@ -69,6 +70,7 @@ async def get_settings(request: Request) -> JSONResponse:
     return JSONResponse(content={
         "validate_db_urls": app_settings.validate_db_urls,
         "validate_sbom_refs": app_settings.validate_sbom_refs,
+        "sbom_multiple_vcs_behavior": app_settings.sbom_multiple_vcs_behavior,
         "url_validation_timeout": app_settings.url_validation_timeout,
         "revalidation_cooldown_hours": app_settings.revalidation_cooldown_hours,
         "retry_max_attempts": app_settings.retry_max_attempts,
@@ -134,6 +136,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
     return JSONResponse(content={
         "validate_db_urls": updated.validate_db_urls,
         "validate_sbom_refs": updated.validate_sbom_refs,
+        "sbom_multiple_vcs_behavior": updated.sbom_multiple_vcs_behavior,
         "url_validation_timeout": updated.url_validation_timeout,
         "revalidation_cooldown_hours": updated.revalidation_cooldown_hours,
         "retry_max_attempts": updated.retry_max_attempts,

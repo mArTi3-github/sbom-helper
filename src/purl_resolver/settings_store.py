@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class AppSettings(BaseModel):
     validate_db_urls: bool = False
     validate_sbom_refs: bool = False
+    sbom_multiple_vcs_behavior: str = Field(default="keep-first", pattern="^(keep-first|keep-all)$")
     url_validation_timeout: int = Field(default=5, ge=1, le=60)
     github_token: str | None = None
     librariesio_enabled: bool = False
