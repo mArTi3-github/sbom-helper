@@ -45,9 +45,10 @@ When `PATCH /api/v1/settings` receives a `github_token`:
 ### 4. Token invalidation on use
 
 If a token fails during URL validation:
-1. `validate_url()` returns `UrlValidationResult.TOKEN_INVALID` only when GitHub returns HTTP 401 (invalid/expired/revoked token). HTTP 403 (rate limit, scope issues) does NOT trigger `TOKEN_INVALID`.
-2. `validate_url_with_retry()` deletes the token from settings and logs the event.
-3. Retries the validation without the token — for public repositories the unauthenticated request succeeds; for private repositories it returns a validation error.
+1. `validate_url()` returns `UrlValidationResult.TOKEN_INVALID`
+2. `service.py` deletes the token from settings
+3. Retries the validation without the token
+4. Logs the event
 
 ### 5. API response masking
 
