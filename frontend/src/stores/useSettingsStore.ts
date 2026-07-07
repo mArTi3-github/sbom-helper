@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getSettings, updateSettings } from '../api/settings'
+import { getSettings, updateSettings, checkGithubToken as checkGithubTokenApi } from '../api/settings'
 import type { SettingsUpdate } from '../types/api'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -20,6 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const connectivityTimeout = ref(2)
   const jsonIndent = ref(4)
   const tokenSet = ref({ github_token: false, librariesio_api_key: false, ecosystems_api_key: false })
+  const githubTokenValidity = ref<'valid' | 'invalid' | null>(null)
   const githubToken = ref('')
   const librariesioKey = ref('')
   const ecosystemsKey = ref('')
@@ -56,13 +57,22 @@ export const useSettingsStore = defineStore('settings', () => {
   async function save(partial: SettingsUpdate) {
     const data = await updateSettings(partial)
     tokenSet.value = data.token_set
-    if ('github_token' in partial) githubToken.value = ''
+    if ('github_token' in partial) {
+      githubToken.value = ''
+      githubTokenValidity.value = 'valid'
+    }
     if ('librariesio_api_key' in partial) librariesioKey.value = ''
     if ('ecosystems_api_key' in partial) ecosystemsKey.value = ''
   }
 
   async function clearToken(field: 'github_token' | 'librariesio_api_key' | 'ecosystems_api_key') {
     await updateSettings({ [field]: null } as SettingsUpdate)
+    if (field === 'github_token') githubTokenValidity.value = null
+  }
+
+  async function checkGithubToken() {
+    const result = await checkGithubTokenApi()
+    githubTokenValidity.value = result.status
   }
 
   return {
@@ -71,6 +81,7 @@ export const useSettingsStore = defineStore('settings', () => {
     librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, connectivityUrl, connectivityTimeout, jsonIndent,
     tokenSet, githubToken, librariesioKey, ecosystemsKey, loading,
-    hasAnyToken, load, save, clearToken,
+    githubTokenValidity,
+    hasAnyToken, load, save, clearToken, checkGithubToken,
   }
 })

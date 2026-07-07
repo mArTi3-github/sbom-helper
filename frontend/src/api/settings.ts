@@ -13,6 +13,10 @@ export function updateSettings(body: SettingsUpdate): Promise<SettingsResponse> 
   })
 }
 
+export function checkGithubToken(): Promise<{ status: 'valid' | 'invalid' }> {
+  return apiFetch<{ status: 'valid' | 'invalid' }>('/api/v1/settings/check-github-token', { method: 'POST' })
+}
+
 export function clearValidationCache(): Promise<{ status: string }> {
   return apiFetch('/api/v1/settings/clear-validation-cache', { method: 'POST' })
 }
