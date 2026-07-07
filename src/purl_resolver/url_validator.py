@@ -340,7 +340,7 @@ async def validate_url(
     if url.startswith(("http://", "https://")):
         try:
             resp = await _head_request(url, timeout, github_token=github_token)
-            if resp.status_code in (401, 403) and github_token:
+            if resp.status_code == 401 and github_token:
                 return UrlValidationOutput(
                     UrlValidationResult.TOKEN_INVALID,
                     final_url=str(resp.url),

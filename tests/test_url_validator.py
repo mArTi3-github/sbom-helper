@@ -148,6 +148,17 @@ class TestValidateUrlRedirectCapture:
 
 class TestValidateUrlWithToken:
     @pytest.mark.asyncio
+    async def test_403_with_token_does_not_return_token_invalid(self):
+        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
+             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
+            mock_head.return_value = _mock_response(403, {"x-github-media-type": "v3"})
+            result = await validate_url(
+                "https://github.com/psf/requests", timeout=5, github_token="ghp_valid_token"
+            )
+            assert result.result != UrlValidationResult.TOKEN_INVALID
+
+
+    @pytest.mark.asyncio
     async def test_token_passed_to_head_request(self):
         with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
              patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
