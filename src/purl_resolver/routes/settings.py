@@ -162,3 +162,17 @@ async def clear_validation_cache(request: Request) -> JSONResponse:
     vs: UrlValidationService = request.app.state.validation_service
     vs.clear_cache()
     return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.post("/api/v1/settings/check-github-token")
+async def check_github_token(request: Request) -> JSONResponse:
+    store: SettingsStore = request.app.state.settings_store
+    app_settings = store.load()
+    token = app_settings.github_token
+    if not token:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "token_not_set", "message": "GitHub token is not set"},
+        )
+    is_valid = await validate_github_token(token)
+    return JSONResponse(content={"status": "valid" if is_valid else "invalid"})

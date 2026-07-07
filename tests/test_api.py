@@ -240,6 +240,29 @@ class TestSettingsAPI:
         data = response.json()
         assert data["token_set"]["github_token"] is False
 
+    def test_check_github_token_valid(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "check1.json")
+        client.app.state.settings_store.save(AppSettings(github_token="ghp_valid"))
+        with patch("purl_resolver.routes.settings.validate_github_token", new_callable=AsyncMock, return_value=True):
+            response = client.post("/api/v1/settings/check-github-token")
+        assert response.status_code == 200
+        assert response.json() == {"status": "valid"}
+
+    def test_check_github_token_invalid(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "check2.json")
+        client.app.state.settings_store.save(AppSettings(github_token="ghp_invalid"))
+        with patch("purl_resolver.routes.settings.validate_github_token", new_callable=AsyncMock, return_value=False):
+            response = client.post("/api/v1/settings/check-github-token")
+        assert response.status_code == 200
+        assert response.json() == {"status": "invalid"}
+
+    def test_check_github_token_not_set(self, client: TestClient, tmp_path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "check3.json")
+        client.app.state.settings_store.save(AppSettings(github_token=None))
+        response = client.post("/api/v1/settings/check-github-token")
+        assert response.status_code == 400
+        assert response.json()["error"] == "token_not_set"
+
 
 class TestLibrariesIoSettings:
     def test_get_settings_includes_librariesio(self, client: TestClient) -> None:
