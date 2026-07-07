@@ -374,6 +374,33 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 
 ---
 
+### `POST /api/v1/settings/check-github-token`
+
+Manually validate the currently stored GitHub token. No request body.
+
+#### Response (200) — token is valid
+
+```json
+{ "status": "valid" }
+```
+
+#### Response (200) — token is invalid
+
+```json
+{ "status": "invalid" }
+```
+
+#### Error Response (400) — token not set
+
+```json
+{
+  "error": "token_not_set",
+  "message": "GitHub token is not set"
+}
+```
+
+---
+
 ### `POST /api/v1/convert/images-list`
 
 Convert a CycloneDX SBOM file into a machine-readable list of Docker container images in CycloneDX format.
@@ -473,6 +500,7 @@ Standard FastAPI/Pydantic 422 response.
 | Images list conversion: invalid SBOM format | 400 | `invalid_sbom` |
 | Images list conversion: file too large | 413 | `file_too_large` |
 | Images list conversion: missing file field | 422 | (Pydantic validation) |
+| GitHub token check with no token stored | 400 | `token_not_set` |
 | Network unavailable (GitHub connectivity check failed) | 503 | `network_unavailable` |
 
 ## Breaking Change Checklist

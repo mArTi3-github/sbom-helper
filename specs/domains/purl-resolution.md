@@ -158,6 +158,7 @@ Client                    API Layer (router)         Service Layer             p
 - Validates repository URLs via HTTP HEAD + multi-VCS probe to verify the URL exists and is reachable
 - `validate_url(url, timeout, github_token=None) → UrlValidationOutput` — performs HEAD (with `follow_redirects=True`), captures the final URL after all 3xx redirects via `str(resp.url)`, then runs `_check_vcs()` against the final URL; returns `UrlValidationOutput(result, final_url)`
 - `validate_url_with_retry(url, timeout, github_token=None, settings_store=None) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
+- `TOKEN_INVALID` is returned **only** on HTTP 401 (invalid/expired token). HTTP 403 (rate limit, scope issues) does NOT trigger `TOKEN_INVALID` — the response is treated as a passthrough to VCS probes.
 - `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
 - `ensure_connectivity(github_token=None, url=None, timeout=None) → bool` — connectivity probe against configurable URL (default `https://github.com`); raises `ConnectionError` on failure
 - `_RateLimitTracker` — instance-based in-memory counter with `asyncio.Lock` (module-level singleton `_rate_limit_tracker`); after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds

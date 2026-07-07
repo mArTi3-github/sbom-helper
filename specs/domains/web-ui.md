@@ -157,7 +157,7 @@ User                   Browser (Vue SPA)             API Layer
 - URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds), number input controls `revalidation_cooldown_hours` (0–720, default 24; 0 disables cooldown)
 - Retry Configuration card: number input controls `retry_max_attempts` (1–10), number input controls `retry_base_cooldown_seconds` (0.5–120)
 - Log Level card: dropdown controls `log_level` (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- GitHub API Token card: password input for GitHub PAT, status badge (set/not set), clear button, link to token generation
+- GitHub API Token card: password input for GitHub PAT, status badge (set/not set), clear button, link to token generation, validity indicator (valid/invalid/—) and "Check validity" button that POSTs to `/api/v1/settings/check-github-token`; validity auto-set to "valid" after successful PATCH save of a new token; validity hidden when token is not set
 - ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits), rate limit input (`ecosystems_max_requests_per_second`, 0.1–100), status badge (set/not set), clear button
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
 - Settings are loaded from `GET /api/v1/settings` on page mount
