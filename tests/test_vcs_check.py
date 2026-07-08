@@ -21,7 +21,6 @@ def _make_proc(returncode: int = 0, stderr: bytes = b"") -> AsyncMock:
     mock_proc = AsyncMock()
     mock_proc.communicate = AsyncMock(return_value=(b"", stderr))
     mock_proc.returncode = returncode
-    mock_proc.kill = MagicMock()
     mock_proc.wait = AsyncMock()
     return mock_proc
 
@@ -30,7 +29,6 @@ def _make_proc_timeout():
     """Create a mock subprocess whose communicate() raises asyncio.TimeoutError."""
     mock_proc = AsyncMock()
     mock_proc.communicate = AsyncMock(side_effect=TimeoutError)
-    mock_proc.kill = MagicMock()
     mock_proc.wait = AsyncMock()
     return mock_proc
 
@@ -250,7 +248,7 @@ class TestGitProbe:
         with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
             result = await _git_probe("https://github.com/psf/requests", 5)
             assert result is None
-            mock_exec.return_value.kill.assert_called_once()
+            mock_exec.return_value.wait.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_github_token_rewrites_url(self):
@@ -293,7 +291,7 @@ class TestSvnProbe:
         with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
             result = await _svn_probe("https://example.com/svn-repo", 5)
             assert result is None
-            mock_exec.return_value.kill.assert_called_once()
+            mock_exec.return_value.wait.assert_awaited_once()
 
 
 class TestHgProbe:
@@ -320,7 +318,7 @@ class TestHgProbe:
         with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
             result = await _hg_probe("https://example.com/hg-repo", 5)
             assert result is None
-            mock_exec.return_value.kill.assert_called_once()
+            mock_exec.return_value.wait.assert_awaited_once()
 
 
 def _make_streaming_response(

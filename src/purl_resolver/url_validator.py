@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import os
+import signal
 import socket
-
-import httpx
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
+
+import httpx
 
 if TYPE_CHECKING:
     from .settings_store import SettingsStore
@@ -130,11 +132,16 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
             "git", "ls-remote", "--exit-code", git_url,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            proc.kill()
+            if isinstance(proc.pid, int) and proc.pid > 1:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             await proc.wait()
             logger.warning("git ls-remote timed out for %s", url)
             return None
@@ -158,11 +165,16 @@ async def _svn_probe(url: str, timeout: int) -> bool | None:
             "svn", "ls", url,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            proc.kill()
+            if isinstance(proc.pid, int) and proc.pid > 1:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             await proc.wait()
             logger.warning("svn ls timed out for %s", url)
             return None
@@ -182,11 +194,16 @@ async def _hg_probe(url: str, timeout: int) -> bool | None:
             "hg", "identify", url,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
-            proc.kill()
+            if isinstance(proc.pid, int) and proc.pid > 1:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             await proc.wait()
             logger.warning("hg identify timed out for %s", url)
             return None
