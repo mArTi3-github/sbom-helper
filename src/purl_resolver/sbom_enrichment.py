@@ -110,6 +110,13 @@ class SbomEnrichmentPipeline:
 
         components = collect_components(sbom_data)
 
+        # --- Ignore patterns filtering (before validation) ---
+        if ignore_patterns:
+            for comp in components:
+                if _component_matches_any_pattern(sbom_data, comp, ignore_patterns):
+                    comp.ignored = True
+                    comp.needs_enrichment = False
+
         settings = self._resolution_service.settings_store
         if settings:
             app_settings = settings.load()
@@ -131,15 +138,6 @@ class SbomEnrichmentPipeline:
                             obj = obj[k]
                     assert isinstance(obj, dict)
                     obj["externalReferences"] = list(comp.existing_references)
-
-        # --- Ignore patterns filtering ---
-        if ignore_patterns:
-            for comp in components:
-                if not comp.needs_enrichment:
-                    continue
-                if _component_matches_any_pattern(sbom_data, comp, ignore_patterns):
-                    comp.ignored = True
-                    comp.needs_enrichment = False
 
         purls_to_resolve = [c for c in components if c.needs_enrichment]
 
