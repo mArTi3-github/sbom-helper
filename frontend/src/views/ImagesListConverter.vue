@@ -34,6 +34,7 @@
               <th>Заполнены компоненты</th>
               <th>Заполнено поле name</th>
               <th>Заполнено поле Properties</th>
+              <th>Удалено дублей</th>
             </tr>
           </thead>
           <tbody>
@@ -60,6 +61,7 @@
                   {{ img.missing_properties ? '\u2717' : '\u2713' }}
                 </span>
               </td>
+              <td>{{ img.duplicates_removed > 0 ? img.duplicates_removed : '—' }}</td>
             </tr>
           </tbody>
         </table>

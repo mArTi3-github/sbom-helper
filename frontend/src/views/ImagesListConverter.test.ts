@@ -14,6 +14,7 @@ const okResponse: ImagesListResponse = {
       missing_name: false,
       missing_version: false,
       missing_properties: false,
+      duplicates_removed: 0,
     },
     {
       name: 'redis',
@@ -22,6 +23,7 @@ const okResponse: ImagesListResponse = {
       missing_name: false,
       missing_version: true,
       missing_properties: false,
+      duplicates_removed: 0,
     },
   ],
   images_list: { images: [{ name: 'nginx', version: '1.25.0' }] },

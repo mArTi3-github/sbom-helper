@@ -74,6 +74,7 @@ export interface ImageItem {
   missing_name: boolean
   missing_version: boolean
   missing_properties: boolean
+  duplicates_removed: number
 }
 
 export interface ImagesListResponse {
