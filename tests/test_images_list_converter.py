@@ -543,3 +543,5 @@ class TestImagesListConverterAPI:
             assert "missing_name" in img
             assert "missing_version" in img
             assert "missing_properties" in img
+            assert "duplicates_removed" in img
+            assert isinstance(img["duplicates_removed"], int)

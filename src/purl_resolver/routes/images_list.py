@@ -56,6 +56,7 @@ async def convert_images_list(
                     "missing_name": img.missing_name,
                     "missing_version": img.missing_version,
                     "missing_properties": img.missing_properties,
+                    "duplicates_removed": img.duplicates_removed,
                 }
                 for img in result.images
             ],
