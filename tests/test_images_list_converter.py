@@ -12,6 +12,170 @@ from purl_resolver.sbom.parser import SbomParseError
 
 
 class TestImagesListConverter:
+    def test_dedup_by_purl(self) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "container",
+                    "name": "nginx",
+                    "version": "1.21",
+                    "purl": "pkg:docker/nginx@1.21",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "nginx",
+                    "version": "1.21",
+                    "purl": "pkg:docker/nginx@1.21",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "postgres",
+                    "version": "14",
+                    "purl": "pkg:docker/postgres@14",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+            ],
+        }
+        result = ImagesListConverter.convert(sbom)
+        assert len(result.images_list["components"]) == 2
+        assert result.images[0].name == "nginx"
+        assert result.images[0].duplicates_removed == 1
+        assert result.images[1].name == "postgres"
+        assert result.images[1].duplicates_removed == 0
+
+    def test_dedup_no_purl_not_deduped(self) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "container",
+                    "name": "web",
+                    "version": "1.0",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "web",
+                    "version": "1.0",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+            ],
+        }
+        result = ImagesListConverter.convert(sbom)
+        assert len(result.images_list["components"]) == 2
+        assert result.images[0].duplicates_removed == 0
+        assert result.images[1].duplicates_removed == 0
+
+    def test_dedup_already_valid_list_with_dups(self) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "container",
+                    "name": "nginx",
+                    "version": "1.21",
+                    "purl": "pkg:docker/nginx@1.21",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "nginx",
+                    "version": "1.21",
+                    "purl": "pkg:docker/nginx@1.21",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+            ],
+        }
+        result = ImagesListConverter.convert(sbom)
+        assert result.was_transformed is True
+        assert len(result.images_list["components"]) == 1
+        assert result.images[0].duplicates_removed == 1
+
+    def test_dedup_no_duplicates(self) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "container",
+                    "name": "web",
+                    "version": "1.0",
+                    "purl": "pkg:docker/web@1.0",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+            ],
+        }
+        result = ImagesListConverter.convert(sbom)
+        assert result.was_transformed is False
+        assert len(result.images_list["components"]) == 1
+        assert result.images[0].duplicates_removed == 0
+
+    def test_dedup_multiple_purls(self) -> None:
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "container",
+                    "name": "a",
+                    "version": "1",
+                    "purl": "pkg:docker/a",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "a",
+                    "version": "1",
+                    "purl": "pkg:docker/a",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "b",
+                    "version": "1",
+                    "purl": "pkg:docker/b",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "b",
+                    "version": "1",
+                    "purl": "pkg:docker/b",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "b",
+                    "version": "1",
+                    "purl": "pkg:docker/b",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+                {
+                    "type": "container",
+                    "name": "c",
+                    "version": "1",
+                    "purl": "pkg:docker/c",
+                    "properties": [{"name": "GOST:attack_surface", "value": "no"}],
+                },
+            ],
+        }
+        result = ImagesListConverter.convert(sbom)
+        assert len(result.images_list["components"]) == 3
+        assert result.images[0].duplicates_removed == 1
+        assert result.images[1].duplicates_removed == 2
+        assert result.images[2].duplicates_removed == 0
+
     def test_already_valid_images_list(self) -> None:
         sbom = {
             "bomFormat": "CycloneDX",

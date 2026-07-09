@@ -11,6 +11,7 @@ class ImageInfo:
     missing_name: bool = False
     missing_version: bool = False
     missing_properties: bool = False
+    duplicates_removed: int = 0
 
 
 @dataclass
@@ -25,18 +26,25 @@ class ImagesListConverter:
     def convert(cls, sbom_data: object) -> ImagesListConversionResult:
         data = cls._validate(sbom_data)
         top_components = data.get("components", [])
-        if cls._all_are_containers(top_components):
-            images = cls._build_image_infos(top_components)
-            return ImagesListConversionResult(
-                images_list=data, was_transformed=False, images=images
-            )
 
-        all_containers = cls._collect_containers(data)
+        if cls._all_are_containers(top_components):
+            containers = top_components
+            was_transformed = False
+        else:
+            containers = cls._collect_containers(data)
+            was_transformed = True
+
+        deduped, dup_counts = cls._deduplicate_containers(containers)
+
+        if dup_counts:
+            was_transformed = True
+
+        images = cls._build_image_infos(deduped, dup_counts)
         result_sbom = dict(data)
-        result_sbom["components"] = all_containers
-        images = cls._build_image_infos(all_containers)
+        result_sbom["components"] = deduped
+
         return ImagesListConversionResult(
-            images_list=result_sbom, was_transformed=True, images=images
+            images_list=result_sbom, was_transformed=was_transformed, images=images
         )
 
     @classmethod
@@ -60,6 +68,21 @@ class ImagesListConverter:
         return containers
 
     @classmethod
+    def _deduplicate_containers(cls, containers: list[dict]) -> tuple[list[dict], dict[str, int]]:
+        seen: set[str] = set()
+        dup_counts: dict[str, int] = {}
+        deduped: list[dict] = []
+        for comp in containers:
+            purl = comp.get("purl")
+            if isinstance(purl, str):
+                if purl in seen:
+                    dup_counts[purl] = dup_counts.get(purl, 0) + 1
+                    continue
+                seen.add(purl)
+            deduped.append(comp)
+        return deduped, dup_counts
+
+    @classmethod
     def _walk_and_collect(cls, obj: object, containers: list[dict]) -> None:
         if isinstance(obj, dict):
             if obj.get("type") == "container":
@@ -72,11 +95,15 @@ class ImagesListConverter:
                 cls._walk_and_collect(item, containers)
 
     @classmethod
-    def _build_image_infos(cls, components: list[dict]) -> list[ImageInfo]:
+    def _build_image_infos(cls, components: list[dict], dup_counts: dict[str, int] | None = None) -> list[ImageInfo]:
+        if dup_counts is None:
+            dup_counts = {}
         images: list[ImageInfo] = []
         for comp in components:
             name = comp.get("name")
             version = comp.get("version")
+            purl = comp.get("purl")
+            dr = dup_counts.get(purl, 0) if isinstance(purl, str) else 0
             info = ImageInfo(
                 name=name if isinstance(name, str) and name else None,
                 version=version if isinstance(version, str) and version else None,
@@ -84,6 +111,7 @@ class ImagesListConverter:
                 missing_version=not (isinstance(version, str) and version),
                 missing_components=not cls._has_subcomponents(comp),
                 missing_properties=not cls._has_properties(comp),
+                duplicates_removed=dr,
             )
             images.append(info)
         return images
