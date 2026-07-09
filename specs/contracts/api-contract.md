@@ -425,16 +425,17 @@ Convert a CycloneDX SBOM file into a machine-readable list of Docker container i
       "missing_components": false,
       "missing_name": false,
       "missing_version": false,
-      "missing_properties": false
+      "missing_properties": false,
+      "duplicates_removed": 0
     }
   ],
   "images_list": { "bomFormat": "CycloneDX", "...": "..." }
 }
 ```
 
-- `was_transformed` — boolean, whether the SBOM needed transformation (true = containers were promoted from nested levels, non-containers removed)
-- `images` — array of ImageInfo objects with completeness flags: `missing_components` (no nested components), `missing_name` (name empty/absent), `missing_version` (version empty/absent), `missing_properties` (properties empty/absent)
-- `images_list` — the resulting CycloneDX document with only `type=container` components at the top level
+- `was_transformed` — boolean, whether the SBOM was modified (true = containers were promoted from nested levels, non-containers removed, or duplicate containers with the same `purl` were removed)
+- `images` — array of ImageInfo objects with completeness flags: `missing_components` (no nested components), `missing_name` (name empty/absent), `missing_version` (version empty/absent), `missing_properties` (properties empty/absent), `duplicates_removed` (how many additional copies of this image with the same `purl` were removed)
+- `images_list` — the resulting CycloneDX document with only `type=container` components at the top level, deduplicated by `purl`
 
 #### Error Response (400) — invalid JSON
 

@@ -172,10 +172,11 @@ User                   Browser (Vue SPA)             API Layer
 - Upload area supports drag-and-drop and file picker (via `FileUploadZone` component)
 - Convert button is disabled until a file is selected
 - Loading spinner is shown during server-side processing
-- Status card displays: "Преобразований не требуется" (green) if `was_transformed=false`, or "Выполнено преобразование" (yellow) if `was_transformed=true`
-- Results table displays columns: Имя образа, Версия, Заполнены компоненты, Заполнено поле name, Заполнено поле Properties
+- Status card displays: "Преобразований не требуется" (green) if `was_transformed=false`, or "Выполнено преобразование" (yellow) if `was_transformed=true`; `was_transformed` is true when containers were promoted from nested levels or when duplicate containers (same `purl`) were removed
+- Results table displays columns: Имя образа, Версия, Заполнены компоненты, Заполнено поле name, Заполнено поле Properties, Удалено дублей
 - Completeness flags use ✅ (green) when condition is met, ❌ (red) when not; empty cells only when condition is met and flag is positive
 - Version cell shows ❌ inline when version is missing
+- "Удалено дублей" column shows the number of container components with the same `purl` that were removed; shows em-dash (`—`) when no duplicates were removed
 - "Скачать список образов" button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled)
 - All states (empty, loading, success, error, network failure) have distinct visual representations
 

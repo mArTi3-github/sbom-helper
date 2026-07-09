@@ -204,7 +204,7 @@
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
 - Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
-- Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, returns conversion result with completeness flags
+- Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, deduplicates by `purl`, returns conversion result with completeness flags and duplicate counts
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`
 - Handle error responses from Service Layer and Pipeline
 - Serve the Vue 3 SPA via `SPAStaticFiles` mounted at `/` in `main.py` (after all API routes); `SPAStaticFiles` falls back to `index.html` for any unmatched path, enabling Vue Router client-side routing
@@ -248,7 +248,7 @@
 - **`enricher.py`** — `enrich_sbom(sbom, components, resolved)` inserts `{"type": "vcs", "url": "..."}` into component `externalReferences` arrays at the correct paths; preserves existing references; increments `version` field by 1
 - **`remover.py`** — `remove_unresolved_components(sbom, components, resolved) → list[dict]` removes components that need enrichment, have no subcomponents, and were not resolved; returns list of removed component dicts
 - **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL; removed components are excluded from `not_found` counts
-- **`images_list_converter.py`** — `ImagesListConverter.convert(data) → ImagesListConversionResult` validates SBOM format via `CycloneDXParser`, checks if all top-level components are `type=container`, recursively collects container components from all nesting levels, promotes them to top-level, removes non-container components; returns `ImagesListConversionResult` with `was_transformed` flag, `images` list (with completeness flags), and the resulting `images_list` dict
+- **`images_list_converter.py`** — `ImagesListConverter.convert(data) → ImagesListConversionResult` validates SBOM format via `CycloneDXParser`, checks if all top-level components are `type=container`, recursively collects container components from all nesting levels, promotes them to top-level, removes non-container components, deduplicates remaining containers by `purl` field (first-wins, components without `purl` treated as unique); returns `ImagesListConversionResult` with `was_transformed` flag, `images` list (with completeness flags and per-image duplicate count), and the resulting `images_list` dict
 - Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly
 
 ### Config Layer (`config.py`)
