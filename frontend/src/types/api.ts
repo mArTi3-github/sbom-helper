@@ -43,6 +43,7 @@ export interface SettingsResponse {
   connectivity_url: string
   connectivity_timeout: number
   json_indent: number
+  language: string
   token_set: SettingsTokenSet
 }
 
@@ -65,6 +66,7 @@ export interface SettingsUpdate {
   connectivity_url?: string
   connectivity_timeout?: number
   json_indent?: number
+  language?: string
 }
 
 export interface ImageItem {

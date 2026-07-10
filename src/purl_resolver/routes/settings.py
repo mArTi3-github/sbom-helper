@@ -49,6 +49,7 @@ class SettingsUpdate(BaseModel):
     connectivity_url: str | None = None
     connectivity_timeout: int | None = Field(None, ge=1, le=30)
     json_indent: Literal[1, 2, 4] | None = Field(None)
+    language: Literal['en', 'ru'] | None = None
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -83,6 +84,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "connectivity_url": app_settings.connectivity_url,
         "connectivity_timeout": app_settings.connectivity_timeout,
         "json_indent": app_settings.json_indent,
+        "language": app_settings.language,
         "token_set": {
             "github_token": app_settings.github_token is not None,
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
@@ -149,6 +151,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "connectivity_url": updated.connectivity_url,
         "connectivity_timeout": updated.connectivity_timeout,
         "json_indent": updated.json_indent,
+        "language": updated.language,
         "token_set": {
             "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,

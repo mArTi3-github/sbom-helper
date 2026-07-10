@@ -31,6 +31,7 @@ class AppSettings(BaseModel):
     connectivity_url: str = Field(default="https://github.com")
     connectivity_timeout: int = Field(default=2, ge=1, le=30)
     json_indent: Literal[1, 2, 4] = Field(default=4)
+    language: Literal['en', 'ru'] = "en"
 
     def log_level_as_int(self) -> int:
         return getattr(logging, self.log_level.upper(), logging.INFO)
