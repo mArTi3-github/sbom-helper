@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
+import { mountWithI18n } from '../tests/i18n'
 import PurlResolver from './PurlResolver.vue'
 import { ApiError } from '../api/client'
 import type { ResolveResponse } from '../types/api'
@@ -25,7 +26,7 @@ vi.mock('../api/purl', () => ({
 }))
 
 function mountResolver() {
-  return mount(PurlResolver)
+  return mountWithI18n(PurlResolver)
 }
 
 describe('PurlResolver.vue', () => {
@@ -98,7 +99,7 @@ describe('PurlResolver.vue', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('not_found')
+    expect(wrapper.find('.error-msg').text()).toBe('Not found')
     expect(wrapper.find('.result').exists()).toBe(false)
   })
 

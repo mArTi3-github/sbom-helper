@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
+import { mountWithI18n } from '../tests/i18n'
 import SbomUpdater from './SbomUpdater.vue'
 import { ApiError } from '../api/client'
 import type { SbomResponse } from '../types/api'
@@ -30,12 +31,12 @@ const resolveSbomMock = vi.fn()
 vi.mock('../api/sbom', () => ({
   getIgnorePatterns: () => getIgnorePatternsMock(),
   saveIgnorePatterns: (patterns: unknown) => saveIgnorePatternsMock(patterns),
-  resolveSbom: (file: File, removeUnresolved: boolean, validateRefs: boolean, patterns: unknown, signal: AbortSignal) =>
-    resolveSbomMock(file, removeUnresolved, validateRefs, patterns, signal),
+  resolveSbom: (file: File, removeUnresolved: boolean, patterns: unknown, signal?: AbortSignal) =>
+    resolveSbomMock(file, removeUnresolved, patterns, signal),
 }))
 
 function mountUpdater() {
-  return mount(SbomUpdater)
+  return mountWithI18n(SbomUpdater)
 }
 
 describe('SbomUpdater.vue', () => {
@@ -74,10 +75,10 @@ describe('SbomUpdater.vue', () => {
     expect(wrapper.findAll('.pattern-row').length).toBe(1)
   })
 
-  it('adds a new empty pattern row when "Добавить строку" is clicked', async () => {
+  it('adds a new empty pattern row when "Add row" is clicked', async () => {
     const wrapper = mountUpdater()
     await flushPromises()
-    const addBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Добавить'))
+    const addBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Add'))
     await addBtn!.trigger('click')
     expect(wrapper.findAll('.pattern-row').length).toBe(2)
   })
@@ -100,11 +101,11 @@ describe('SbomUpdater.vue', () => {
       getIgnorePatternsMock.mockResolvedValueOnce(twoPatternsFresh)
       const wrapper = mountUpdater()
       await flushPromises()
-      const addBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Добавить'))
+      const addBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Add'))
       await addBtn!.trigger('click')
       await flushPromises()
 
-      const saveBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Сохранить'))
+      const saveBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Save'))
       await saveBtn!.trigger('click')
       await flushPromises()
 
@@ -122,11 +123,11 @@ describe('SbomUpdater.vue', () => {
     saveIgnorePatternsMock.mockRejectedValueOnce(new ApiError(400, 'bad_request'))
     const wrapper = mountUpdater()
     await flushPromises()
-    const saveBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Сохранить'))
+    const saveBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Save'))
     await saveBtn!.trigger('click')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('bad_request')
+    expect(wrapper.find('.error-msg').text()).toBe('Bad request')
   })
 
   it('processes SBOM and renders summary + results table', async () => {
@@ -136,7 +137,7 @@ describe('SbomUpdater.vue', () => {
     await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
     await flushPromises()
 
-    const processBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Обработать'))
+    const processBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Process'))
     expect(processBtn!.attributes('disabled')).toBeUndefined()
     await processBtn!.trigger('click')
     await flushPromises()
@@ -155,18 +156,18 @@ describe('SbomUpdater.vue', () => {
     const file = new File(['{}'], 'bom.json', { type: 'application/json' })
     await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
     await flushPromises()
-    await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Обработать'))!.trigger('click')
+    await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Process'))!.trigger('click')
     await flushPromises()
 
     const args = resolveSbomMock.mock.calls[0]
-    expect(args.length).toBe(5)
-    expect(args[4]).toBeInstanceOf(AbortSignal)
+    expect(args.length).toBe(4)
+    expect(args[3]).toBeInstanceOf(AbortSignal)
   })
 
   it('process button is disabled when no file is selected', async () => {
     const wrapper = mountUpdater()
     await flushPromises()
-    const processBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Обработать'))
+    const processBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Process'))
     expect(processBtn!.attributes('disabled')).toBeDefined()
     await processBtn!.trigger('click')
     await flushPromises()

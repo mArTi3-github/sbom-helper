@@ -1,6 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
+import { mountWithI18n } from '../tests/i18n'
 import DatabaseAdmin from './DatabaseAdmin.vue'
 import DbFilterPanel from '../components/db/DbFilterPanel.vue'
 import DbDataTable from '../components/db/DbDataTable.vue'
@@ -48,7 +49,7 @@ vi.mock('../api/db', () => ({
 }))
 
 function mountAdmin() {
-  return mount(DatabaseAdmin)
+  return mountWithI18n(DatabaseAdmin)
 }
 
 describe('DatabaseAdmin.vue', () => {

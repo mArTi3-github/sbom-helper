@@ -1,6 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import { mountWithI18n } from '../tests/i18n'
 import Settings from './Settings.vue'
 import type { SettingsResponse } from '../types/api'
 
@@ -40,7 +41,7 @@ async function flush(ms = 0) {
 }
 
 function mountSettings(): VueWrapper {
-  return mount(Settings)
+  return mountWithI18n(Settings)
 }
 
 describe('Settings.vue', () => {

@@ -1,5 +1,7 @@
+import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
+import { mountWithI18n } from '../tests/i18n'
 import ImagesListConverter from './ImagesListConverter.vue'
 import { ApiError } from '../api/client'
 import type { ImagesListResponse } from '../types/api'
@@ -36,11 +38,12 @@ vi.mock('../api/images', () => ({
 }))
 
 function mountConverter() {
-  return mount(ImagesListConverter)
+  return mountWithI18n(ImagesListConverter)
 }
 
 describe('ImagesListConverter.vue', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     convertMock.mockResolvedValue(okResponse)
   })
@@ -82,7 +85,7 @@ describe('ImagesListConverter.vue', () => {
     const statusCard = wrapper.find('.status-card')
     expect(statusCard.exists()).toBe(true)
     expect(statusCard.classes()).toContain('status-ok')
-    expect(statusCard.text()).toContain('Преобразований не требуется')
+    expect(statusCard.text()).toContain('No transformation needed')
   })
 
   it('renders yellow status card when was_transformed is true', async () => {
@@ -96,7 +99,7 @@ describe('ImagesListConverter.vue', () => {
     await flushPromises()
     const statusCard = wrapper.find('.status-card')
     expect(statusCard.classes()).toContain('status-transformed')
-    expect(statusCard.text()).toContain('Выполнено преобразование')
+    expect(statusCard.text()).toContain('Transformation applied')
   })
 
   it('renders images table with completeness flags', async () => {
@@ -124,7 +127,7 @@ describe('ImagesListConverter.vue', () => {
     await wrapper.find('.toolbar button').trigger('click')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('bad_request')
+    expect(wrapper.find('.error-msg').text()).toBe('Bad request')
     expect(wrapper.find('.results').exists()).toBe(false)
   })
 
@@ -140,7 +143,7 @@ describe('ImagesListConverter.vue', () => {
     expect(wrapper.find('.error-msg').text()).toContain('Network error')
   })
 
-  it('triggers JSON download when "Скачать список образов" is clicked', async () => {
+  it('triggers JSON download when "Download image list" is clicked', async () => {
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake')
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     const clickSpy = vi.fn()
@@ -163,7 +166,7 @@ describe('ImagesListConverter.vue', () => {
     await flushPromises()
 
     const buttons = wrapper.findAll('.toolbar button')
-    const downloadBtn = buttons.find((b) => b.text().includes('Скачать'))
+    const downloadBtn = buttons.find((b) => b.text().includes('Download'))
     expect(downloadBtn).toBeDefined()
     await downloadBtn!.trigger('click')
 
