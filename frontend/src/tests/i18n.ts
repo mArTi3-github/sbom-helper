@@ -1,7 +1,7 @@
 import { createI18n } from 'vue-i18n'
 import { mount, type MountingOptions } from '@vue/test-utils'
 
-const en: Record<string, unknown> = {
+const en = {
   common: { appTitle: 'sbom-helper', pageNotFound: 'Page not found', goHome: 'Go to PURL Resolver', poweredBy: 'Powered by sbom-helper' },
   nav: { purlResolver: 'PURL Resolver', sbomUpdater: 'SBOM Updater', dbAdmin: 'Database Admin', settings: 'Settings', imagesListConverter: 'Images List Converter' },
   purlResolver: { title: 'PURL Resolver', subtitle: 'Resolve a Package URL to its source code repository', placeholder: 'pkg:pypi/requests@2.31.0', resolve: 'Resolve', resolving: 'Resolving...', noRepoUrl: 'No repository URL found', hideDetails: 'Hide details', showDetails: 'Show details', repoUrl: 'Repository URL', repoType: 'Repository Type', repoKind: 'Repository Kind', evidence: 'Evidence', warnings: 'Warnings', versionRef: 'Version Reference', foundBy: 'Found by', resolver: 'Resolver', unknown: 'unknown' },

@@ -351,7 +351,11 @@ function autoSave(partial: SettingsUpdate) {
       if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
       if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
     })
-    .catch((err: Error) => showToast(t('settings.saveFailedToast', { message: err.message }), true))
+    .catch((err: Error) => {
+      const apiErr = err as import('../api/client').ApiError
+      const msg = apiErr.error ? t('errors.' + apiErr.error, apiErr.data) : err.message
+      showToast(t('settings.saveFailedToast', { message: msg }), true)
+    })
 }
 
 const debouncedAutoSave = debounce(autoSave, 500)
@@ -418,13 +422,15 @@ async function onClearValidationCache() {
 
 async function setLanguage(e: Event) {
   const lang = (e.target as HTMLSelectElement).value
-  locale.value = lang
-  localStorage.setItem('locale', lang)
   try {
     await store.save({ language: lang } as SettingsUpdate)
+    locale.value = lang
+    localStorage.setItem('locale', lang)
     showToast(t('settings.savedToast'), false)
-  } catch {
-    showToast(t('settings.saveFailedToast', { message: '' }), true)
+  } catch (err) {
+    const apiErr = err as import('../api/client').ApiError
+    const msg = apiErr.error ? t('errors.' + apiErr.error, apiErr.data) : t('settings.errorMessages.loadFailed')
+    showToast(msg, true)
   }
 }
 
