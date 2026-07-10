@@ -29,127 +29,169 @@
     </div>
 
     <div class="toolbar">
-      <button :disabled="!selectedFile || processing" @click="handleProcess">{{ t('sbomUpdater.process') }}</button>
-    </div>
-
-    <div v-if="processing" class="loading">
-      <span class="spinner"></span> {{ t('sbomUpdater.processing') }}
+      <button :disabled="!selectedFile || submitting" @click="handleProcess">{{ t('sbomUpdater.process') }}</button>
     </div>
 
     <div v-if="error" class="error-msg">{{ error }}</div>
 
-    <div v-if="result" class="results">
-      <div class="summary-grid">
-        <div class="summary-item">
-          <div class="summary-value">{{ result.summary.total_purls }}</div>
-          <div class="summary-label">
-            {{ t('sbomUpdater.total') }}
-            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttUniquePurls')">i</span>
+    <!-- Recent Jobs + Details -->
+    <div v-if="jobs.length > 0" class="jobs-section">
+      <RecentJobs :jobs="jobs" :active-id="activeJobId" @select="selectJob" />
+    </div>
+
+    <div v-if="activeJobId && activeJob" class="job-details">
+      <!-- queued / running -->
+      <div v-if="activeJob.status === 'queued' || activeJob.status === 'running'" class="loading">
+        <span class="spinner"></span>
+        <span>{{ t('sbomUpdater.processing') }}</span>
+        <span v-if="activeJob.progress_total > 0" class="progress-text">
+          ({{ activeJob.progress_current }} / {{ activeJob.progress_total }})
+        </span>
+        <button class="btn-cancel" @click="handleCancel" :disabled="cancelling">
+          {{ t('common.cancel') }}
+        </button>
+      </div>
+
+      <!-- completed -->
+      <div v-if="activeJob.status === 'completed' && activeJob.summary" class="results">
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-value">{{ activeJob.summary.total_purls }}</div>
+            <div class="summary-label">
+              {{ t('sbomUpdater.total') }}
+              <span class="info-icon" :data-tooltip="t('sbomUpdater.ttUniquePurls')">i</span>
+            </div>
+          </div>
+          <div class="summary-item summary-found">
+            <div class="summary-value">{{ activeJob.summary.found }}</div>
+            <div class="summary-label">
+              {{ t('sbomUpdater.found') }}
+              <span class="info-icon" :data-tooltip="t('sbomUpdater.ttFoundRepo')">i</span>
+            </div>
+          </div>
+          <div class="summary-item summary-not-found">
+            <div class="summary-value">{{ activeJob.summary.not_found }}</div>
+            <div class="summary-label">
+              {{ t('sbomUpdater.notFound') }}
+              <span class="info-icon" :data-tooltip="t('sbomUpdater.ttNotFound')">i</span>
+            </div>
+          </div>
+          <div v-if="activeJob.summary.skipped > 0" class="summary-item summary-skipped">
+            <div class="summary-value">{{ activeJob.summary.skipped }}</div>
+            <div class="summary-label">
+              {{ t('sbomUpdater.skipped') }}
+              <span class="info-icon" :data-tooltip="t('sbomUpdater.ttSkipped')">i</span>
+            </div>
+          </div>
+          <div v-if="activeJob.summary.removed > 0" class="summary-item summary-removed">
+            <div class="summary-value">{{ activeJob.summary.removed }}</div>
+            <div class="summary-label">
+              {{ t('sbomUpdater.removed') }}
+              <span class="info-icon" :data-tooltip="t('sbomUpdater.ttRemoved')">i</span>
+            </div>
+          </div>
+          <div v-if="activeJob.summary.ignored > 0" class="summary-item summary-ignored">
+            <div class="summary-value">{{ activeJob.summary.ignored }}</div>
+            <div class="summary-label">
+              {{ t('sbomUpdater.ignored') }}
+              <span class="info-icon" :data-tooltip="t('sbomUpdater.ttIgnored')">i</span>
+            </div>
           </div>
         </div>
-        <div class="summary-item summary-found">
-          <div class="summary-value">{{ result.summary.found }}</div>
-          <div class="summary-label">
-            {{ t('sbomUpdater.found') }}
-            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttFoundRepo')">i</span>
-          </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t('sbomUpdater.purl') }}</th>
+                <th>{{ t('sbomUpdater.status') }}</th>
+                <th>{{ t('sbomUpdater.repoUrl') }}</th>
+                <th>{{ t('sbomUpdater.foundBy') }}</th>
+                <th>{{ t('sbomUpdater.resolver') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, i) in activeJob.results" :key="i">
+                <td class="cell-purl">{{ item.purl }}</td>
+                <td>
+                  <span :class="['status-badge', 'status-' + item.status]">{{ t('status.' + item.status) }}</span>
+                </td>
+                <td>
+                  <a v-if="item.repository_url" :href="safeUrl(item.repository_url)" target="_blank">{{ item.repository_url }}</a>
+                  <span v-else>—</span>
+                </td>
+                <td>{{ item.found_by || '—' }}</td>
+                <td>{{ item.resolver || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="summary-item summary-not-found">
-          <div class="summary-value">{{ result.summary.not_found }}</div>
-          <div class="summary-label">
-            {{ t('sbomUpdater.notFound') }}
-            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttNotFound')">i</span>
-          </div>
-        </div>
-        <div v-if="result.summary.skipped > 0" class="summary-item summary-skipped">
-          <div class="summary-value">{{ result.summary.skipped }}</div>
-          <div class="summary-label">
-            {{ t('sbomUpdater.skipped') }}
-            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttSkipped')">i</span>
-          </div>
-        </div>
-        <div v-if="result.summary.removed > 0" class="summary-item summary-removed">
-          <div class="summary-value">{{ result.summary.removed }}</div>
-          <div class="summary-label">
-            {{ t('sbomUpdater.removed') }}
-            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttRemoved')">i</span>
-          </div>
-        </div>
-        <div v-if="result.summary.ignored > 0" class="summary-item summary-ignored">
-          <div class="summary-value">{{ result.summary.ignored }}</div>
-          <div class="summary-label">
-            {{ t('sbomUpdater.ignored') }}
-            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttIgnored')">i</span>
-          </div>
+
+        <div class="toolbar">
+          <a :href="downloadResultUrl()" class="btn-primary" download>
+            {{ t('sbomUpdater.downloadEnriched') }}
+          </a>
         </div>
       </div>
 
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>{{ t('sbomUpdater.purl') }}</th>
-              <th>{{ t('sbomUpdater.status') }}</th>
-              <th>{{ t('sbomUpdater.repoUrl') }}</th>
-              <th>{{ t('sbomUpdater.foundBy') }}</th>
-              <th>{{ t('sbomUpdater.resolver') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, i) in result.results" :key="i">
-              <td class="cell-purl">{{ item.purl }}</td>
-              <td>
-                <span :class="['status-badge', 'status-' + item.status]">{{ t('status.' + item.status) }}</span>
-              </td>
-              <td>
-                <a v-if="item.repository_url" :href="safeUrl(item.repository_url)" target="_blank">{{ item.repository_url }}</a>
-                <span v-else>—</span>
-              </td>
-              <td>{{ item.found_by || '—' }}</td>
-              <td>{{ item.resolver || '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- failed -->
+      <div v-if="activeJob.status === 'failed'" class="error-msg">
+        {{ activeJob.error_message || t('sbomUpdater.failed') }}
       </div>
 
-      <div class="toolbar">
-        <button @click="downloadResult">{{ t('sbomUpdater.downloadEnriched') }}</button>
+      <!-- cancelled -->
+      <div v-if="activeJob.status === 'cancelled'" class="info-msg">
+        {{ t('sbomUpdater.cancelled') }}
+      </div>
+
+      <!-- Delete button for terminal statuses -->
+      <div v-if="isTerminal(activeJob.status)" class="toolbar">
+        <button class="btn-delete-job" @click="handleDelete" :disabled="deleting">
+          {{ t('common.delete') }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
-import { getIgnorePatterns, saveIgnorePatterns, resolveSbom } from '../api/sbom'
+import RecentJobs from '../components/RecentJobs.vue'
+import { getIgnorePatterns, saveIgnorePatterns } from '../api/sbom'
+import { createSbomEnrichJob, getJob, cancelJob, deleteJob, listJobs, downloadJobResultUrl } from '../api/jobs'
 import { ApiError } from '../api/client'
-import { useSettingsStore } from '../stores/useSettingsStore'
-import { downloadJson, safeUrl } from '../composables/useDownload'
-import type { IgnorePatternItem, SbomResponse } from '../types/api'
+import { safeUrl } from '../composables/useDownload'
+import type { IgnorePatternItem, JobRecord, JobStatus } from '../types/api'
 
 const { t } = useI18n()
 
 const selectedFile = ref<File | null>(null)
 const removeUnresolved = ref(false)
-const processing = ref(false)
+const submitting = ref(false)
 const error = ref<string | null>(null)
-const result = ref<SbomResponse | null>(null)
-const enrichedSbom = ref<unknown>(null)
+const cancelling = ref(false)
+const deleting = ref(false)
 
 const patternRows = ref<IgnorePatternItem[]>([])
 const savingPatterns = ref(false)
 const patternsSaved = ref(false)
 
+const jobs = ref<JobRecord[]>([])
+const activeJobId = ref<string | null>(null)
+const activeJob = computed(() => jobs.value.find(j => j.job_id === activeJobId.value) || null)
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
-let abortController: AbortController | null = null
+
+function isTerminal(status: JobStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled'
+}
 
 function onFileSelected(file: File) {
   selectedFile.value = file
   error.value = null
-  result.value = null
-  enrichedSbom.value = null
 }
 
 function addRow() {
@@ -189,25 +231,18 @@ async function savePatterns() {
 
 async function handleProcess() {
   if (!selectedFile.value) return
-
   error.value = null
-  result.value = null
-  enrichedSbom.value = null
-  processing.value = true
-
-  abortController = new AbortController()
-
+  submitting.value = true
   try {
-    const res = await resolveSbom(
+    const res = await createSbomEnrichJob(
       selectedFile.value,
       removeUnresolved.value,
       collectPatterns(),
-      abortController.signal,
     )
-    result.value = res
-    enrichedSbom.value = res.enriched_sbom
+    activeJobId.value = res.job_id
+    await loadJobs()
+    startPolling(res.job_id)
   } catch (e: unknown) {
-    if (e instanceof DOMException && e.name === 'AbortError') return
     if (e instanceof ApiError) {
       error.value = t('errors.' + e.error, e.data)
     } else if (e instanceof Error) {
@@ -216,15 +251,82 @@ async function handleProcess() {
       error.value = t('errors.unexpected_error')
     }
   } finally {
-    processing.value = false
-    abortController = null
+    submitting.value = false
   }
 }
 
-function downloadResult() {
-  if (!enrichedSbom.value || !selectedFile.value) return
-  const store = useSettingsStore()
-  downloadJson(enrichedSbom.value, selectedFile.value.name.replace(/\.json$/, '') + '_enriched.json', store.jsonIndent)
+function startPolling(jobId: string) {
+  stopPolling()
+  pollTimer = setInterval(async () => {
+    try {
+      const record = await getJob(jobId)
+      const idx = jobs.value.findIndex(j => j.job_id === jobId)
+      if (idx >= 0) {
+        jobs.value[idx] = record
+      }
+      if (isTerminal(record.status)) {
+        stopPolling()
+      }
+    } catch {
+      stopPolling()
+    }
+  }, 2000)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+async function selectJob(jobId: string) {
+  activeJobId.value = jobId
+  stopPolling()
+  const record = jobs.value.find(j => j.job_id === jobId)
+  if (record && !isTerminal(record.status)) {
+    startPolling(jobId)
+  }
+}
+
+async function handleCancel() {
+  if (!activeJobId.value) return
+  cancelling.value = true
+  try {
+    await cancelJob(activeJobId.value)
+    await loadJobs()
+  } catch {
+    // ignore
+  } finally {
+    cancelling.value = false
+  }
+}
+
+async function handleDelete() {
+  if (!activeJobId.value) return
+  deleting.value = true
+  try {
+    await deleteJob(activeJobId.value)
+    jobs.value = jobs.value.filter(j => j.job_id !== activeJobId.value)
+    activeJobId.value = jobs.value.length > 0 ? jobs.value[0].job_id : null
+  } catch {
+    // ignore
+  } finally {
+    deleting.value = false
+  }
+}
+
+async function loadJobs() {
+  try {
+    const data = await listJobs(20, 0)
+    jobs.value = data.jobs
+  } catch {
+    // ignore
+  }
+}
+
+function downloadResultUrl(): string {
+  return activeJobId.value ? downloadJobResultUrl(activeJobId.value) : '#'
 }
 
 onMounted(async () => {
@@ -234,15 +336,12 @@ onMounted(async () => {
   } catch {
     patternRows.value = [{ field: '', pattern: '' }]
   }
+  await loadJobs()
 })
 
 onUnmounted(() => {
-  if (abortController) {
-    abortController.abort()
-  }
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-  }
+  stopPolling()
+  if (saveTimer) clearTimeout(saveTimer)
 })
 </script>
 
@@ -359,6 +458,8 @@ h1 {
   border-radius: var(--border-radius);
   font-size: 0.9rem;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .btn-primary:hover {
@@ -418,12 +519,68 @@ h1 {
   color: var(--color-muted);
 }
 
+.progress-text {
+  font-size: 0.85rem;
+  color: var(--color-muted-light);
+}
+
+.btn-cancel {
+  margin-left: auto;
+  padding: 0.4rem 0.8rem;
+  background: var(--color-card-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: var(--color-error-bg);
+}
+
+.btn-delete-job {
+  padding: 0.75rem 1.5rem;
+  background: var(--color-error);
+  color: #fff;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.btn-delete-job:hover {
+  opacity: 0.9;
+}
+
+.btn-delete-job:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .error-msg {
   background: var(--color-error-bg);
   border: 1px solid var(--color-error-border);
   border-radius: var(--border-radius);
   padding: 1rem;
   color: var(--color-error);
+  margin-top: 1rem;
+}
+
+.info-msg {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  color: var(--color-muted);
+  margin-top: 1rem;
+}
+
+.jobs-section {
+  margin-top: 1.5rem;
+}
+
+.job-details {
   margin-top: 1rem;
 }
 

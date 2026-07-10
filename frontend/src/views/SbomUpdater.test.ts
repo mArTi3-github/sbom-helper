@@ -3,12 +3,33 @@ import { flushPromises } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
 import SbomUpdater from './SbomUpdater.vue'
 import { ApiError } from '../api/client'
-import type { SbomResponse } from '../types/api'
+import type { JobRecord } from '../types/api'
 
 const emptyPatterns = { patterns: [] }
 const twoPatterns = { patterns: [{ field: 'purl', pattern: 'requests' }, { field: 'type', pattern: 'npm' }] }
 
-const successResult: SbomResponse = {
+const runningJob: JobRecord = {
+  job_id: 'job-1',
+  type: 'sbom_enrich',
+  status: 'running',
+  progress_current: 5,
+  progress_total: 10,
+  input_filename: 'bom.json',
+  summary: null,
+  results: null,
+  error_message: null,
+  created_at: '2026-01-01T00:00:00Z',
+  started_at: '2026-01-01T00:00:01Z',
+  finished_at: null,
+}
+
+const completedJob: JobRecord = {
+  job_id: 'job-2',
+  type: 'sbom_enrich',
+  status: 'completed',
+  progress_current: 10,
+  progress_total: 10,
+  input_filename: 'bom.json',
   summary: {
     total_purls: 10,
     found: 7,
@@ -21,18 +42,48 @@ const successResult: SbomResponse = {
     { purl: 'pkg:pypi/requests@2.31.0', status: 'found', repository_url: 'https://github.com/psf/requests', found_by: 'purl2repo', resolver: 'purl2repo' },
     { purl: 'pkg:pypi/missing@1.0.0', status: 'not_found', repository_url: null },
   ],
-  enriched_sbom: { bomFormat: 'CycloneDX', components: [] },
+  error_message: null,
+  created_at: '2026-01-01T00:00:00Z',
+  started_at: '2026-01-01T00:00:01Z',
+  finished_at: '2026-01-01T00:01:00Z',
+}
+
+const failedJob: JobRecord = {
+  job_id: 'job-3',
+  type: 'sbom_enrich',
+  status: 'failed',
+  progress_current: 3,
+  progress_total: 10,
+  input_filename: 'bom.json',
+  summary: null,
+  results: null,
+  error_message: 'Something went wrong',
+  created_at: '2026-01-01T00:00:00Z',
+  started_at: '2026-01-01T00:00:01Z',
+  finished_at: '2026-01-01T00:00:30Z',
 }
 
 const getIgnorePatternsMock = vi.fn()
 const saveIgnorePatternsMock = vi.fn()
-const resolveSbomMock = vi.fn()
+const createSbomEnrichJobMock = vi.fn()
+const getJobMock = vi.fn()
+const cancelJobMock = vi.fn()
+const deleteJobMock = vi.fn()
+const listJobsMock = vi.fn()
 
 vi.mock('../api/sbom', () => ({
   getIgnorePatterns: () => getIgnorePatternsMock(),
   saveIgnorePatterns: (patterns: unknown) => saveIgnorePatternsMock(patterns),
-  resolveSbom: (file: File, removeUnresolved: boolean, patterns: unknown, signal?: AbortSignal) =>
-    resolveSbomMock(file, removeUnresolved, patterns, signal),
+}))
+
+vi.mock('../api/jobs', () => ({
+  createSbomEnrichJob: (file: File, removeUnresolved: boolean, patterns: unknown) =>
+    createSbomEnrichJobMock(file, removeUnresolved, patterns),
+  getJob: (jobId: string) => getJobMock(jobId),
+  cancelJob: (jobId: string) => cancelJobMock(jobId),
+  deleteJob: (jobId: string) => deleteJobMock(jobId),
+  listJobs: (limit: number, offset: number) => listJobsMock(limit, offset),
+  downloadJobResultUrl: (jobId: string) => `/api/v1/jobs/${jobId}/result`,
 }))
 
 function mountUpdater() {
@@ -44,7 +95,11 @@ describe('SbomUpdater.vue', () => {
     vi.clearAllMocks()
     getIgnorePatternsMock.mockResolvedValue(emptyPatterns)
     saveIgnorePatternsMock.mockResolvedValue({ status: 'ok' })
-    resolveSbomMock.mockResolvedValue(successResult)
+    createSbomEnrichJobMock.mockResolvedValue({ job_id: 'job-1', status: 'queued' })
+    getJobMock.mockResolvedValue(completedJob)
+    cancelJobMock.mockResolvedValue({ job_id: 'job-1', status: 'cancelled' })
+    deleteJobMock.mockResolvedValue({ job_id: 'job-1', deleted: true })
+    listJobsMock.mockResolvedValue({ jobs: [] })
   })
 
   it('loads on mount with one empty pattern row when API returns empty', async () => {
@@ -130,38 +185,69 @@ describe('SbomUpdater.vue', () => {
     expect(wrapper.find('.error-msg').text()).toBe('Invalid SBOM file')
   })
 
-  it('processes SBOM and renders summary + results table', async () => {
+  it('creates an enrich job when Process is clicked', async () => {
+    listJobsMock.mockResolvedValue({ jobs: [runningJob] })
     const wrapper = mountUpdater()
     await flushPromises()
+
     const file = new File(['{}'], 'bom.json', { type: 'application/json' })
     await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
     await flushPromises()
 
     const processBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Process'))
-    expect(processBtn!.attributes('disabled')).toBeUndefined()
     await processBtn!.trigger('click')
     await flushPromises()
 
-    expect(resolveSbomMock).toHaveBeenCalledTimes(1)
+    expect(createSbomEnrichJobMock).toHaveBeenCalledTimes(1)
+    expect(listJobsMock).toHaveBeenCalled()
+    expect(wrapper.find('.jobs-section').exists()).toBe(true)
+  })
+
+  it('renders completed job summary and results table', async () => {
+    listJobsMock.mockResolvedValue({ jobs: [completedJob] })
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    const jobRow = wrapper.find('.job-row')
+    await jobRow.trigger('click')
+    await flushPromises()
+
     expect(wrapper.find('.results').exists()).toBe(true)
     expect(wrapper.text()).toContain('10')
     expect(wrapper.text()).toContain('7')
-    expect(wrapper.text()).toContain('Not found')
     expect(wrapper.findAll('tbody tr').length).toBe(2)
   })
 
-  it('passes an AbortSignal as the 5th argument to resolveSbom', async () => {
+  it('cancels a running job', async () => {
+    listJobsMock.mockResolvedValue({ jobs: [runningJob] })
     const wrapper = mountUpdater()
     await flushPromises()
-    const file = new File(['{}'], 'bom.json', { type: 'application/json' })
-    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
-    await flushPromises()
-    await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Process'))!.trigger('click')
+
+    const jobRow = wrapper.find('.job-row')
+    await jobRow.trigger('click')
     await flushPromises()
 
-    const args = resolveSbomMock.mock.calls[0]
-    expect(args.length).toBe(4)
-    expect(args[3]).toBeInstanceOf(AbortSignal)
+    const cancelBtn = wrapper.find('.btn-cancel')
+    await cancelBtn.trigger('click')
+    await flushPromises()
+
+    expect(cancelJobMock).toHaveBeenCalledWith('job-1')
+  })
+
+  it('deletes a completed job', async () => {
+    listJobsMock.mockResolvedValue({ jobs: [completedJob] })
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    const jobRow = wrapper.find('.job-row')
+    await jobRow.trigger('click')
+    await flushPromises()
+
+    const deleteBtn = wrapper.find('.btn-delete-job')
+    await deleteBtn.trigger('click')
+    await flushPromises()
+
+    expect(deleteJobMock).toHaveBeenCalledWith('job-2')
   })
 
   it('process button is disabled when no file is selected', async () => {
@@ -171,6 +257,37 @@ describe('SbomUpdater.vue', () => {
     expect(processBtn!.attributes('disabled')).toBeDefined()
     await processBtn!.trigger('click')
     await flushPromises()
-    expect(resolveSbomMock).not.toHaveBeenCalled()
+    expect(createSbomEnrichJobMock).not.toHaveBeenCalled()
+  })
+
+  it('shows error when job creation fails with ApiError', async () => {
+    createSbomEnrichJobMock.mockRejectedValueOnce(new ApiError(400, 'invalid_sbom'))
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    const file = new File(['{}'], 'bom.json', { type: 'application/json' })
+    await wrapper.findComponent({ name: 'FileUploadZone' }).vm.$emit('file-selected', file)
+    await flushPromises()
+
+    const processBtn = wrapper.findAll('.toolbar button').find((b) => b.text().includes('Process'))
+    await processBtn!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.error-msg').exists()).toBe(true)
+    expect(wrapper.find('.error-msg').text()).toBe('Invalid SBOM file')
+  })
+
+  it('shows failed job error message', async () => {
+    listJobsMock.mockResolvedValue({ jobs: [failedJob] })
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    const jobRow = wrapper.find('.job-row')
+    await jobRow.trigger('click')
+    await flushPromises()
+
+    const errorMsg = wrapper.find('.error-msg')
+    expect(errorMsg.exists()).toBe(true)
+    expect(errorMsg.text()).toBe('Something went wrong')
   })
 })
