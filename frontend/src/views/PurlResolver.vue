@@ -25,7 +25,7 @@
           <span v-else>{{ t('purlResolver.noRepoUrl') }}</span>
         </div>
         <div class="meta">
-          <span :class="['badge', confidenceClass]">{{ result.confidence || 'unknown' }}</span>
+          <span :class="['badge', confidenceClass]">{{ result.confidence || t('purlResolver.unknown') }}</span>
         </div>
         <button
           v-if="hasDetails"

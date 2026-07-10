@@ -34,6 +34,7 @@
     "resolving": "Resolving...",
     "noRepoUrl": "No repository URL found",
     "confidence": "Confidence",
+    "unknown": "unknown",
     "hideDetails": "Hide details",
     "showDetails": "Show details",
     "repoType": "Repository Type",
