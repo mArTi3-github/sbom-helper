@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   accept?: string
@@ -9,9 +12,9 @@ const props = defineProps<{
 const hintText = computed(() => {
   const sizeMb = props.maxSize || 200
   const accept = (props.accept || '').toLowerCase()
-  if (accept.includes('.csv')) return `CSV, до ${sizeMb} МБ`
-  if (accept.includes('.json')) return `CycloneDX JSON, до ${sizeMb} МБ`
-  return `до ${sizeMb} МБ`
+  if (accept.includes('.csv')) return t('fileUpload.hintCsv', { sizeMb })
+  if (accept.includes('.json')) return t('fileUpload.hintJson', { sizeMb })
+  return t('fileUpload.hintDefault', { sizeMb })
 })
 
 const emit = defineEmits<{
@@ -44,7 +47,7 @@ function onFileInput(e: Event) {
 function handleFile(file: File) {
   const maxBytes = (props.maxSize || 200) * 1048576
   if (file.size > maxBytes) {
-    errorMessage.value = `File exceeds maximum size of ${props.maxSize || 200} MB.`
+    errorMessage.value = t('fileUpload.fileTooLarge', { maxSize: props.maxSize || 200 })
     return
   }
   errorMessage.value = null
@@ -75,11 +78,11 @@ function openFileDialog() {
       @change="onFileInput"
     />
     <div class="upload-label">
-      <strong>Выберите файл</strong> или перетащите его сюда
+      <strong>{{ t('fileUpload.labelStrong') }}</strong> {{ t('fileUpload.labelOr') }}
     </div>
     <div class="upload-hint">{{ hintText }}</div>
     <div v-if="selectedFile" class="file-name">
-      File: {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
+      {{ t('fileUpload.file') }} {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
     </div>
     <div v-if="errorMessage" class="error-msg">{{ errorMessage }}</div>
   </div>

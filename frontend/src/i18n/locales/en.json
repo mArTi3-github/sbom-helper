@@ -251,6 +251,16 @@
     "ignored": "Ignored",
     "skipped": "Skipped"
   },
+  "fileUpload": {
+    "label": "Choose a file or drag it here",
+    "labelStrong": "Choose a file",
+    "labelOr": "or drag it here",
+    "file": "File:",
+    "hintCsv": "CSV, up to {sizeMb} MB",
+    "hintJson": "CycloneDX JSON, up to {sizeMb} MB",
+    "hintDefault": "up to {sizeMb} MB",
+    "fileTooLarge": "File exceeds maximum size of {maxSize} MB."
+  },
   "errors": {
     "file_too_large": "File size exceeds maximum of {max_size_mb} MB",
     "invalid_json": "Invalid JSON format",

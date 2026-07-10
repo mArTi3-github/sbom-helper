@@ -251,6 +251,16 @@
     "ignored": "Игнорировано",
     "skipped": "Пропущено"
   },
+  "fileUpload": {
+    "label": "Выберите файл или перетащите его сюда",
+    "labelStrong": "Выберите файл",
+    "labelOr": "или перетащите его сюда",
+    "file": "Файл:",
+    "hintCsv": "CSV, до {sizeMb} МБ",
+    "hintJson": "CycloneDX JSON, до {sizeMb} МБ",
+    "hintDefault": "до {sizeMb} МБ",
+    "fileTooLarge": "Размер файла превышает максимум {maxSize} МБ."
+  },
   "errors": {
     "file_too_large": "Размер файла превышает максимум {max_size_mb} МБ",
     "invalid_json": "Неверный формат JSON",
