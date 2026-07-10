@@ -22,6 +22,10 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/api/sbom.ts` — SBOM enrichment + ignore patterns API client
 - `frontend/src/api/db.ts` — Database admin API client (list, update, delete, import, export)
 - `frontend/src/api/settings.ts` — Settings API client
+- `frontend/src/i18n/index.ts` — vue-i18n configuration (Composition API mode, `legacy: false`)
+- `frontend/src/i18n/locales/en.json` — English UI strings (241 keys, grouped by domain)
+- `frontend/src/i18n/locales/ru.json` — Russian UI strings (identical key structure)
+- `frontend/src/tests/i18n.ts` — `mountWithI18n` helper for test mounting with vue-i18n plugin
 - `frontend/src/api/images.ts` — Images list conversion API client
 - `frontend/src/types/api.ts` — TypeScript interfaces mirroring backend `schemas.py`
 - `frontend/src/composables/usePagination.ts` — Pagination state composable (DatabaseAdmin)
@@ -70,7 +74,7 @@ User                   Browser (Vue SPA)             API Layer
   |                       |                           |
   | Selects .json file,   |                           |
   | toggles remove option,|                           |
-  | clicks "Обработать"   |                           |
+  | clicks process button |                           |
   |---------------------->|                           |
   |                       | POST /api/v1/resolve/sbom |
   |                       | (multipart/form-data +    |
@@ -97,7 +101,7 @@ User                   Browser (Vue SPA)             API Layer
   |                       | (no full-page reload)     |
   |                       |                           |
   | Selects .json file,   |                           |
-  | clicks "Конвертировать"                           |
+  | clicks convert button |                           |
   |---------------------->|                           |
   |                       | POST /api/v1/convert/images-list
   |                       | (multipart/form-data)     |
@@ -129,13 +133,13 @@ User                   Browser (Vue SPA)             API Layer
 - The page never reloads during enrichment (Vue reactivity, no full-page navigation)
 - Upload area supports drag-and-drop and file picker (via `FileUploadZone` component)
 - Process button is disabled until a file is selected
-- Checkbox "Удалять ненайденные компоненты без подкомпонентов" controls `remove_unresolved_no_subcomponents` form parameter
-- Checkbox "Проверять существующие VCS-ссылки в SBOM" controls `validate_existing_refs` form parameter; when checked, existing VCS externalReferences in the SBOM are validated via HEAD + git ls-remote — invalid URLs trigger re-resolution
+- "Remove unresolved components without subcomponents" checkbox controls `remove_unresolved_no_subcomponents` form parameter
+- "Validate pre-existing URLs from SBOM" checkbox controls `validate_existing_refs` form parameter; when checked, existing VCS externalReferences in the SBOM are validated via HEAD + git ls-remote — invalid URLs trigger re-resolution
 - Ignore patterns editor: dynamic rows with field/pattern inputs, add/remove buttons, save button; patterns are persisted via `POST /api/v1/sbom/ignore-patterns` and loaded on page mount
 - Loading spinner is shown during server-side processing
-- Results table displays: PURL (normalized), status (Found/Not found/Removed/Ignored), repository URL (clickable), found_by, resolver
-- Summary cards show: total PURLs, found, not found, skipped, removed, ignored
-- "Скачать обогащённый SBOM" button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled)
+- Results table displays: PURL (normalized), status (Found/Not found/Removed/Ignored), repository URL (clickable), found_by, resolver; all display strings are translated via i18n keys
+- Summary cards show: total PURLs, found, not found, skipped, removed, ignored; labels are translated via i18n keys
+- Download enriched SBOM button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled); button label is translated via i18n
 - All states (empty, loading, success, partial, error, network failure) have distinct visual representations
 
 ### DB-Admin Page
@@ -154,6 +158,7 @@ User                   Browser (Vue SPA)             API Layer
 ### Settings Page
 
 - Settings page is accessible at `/settings` via Vue Router; nav-bar link present on all pages (via `AppNav` component)
+- Language card: dropdown selects UI language (`en` or `ru`); choice is persisted to `localStorage` immediately and to backend via `PATCH /api/v1/settings` with `language` field
 - URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds), number input controls `revalidation_cooldown_hours` (0–720, default 24; 0 disables cooldown)
 - Retry Configuration card: number input controls `retry_max_attempts` (1–10), number input controls `retry_base_cooldown_seconds` (0.5–120)
 - Log Level card: dropdown controls `log_level` (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -162,7 +167,7 @@ User                   Browser (Vue SPA)             API Layer
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
 - Settings are loaded from `GET /api/v1/settings` on page mount
 - Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
-- Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error)
+- Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error); toast messages are translated via i18n keys
 - JSON Format card: select controls `json_indent` (1 space, 2 spaces, 4 spaces; default 4); description explains the setting affects downloaded SBOM and Images List files
 - Component is covered by `frontend/src/views/Settings.test.ts` (Vitest) with tests for auto-save, debounce, blur logic, success/error toast, and clear-token behaviour
 
@@ -172,12 +177,12 @@ User                   Browser (Vue SPA)             API Layer
 - Upload area supports drag-and-drop and file picker (via `FileUploadZone` component)
 - Convert button is disabled until a file is selected
 - Loading spinner is shown during server-side processing
-- Status card displays: "Преобразований не требуется" (green) if `was_transformed=false`, or "Выполнено преобразование" (yellow) if `was_transformed=true`; `was_transformed` is true when containers were promoted from nested levels or when duplicate containers (same `purl`) were removed
-- Results table displays columns: Имя образа, Версия, Заполнены компоненты, Заполнено поле name, Заполнено поле Properties, Удалено дублей
+- Status card displays: "No transformation needed" (green) if `was_transformed=false`, or "Transformation applied" (yellow) if `was_transformed=true`; `was_transformed` is true when containers were promoted from nested levels or when duplicate containers (same `purl`) were removed; status messages are translated via i18n keys
+- Results table columns (translated via i18n): Image name, Version, Components populated, Name field populated, Properties populated, Duplicates removed
 - Completeness flags use ✅ (green) when condition is met, ❌ (red) when not; empty cells only when condition is met and flag is positive
 - Version cell shows ❌ inline when version is missing
-- "Удалено дублей" column shows the number of container components with the same `purl` that were removed; shows em-dash (`—`) when no duplicates were removed
-- "Скачать список образов" button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled)
+- "Duplicates removed" column shows the number of container components with the same `purl` that were removed; shows em-dash (`—`) when no duplicates were removed
+- Download image list button triggers JSON file download (via `useDownload` composable); indent size comes from `store.jsonIndent` (settings-controlled); button label is translated via i18n
 - All states (empty, loading, success, error, network failure) have distinct visual representations
 
 ### Global
@@ -190,6 +195,9 @@ User                   Browser (Vue SPA)             API Layer
 - Each `.vue` component uses `<style scoped>` for CSS isolation
 - Global CSS variables and resets are in `frontend/src/assets/main.css`
 - TypeScript interfaces in `frontend/src/types/api.ts` mirror backend `schemas.py` — any schema change must be reflected in both
+- All user-facing strings are translated via `vue-i18n` (Composition API mode, `legacy: false`); locale files at `frontend/src/i18n/locales/{en,ru}.json` share identical key structure
+- Initial locale detection: `localStorage.getItem('locale')` → `navigator.language` (if starts with `ru`) → `'en'` (fallback); locale is persisted to `localStorage` on change and synced to backend via `PATCH /api/v1/settings` `language` field
+- All error responses from the API return machine-readable `error` codes (no `message` field); the frontend translates error codes via `t('errors.' + errorCode, errorData)`
 
 ### Test Coverage
 
@@ -198,7 +206,7 @@ Frontend unit tests are written with **Vitest 4.1.9**, `@vue/test-utils 2.4.11`,
 - Explicit imports from `'vitest'` (no globals).
 - Module-level API mocking via `vi.mock('../api/<module>')`.
 - Fake timers via `vi.useFakeTimers()` + `vi.advanceTimersByTime()` + `await flushPromises()`.
-- Vue mounting via `mount()` + `await flushPromises()` for initial loads.
+- Vue mounting via `mountWithI18n()` (from `src/tests/i18n.ts`) + `await flushPromises()` for initial loads; `mountWithI18n` wraps `@vue/test-utils` `mount()` with vue-i18n plugin pre-installed.
 
 **Tested files:**
 

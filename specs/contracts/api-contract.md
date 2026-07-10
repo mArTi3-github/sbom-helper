@@ -63,8 +63,7 @@ Note: `purl` field contains the normalized form (version, qualifiers, subpath st
 
 ```json
 {
-  "error": "invalid_purl",
-  "message": "PURL must start with 'pkg:'."
+  "error": "invalid_purl"
 }
 ```
 
@@ -72,8 +71,7 @@ Note: `purl` field contains the normalized form (version, qualifiers, subpath st
 
 ```json
 {
-  "error": "upstream_error",
-  "message": "Failed to resolve: registry API timeout"
+  "error": "upstream_error"
 }
 ```
 
@@ -175,8 +173,7 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 
 ```json
 {
-  "error": "invalid_json",
-  "message": "Invalid JSON: Expecting value: line 1 column 1"
+  "error": "invalid_json"
 }
 ```
 
@@ -185,7 +182,7 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 ```json
 {
   "error": "invalid_sbom",
-  "message": "Missing required field: bomFormat"
+  "detail": "Missing required field: bomFormat"
 }
 ```
 
@@ -194,7 +191,7 @@ Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS o
 ```json
 {
   "error": "file_too_large",
-  "message": "File size exceeds maximum of 200 MB"
+  "max_size_mb": 200
 }
 ```
 
@@ -225,7 +222,7 @@ Response (200):
 Edit a PURL row. Body: `{ "purl": "...", "repository_url": "..." }` (both optional).
 
 Response (200): `{ "ok": true }`
-Response (404): `{ "error": "not_found", "message": "PURL not found" }`
+Response (404): `{ "error": "purl_not_found" }`
 
 ### `DELETE /api/v1/db/purls`
 
@@ -240,7 +237,7 @@ Import CSV. Multipart: `file` (CSV) + `strategy` (`"upsert"` or `"skip_existing"
 CSV format: comma (`,`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `repository_type`, `repository_kind`, `confidence`, `evidence` (JSON array), `warnings` (JSON array), `version_reference`, `resolver` (default: `"import-csv"` when absent), `resolved_at`. Values containing commas must be quoted per RFC 4180.
 
 Response (200): `{ "imported": N, "skipped": N, "errors": [...] }`
-Response (400): `{ "error": "invalid_csv", "message": "..." }` (missing columns, wrong format)
+Response (400): `{ "error": "invalid_csv" }` (missing columns, wrong format)
 
 ### `POST /api/v1/db/export`
 
@@ -302,6 +299,7 @@ Return current application settings.
     "librariesio_api_key": false,
     "ecosystems_api_key": false
   },
+  "language": "en",
   "json_indent": 4
 }
 ```
@@ -318,6 +316,7 @@ Return current application settings.
 - `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
+- `language`: string — UI language (`"en"` or `"ru"`; default: `"en"`)
 - `json_indent`: integer — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`; default: `4`)
 
 ---
@@ -343,7 +342,7 @@ Partially update application settings.
 }
 ```
 
-Both fields optional. Only provided fields are updated.
+All fields optional. Only provided fields are updated.
 
 - `validate_db_urls`: optional bool — enable/disable URL validation for cached repository URLs.
 - `url_validation_timeout`: optional int — timeout in seconds for HEAD and git ls-remote checks (1–60).
@@ -357,6 +356,7 @@ Both fields optional. Only provided fields are updated.
 - `retry_max_attempts`: optional int — maximum HTTP retry attempts for fallback resolvers (1–10).
 - `retry_base_cooldown_seconds`: optional float — base wait between retries in seconds (0.5–120).
 - `log_level`: optional string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+- `language`: optional string — UI language (`"en"` or `"ru"`).
 - `json_indent`: optional int — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`).
 
 #### Response (200)
@@ -367,8 +367,7 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 
 ```json
 {
-  "error": "invalid_token",
-  "message": "GitHub token is invalid or expired"
+  "error": "invalid_token"
 }
 ```
 
@@ -394,8 +393,7 @@ Manually validate the currently stored GitHub token. No request body.
 
 ```json
 {
-  "error": "token_not_set",
-  "message": "GitHub token is not set"
+  "error": "token_not_set"
 }
 ```
 
@@ -441,8 +439,7 @@ Convert a CycloneDX SBOM file into a machine-readable list of Docker container i
 
 ```json
 {
-  "error": "invalid_json",
-  "message": "Invalid JSON: Expecting value: line 1 column 1"
+  "error": "invalid_json"
 }
 ```
 
@@ -451,7 +448,7 @@ Convert a CycloneDX SBOM file into a machine-readable list of Docker container i
 ```json
 {
   "error": "invalid_sbom",
-  "message": "Missing required field: bomFormat"
+  "detail": "Missing required field: bomFormat"
 }
 ```
 
@@ -460,7 +457,7 @@ Convert a CycloneDX SBOM file into a machine-readable list of Docker container i
 ```json
 {
   "error": "file_too_large",
-  "message": "File size exceeds maximum of 200 MB"
+  "max_size_mb": 200
 }
 ```
 
@@ -492,7 +489,7 @@ Standard FastAPI/Pydantic 422 response.
 | Valid PURL, no repository found | 200 | — (`repository_url: null`) |
 | purl2repo network/timeout error | 502 | `upstream_error` |
 | Empty purl string | 422 | (Pydantic validation) |
-| PURL not found on PATCH | 404 | `not_found` |
+| PURL not found on PATCH | 404 | `purl_not_found` |
 | Invalid CSV (missing columns, wrong format) | 400 | `invalid_csv` |
 | CSV too large | 413 | `file_too_large` |
 | Invalid GitHub token on settings save | 400 | `invalid_token` |
@@ -506,8 +503,9 @@ Standard FastAPI/Pydantic 422 response.
 
 ## Breaking Change Checklist
 
-- [ ] Removing or renaming a response field
-- [ ] Changing the type or format of a response field
+- [x] Removing `message` field from all error responses (replaced by structured fields: `detail` for technical context, `max_size_mb` for file size)
+- [x] Renaming `not_found` error code to `purl_not_found` on PATCH 404
+- [x] Changing the type or format of a response field
 - [ ] Changing HTTP status codes for existing conditions
 - [ ] Adding required request fields
 - [ ] Changing the endpoint URL path

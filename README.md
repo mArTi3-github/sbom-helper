@@ -88,13 +88,13 @@ docker compose -f docker-compose.yml up -d
 ## Stack
 
 **Backend:** FastAPI, Pydantic, purl2repo, ecosyste.ms, libraries.io  
-**UI:** Vue 3 SPA (Vite, TypeScript, Vue Router) — replaces Jinja2 + vanilla JS  
+**UI:** Vue 3 SPA (Vite, TypeScript, Vue Router, vue-i18n) — replaces Jinja2 + vanilla JS  
 **Infrastructure:** Docker, Docker Compose  
 **Python:** 3.11+
 
 ## Status
 
-Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), database administration (view, edit, filter, import/export via CSV, bulk delete), and SBOM-to-images-list conversion (promotes container components from CycloneDX SBOMs into a dedicated images list format with completeness flags). CSV uses comma delimiter with BOM handling; values containing commas are quoted per RFC 4180.
+Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), database administration (view, edit, filter, import/export via CSV, bulk delete), SBOM-to-images-list conversion (promotes container components from CycloneDX SBOMs into a dedicated images list format with completeness flags), and multilingual UI (English/Russian with language selector in Settings). CSV uses comma delimiter with BOM handling; values containing commas are quoted per RFC 4180.
 
 **Optional resolvers:** ecosyste.ms is enabled by default as a fallback resolver after purl2repo. libraries.io can be enabled as an additional fallback (requires API key), configured via the Settings page (`/settings`). Supports: Cargo, Composer (Packagist), Conda, CPAN, CRAN, Gem (RubyGems), Generic (GitHub), Go, Hackage, Hex, Maven, NPM, NuGet, Pub, PyPI, Swift (SwiftPM).
 

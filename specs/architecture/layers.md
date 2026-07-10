@@ -259,7 +259,7 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
 - `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120)
 - `ServiceTokens` dataclass for extracting API tokens from settings (extensible for future services)
@@ -296,6 +296,7 @@
 - **Views** (`src/views/`): `PurlResolver.vue`, `SbomUpdater.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
 - **Components** (`src/components/`): `AppNav.vue` (navigation bar), `FileUploadZone.vue` (drag-and-drop upload), `ModalDialog.vue` (reusable modal)
 - **Composables** (`src/composables/`): `usePagination.ts` (pagination state), `useDownload.ts` (file download helper)
+- **i18n** (`src/i18n/`): `index.ts` (vue-i18n configuration with `legacy: false`), `locales/en.json` (English), `locales/ru.json` (Russian); `@intlify/unplugin-vue-i18n` Vite plugin for compile-time message compilation
 - **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts`, `db.ts`, `settings.ts`, `images.ts`
 - **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`
 - **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 5 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`

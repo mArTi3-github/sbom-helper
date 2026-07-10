@@ -32,6 +32,7 @@
 | Convert SBOM to images list (container list) | `contracts/api-contract.md`, `domains/web-ui.md`, `architecture/layers.md` |
 | Add or change SBOM component ignore patterns | `architecture/layers.md`, `contracts/api-contract.md` |
 | Configure resolver retry, rate limit, or log level | `domains/purl-resolution.md`, `contracts/api-contract.md`, `architecture/layers.md` |
+| Add multilingual support (i18n) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 
 ## Dependency Graph
 
