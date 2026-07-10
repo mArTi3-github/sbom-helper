@@ -257,6 +257,10 @@
     "ignored": "Ignored",
     "skipped": "Skipped"
   },
+  "recentJobs": {
+    "title": "Recent Jobs",
+    "empty": "No recent jobs"
+  },
   "fileUpload": {
     "label": "Choose a file or drag it here",
     "labelStrong": "Choose a file",
