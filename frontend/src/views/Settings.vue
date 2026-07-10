@@ -10,6 +10,23 @@
 
     <template v-if="!loading">
       <div class="card">
+        <div class="card-title">{{ t('settings.language') }}</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.language') }}</div>
+          </div>
+          <select
+            :value="locale"
+            @change="setLanguage"
+            class="select-input"
+          >
+            <option value="en">{{ t('settings.languageEn') }}</option>
+            <option value="ru">{{ t('settings.languageRu') }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">URL Validation</div>
         <div class="setting-row">
           <div>
@@ -314,8 +331,10 @@ import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { clearValidationCache } from '../api/settings'
 import type { SettingsUpdate } from '../types/api'
+import { useI18n } from 'vue-i18n'
 
 const store = useSettingsStore()
+const { t, locale } = useI18n()
 const {
   validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
@@ -419,11 +438,28 @@ async function onClearValidationCache() {
   }
 }
 
+async function setLanguage(e: Event) {
+  const lang = (e.target as HTMLSelectElement).value
+  locale.value = lang
+  localStorage.setItem('locale', lang)
+  try {
+    await store.save({ language: lang } as SettingsUpdate)
+    showToast(t('settings.savedToast'), false)
+  } catch {
+    showToast(t('settings.saveFailedToast', { message: '' }), true)
+  }
+}
+
 onMounted(async () => {
   try {
     await store.load()
+    // Sync language from backend
+    if (store.language && store.language !== locale.value) {
+      locale.value = store.language
+      localStorage.setItem('locale', store.language)
+    }
   } catch {
-    showToast('Failed to load settings', true)
+    showToast(t('settings.errorMessages.loadFailed'), true)
   }
   loading.value = false
 })
