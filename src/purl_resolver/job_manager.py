@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import shutil
 from pathlib import Path
 
 from .job_repository import JobRecord, JobRepository, _new_id, _now
@@ -12,7 +14,7 @@ from .service import PurlResolutionService
 
 logger = logging.getLogger(__name__)
 
-JOBS_DIR = Path("/app/data/jobs")
+JOBS_DIR = Path(os.environ.get("JOBS_DIR", "data/jobs"))
 
 
 class JobManager:
@@ -111,7 +113,6 @@ class JobManager:
             return False
         job_dir = JOBS_DIR / job_id
         if job_dir.exists():
-            import shutil
             shutil.rmtree(job_dir)
         await self._repo.delete(job_id)
         return True

@@ -50,6 +50,7 @@ class SettingsUpdate(BaseModel):
     connectivity_timeout: int | None = Field(None, ge=1, le=30)
     json_indent: Literal[1, 2, 4] | None = Field(None)
     language: Literal['en', 'ru'] | None = None
+    job_ttl_hours: int | None = Field(None, ge=1, le=720)
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -85,6 +86,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "connectivity_timeout": app_settings.connectivity_timeout,
         "json_indent": app_settings.json_indent,
         "language": app_settings.language,
+        "job_ttl_hours": app_settings.job_ttl_hours,
         "token_set": {
             "github_token": app_settings.github_token is not None,
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
@@ -135,6 +137,11 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
     _rebuild_resolvers(request)
     _reconfigure_logging(request)
 
+    if "job_ttl_hours" in update_data:
+        jm = getattr(request.app.state, "job_manager", None)
+        if jm is not None:
+            jm.update_ttl(update_data["job_ttl_hours"])
+
     return JSONResponse(content={
         "validate_db_urls": updated.validate_db_urls,
         "validate_sbom_refs": updated.validate_sbom_refs,
@@ -152,6 +159,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "connectivity_timeout": updated.connectivity_timeout,
         "json_indent": updated.json_indent,
         "language": updated.language,
+        "job_ttl_hours": updated.job_ttl_hours,
         "token_set": {
             "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,

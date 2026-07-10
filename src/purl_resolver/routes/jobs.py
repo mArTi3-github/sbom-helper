@@ -7,9 +7,17 @@ from fastapi import APIRouter, File, Form, Request, UploadFile, status
 from fastapi.responses import JSONResponse, FileResponse
 
 from ..config import sbom_settings
-from ..job_manager import JobManager
 
 router = APIRouter()
+
+_UNAVAILABLE = JSONResponse(
+    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    content={"error": "job_queue_unavailable"},
+)
+
+
+def _get_manager(request: Request) -> JobManager | None:
+    return getattr(request.app.state, "job_manager", None)
 
 
 @router.post("/api/v1/jobs/sbom-enrich", status_code=status.HTTP_202_ACCEPTED)
@@ -49,7 +57,9 @@ async def create_sbom_enrich_job(
     if parsed_patterns:
         params["ignore_patterns"] = parsed_patterns
 
-    manager: JobManager = request.app.state.job_manager
+    manager = _get_manager(request)
+    if manager is None:
+        return _UNAVAILABLE
     job = await manager.create_job(raw, file.filename or "unknown.json", params)
 
     return JSONResponse(
@@ -60,7 +70,9 @@ async def create_sbom_enrich_job(
 
 @router.get("/api/v1/jobs/{job_id}")
 async def get_job(request: Request, job_id: str) -> JSONResponse:
-    manager: JobManager = request.app.state.job_manager
+    manager = _get_manager(request)
+    if manager is None:
+        return _UNAVAILABLE
     record = await manager.get_job(job_id)
     if not record:
         return JSONResponse(status_code=404, content={"error": "job_not_found"})
@@ -82,7 +94,9 @@ async def get_job(request: Request, job_id: str) -> JSONResponse:
 
 @router.get("/api/v1/jobs/{job_id}/result")
 async def download_job_result(request: Request, job_id: str) -> FileResponse:
-    manager: JobManager = request.app.state.job_manager
+    manager = _get_manager(request)
+    if manager is None:
+        return _UNAVAILABLE
     record = await manager.get_job(job_id)
     if not record:
         return JSONResponse(status_code=404, content={"error": "job_not_found"})
@@ -103,7 +117,9 @@ async def download_job_result(request: Request, job_id: str) -> FileResponse:
 
 @router.post("/api/v1/jobs/{job_id}/cancel")
 async def cancel_job(request: Request, job_id: str) -> JSONResponse:
-    manager: JobManager = request.app.state.job_manager
+    manager = _get_manager(request)
+    if manager is None:
+        return _UNAVAILABLE
     success = await manager.cancel_job(job_id)
     if not success:
         record = await manager.get_job(job_id)
@@ -118,7 +134,9 @@ async def cancel_job(request: Request, job_id: str) -> JSONResponse:
 
 @router.delete("/api/v1/jobs/{job_id}")
 async def delete_job(request: Request, job_id: str) -> JSONResponse:
-    manager: JobManager = request.app.state.job_manager
+    manager = _get_manager(request)
+    if manager is None:
+        return _UNAVAILABLE
     success = await manager.delete_job(job_id)
     if not success:
         return JSONResponse(status_code=404, content={"error": "job_not_found"})
@@ -131,7 +149,9 @@ async def list_jobs(
     limit: int = 20,
     offset: int = 0,
 ) -> JSONResponse:
-    manager: JobManager = request.app.state.job_manager
+    manager = _get_manager(request)
+    if manager is None:
+        return _UNAVAILABLE
     records = await manager.list_jobs(limit=limit, offset=offset)
     return JSONResponse(content={
         "jobs": [
