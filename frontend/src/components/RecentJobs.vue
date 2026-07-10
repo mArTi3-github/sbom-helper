@@ -27,7 +27,7 @@ const props = defineProps<{
   activeId: string | null
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   select: [jobId: string]
 }>()
 

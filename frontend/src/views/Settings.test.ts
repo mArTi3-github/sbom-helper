@@ -22,6 +22,7 @@ const defaultSettings: SettingsResponse = {
   connectivity_timeout: 2,
   json_indent: 4,
   language: 'en',
+  job_ttl_hours: 24,
   token_set: { github_token: false, librariesio_api_key: false, ecosystems_api_key: false },
 }
 
