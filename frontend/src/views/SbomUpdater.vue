@@ -283,9 +283,19 @@ function stopPolling() {
 async function selectJob(jobId: string) {
   activeJobId.value = jobId
   stopPolling()
-  const record = jobs.value.find(j => j.job_id === jobId)
-  if (record && !isTerminal(record.status)) {
-    startPolling(jobId)
+  try {
+    const record = await getJob(jobId)
+    const idx = jobs.value.findIndex(j => j.job_id === jobId)
+    if (idx >= 0) {
+      jobs.value[idx] = record
+    } else {
+      jobs.value.unshift(record)
+    }
+    if (!isTerminal(record.status)) {
+      startPolling(jobId)
+    }
+  } catch {
+    // ignore
   }
 }
 

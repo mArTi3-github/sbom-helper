@@ -205,6 +205,7 @@ describe('SbomUpdater.vue', () => {
 
   it('renders completed job summary and results table', async () => {
     listJobsMock.mockResolvedValue({ jobs: [completedJob] })
+    getJobMock.mockResolvedValue(completedJob)
     const wrapper = mountUpdater()
     await flushPromises()
 
@@ -212,6 +213,7 @@ describe('SbomUpdater.vue', () => {
     await jobRow.trigger('click')
     await flushPromises()
 
+    expect(getJobMock).toHaveBeenCalledWith('job-2')
     expect(wrapper.find('.results').exists()).toBe(true)
     expect(wrapper.text()).toContain('10')
     expect(wrapper.text()).toContain('7')
@@ -220,6 +222,7 @@ describe('SbomUpdater.vue', () => {
 
   it('cancels a running job', async () => {
     listJobsMock.mockResolvedValue({ jobs: [runningJob] })
+    getJobMock.mockResolvedValue(runningJob)
     const wrapper = mountUpdater()
     await flushPromises()
 
@@ -236,6 +239,7 @@ describe('SbomUpdater.vue', () => {
 
   it('deletes a completed job', async () => {
     listJobsMock.mockResolvedValue({ jobs: [completedJob] })
+    getJobMock.mockResolvedValue(completedJob)
     const wrapper = mountUpdater()
     await flushPromises()
 
@@ -279,6 +283,7 @@ describe('SbomUpdater.vue', () => {
 
   it('shows failed job error message', async () => {
     listJobsMock.mockResolvedValue({ jobs: [failedJob] })
+    getJobMock.mockResolvedValue(failedJob)
     const wrapper = mountUpdater()
     await flushPromises()
 

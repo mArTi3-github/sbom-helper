@@ -39,3 +39,75 @@ function formatTime(iso: string | null): string {
   return d.toLocaleString()
 }
 </script>
+
+<style scoped>
+.recent-jobs {
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--color-card-bg);
+  box-shadow: var(--color-card-shadow);
+}
+
+.recent-jobs-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--color-muted-light);
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-card-border);
+}
+
+.empty-state {
+  padding: 1rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-row-border);
+  transition: background-color 0.15s ease;
+}
+
+.job-row:last-child {
+  border-bottom: none;
+}
+
+.job-row:hover {
+  background: var(--color-table-header-bg);
+}
+
+.job-row.job-active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.job-row.job-active .job-time {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.job-status-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.job-filename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.job-time {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--color-muted-light);
+}
+</style>
