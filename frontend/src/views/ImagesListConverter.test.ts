@@ -118,7 +118,7 @@ describe('ImagesListConverter.vue', () => {
   })
 
   it('shows API error message on ApiError', async () => {
-    convertMock.mockRejectedValueOnce(new ApiError(400, 'bad_request'))
+    convertMock.mockRejectedValueOnce(new ApiError(400, 'invalid_json'))
     const wrapper = mountConverter()
     await flushPromises()
     const file = new File(['{}'], 'sbom.json', { type: 'application/json' })
@@ -127,7 +127,7 @@ describe('ImagesListConverter.vue', () => {
     await wrapper.find('.toolbar button').trigger('click')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('Bad request')
+    expect(wrapper.find('.error-msg').text()).toBe('Invalid JSON format')
     expect(wrapper.find('.results').exists()).toBe(false)
   })
 

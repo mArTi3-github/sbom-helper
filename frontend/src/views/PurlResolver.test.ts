@@ -92,14 +92,14 @@ describe('PurlResolver.vue', () => {
   })
 
   it('shows API error message when resolvePurl rejects with ApiError', async () => {
-    resolvePurlMock.mockRejectedValueOnce(new ApiError(404, 'not_found'))
+    resolvePurlMock.mockRejectedValueOnce(new ApiError(404, 'purl_not_found'))
     const wrapper = mountResolver()
     await flushPromises()
     await wrapper.find('input[type="text"]').setValue('pkg:pypi/missing@1.0.0')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('Not found')
+    expect(wrapper.find('.error-msg').text()).toBe('PURL not found')
     expect(wrapper.find('.result').exists()).toBe(false)
   })
 

@@ -29,7 +29,7 @@
   "purlResolver": {
     "title": "PURL Resolver",
     "subtitle": "Определить репозиторий исходного кода по Package URL",
-    "placeholder": "pkg:pypi/requests\\@2.31.0",
+    "placeholder": "pkg:pypi/requests@2.31.0",
     "resolve": "Найти",
     "resolving": "Поиск...",
     "noRepoUrl": "URL репозитория не найден",

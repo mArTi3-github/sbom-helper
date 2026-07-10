@@ -59,6 +59,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function save(partial: SettingsUpdate) {
     const data = await updateSettings(partial)
     tokenSet.value = data.token_set
+    language.value = data.language
     if ('github_token' in partial) {
       githubToken.value = ''
       githubTokenValidity.value = 'valid'

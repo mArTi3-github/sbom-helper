@@ -258,7 +258,7 @@
           </div>
           <input type="number" v-model.number="connectivityTimeout" min="1" max="30" @change="debouncedAutoSave({ connectivity_timeout: connectivityTimeout })" class="num-input">
         </div>
-        </div>
+      </div>
 
       <div class="card">
         <div class="card-title">{{ t('settings.logging.title') }}</div>

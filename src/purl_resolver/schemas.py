@@ -27,10 +27,6 @@ class ResolveResponse(BaseModel):
     resolved_at: str = ""
 
 
-class ErrorResponse(BaseModel):
-    error: str
-    message: str
-
 
 @dataclass(frozen=True)
 class ResolveResult:

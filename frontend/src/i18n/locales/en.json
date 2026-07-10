@@ -29,7 +29,7 @@
   "purlResolver": {
     "title": "PURL Resolver",
     "subtitle": "Resolve a Package URL to its source code repository",
-    "placeholder": "pkg:pypi/requests\\@2.31.0",
+    "placeholder": "pkg:pypi/requests@2.31.0",
     "resolve": "Resolve",
     "resolving": "Resolving...",
     "noRepoUrl": "No repository URL found",
