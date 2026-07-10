@@ -1,11 +1,11 @@
 <template>
   <div class="settings-page">
-    <h1>Settings</h1>
-    <p class="subtitle">Application settings</p>
+    <h1>{{ t('settings.title') }}</h1>
+    <p class="subtitle">{{ t('settings.subtitle') }}</p>
 
     <div v-if="loading" class="loading">
       <span class="spinner"></span>
-      Loading settings…
+      {{ t('common.loading') }}
     </div>
 
     <template v-if="!loading">
@@ -27,14 +27,12 @@
       </div>
 
       <div class="card">
-        <div class="card-title">URL Validation</div>
+        <div class="card-title">{{ t('settings.urlValidation.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Validate URLs from local database</div>
+            <div class="setting-label">{{ t('settings.urlValidation.validateDbUrls') }}</div>
             <div class="setting-desc">
-              When enabled, repository URLs found in the local database are verified
-              (HTTP HEAD + git ls-remote) before being returned. Invalid URLs are
-              deleted and resolution continues through the resolver chain.
+              {{ t('settings.urlValidation.validateDbUrlsDesc') }}
             </div>
           </div>
           <label class="toggle">
@@ -44,11 +42,9 @@
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Validate pre-existing URLs from SBOM</div>
+            <div class="setting-label">{{ t('settings.urlValidation.validateSbomRefs') }}</div>
             <div class="setting-desc">
-              When enabled, existing VCS and source-distribution URLs found in SBOM
-              files are verified before enrichment. Invalid URLs trigger re-resolution
-              of the component.
+              {{ t('settings.urlValidation.validateSbomRefsDesc') }}
             </div>
           </div>
           <label class="toggle">
@@ -58,10 +54,9 @@
         </div>
         <div class="setting-row" :class="{ 'setting-disabled': !validateSbomRefs }">
           <div>
-            <div class="setting-label">Behavior when multiple valid VCS-links are found</div>
+            <div class="setting-label">{{ t('settings.urlValidation.multipleVcs') }}</div>
             <div class="setting-desc">
-              When multiple VCS references are valid, choose whether to keep only the
-              first one or keep all of them in the SBOM.
+              {{ t('settings.urlValidation.multipleVcsDesc') }}
             </div>
           </div>
           <select
@@ -70,74 +65,66 @@
             @change="debouncedAutoSave({ sbom_multiple_vcs_behavior: sbomMultipleVcsBehavior })"
             class="select-input"
           >
-            <option value="keep-first">keep only first</option>
-            <option value="keep-all">keep all</option>
+            <option value="keep-first">{{ t('settings.urlValidation.keepFirst') }}</option>
+            <option value="keep-all">{{ t('settings.urlValidation.keepAll') }}</option>
           </select>
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Validation timeout (seconds)</div>
+            <div class="setting-label">{{ t('settings.urlValidation.timeout') }}</div>
             <div class="setting-desc">
-              Timeout for each HTTP HEAD and git ls-remote check (1-60 seconds).
+              {{ t('settings.urlValidation.timeoutDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="urlValidationTimeout" min="1" max="60" @change="debouncedAutoSave({ url_validation_timeout: urlValidationTimeout })" class="num-input">
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Re-validation cooldown (hours)</div>
+            <div class="setting-label">{{ t('settings.urlValidation.cooldown') }}</div>
             <div class="setting-desc">
-              This setting controls how long a successfully validated URL remains
-              in the validation cache before being re-checked. All validated URLs
-              are treated equally regardless of origin (resolver, import, or database).
-              Set to 0 to disable the cache and always re-validate.
+              {{ t('settings.urlValidation.cooldownDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="revalidationCooldownHours" min="0" max="720" @change="debouncedAutoSave({ revalidation_cooldown_hours: revalidationCooldownHours })" class="num-input">
         </div>
         <div class="setting-row info-row">
           <div class="setting-desc">
-            URLs returned by resolvers are always validated before being returned.
-            Validation results are cached and reused across all contexts
-            (local database, SBOM enrichment) within the configured cooldown period.
+            {{ t('settings.urlValidation.infoText') }}
           </div>
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Clear validation cache</div>
+            <div class="setting-label">{{ t('settings.urlValidation.clearCache') }}</div>
             <div class="setting-desc">
-              Remove all cached URL validation results. The next validation for each
-              URL will perform a full check.
+              {{ t('settings.urlValidation.clearCacheDesc') }}
             </div>
           </div>
-          <button class="btn-secondary" @click="onClearValidationCache">Clear cache</button>
+          <button class="btn-secondary" @click="onClearValidationCache">{{ t('settings.urlValidation.clearCacheBtn') }}</button>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">GitHub API Token (optional)</div>
+        <div class="card-title">{{ t('settings.githubToken.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">GitHub Personal Access Token</div>
+            <div class="setting-label">{{ t('settings.githubToken.label') }}</div>
             <div class="setting-desc">
-              Used for authenticated git ls-remote and HTTP requests.
-              Increases rate limits from 60/hr to 5000/hr for API,
-              and removes limits for git operations.
+              {{ t('settings.githubToken.desc') }}
             </div>
             <div class="setting-desc link-desc">
-              <a href="https://github.com/settings/tokens" target="_blank">Generate token</a>
-              → Settings → Developer settings → Personal access tokens → Fine-grained or classic
+              <a href="https://github.com/settings/tokens" target="_blank">{{ t('settings.githubToken.genToken') }}</a>
+              {{ t('settings.githubToken.genTokenHint') }}
             </div>
             <div class="setting-desc status-desc">
-              Status: <span :class="tokenSet.github_token ? 'status-set' : 'status-not-set'">{{ tokenSet.github_token ? 'set' : 'not set' }}</span>
-              <button v-if="tokenSet.github_token" class="btn-danger btn-small" @click="clearToken">Clear token</button>
+              {{ t('settings.githubToken.status') }} <span :class="tokenSet.github_token ? 'status-set' : 'status-not-set'">{{ tokenSet.github_token ? t('settings.set') : t('settings.notSet') }}</span>
+              <button v-if="tokenSet.github_token" class="btn-danger btn-small" @click="clearToken">{{ t('settings.clearToken') }}</button>
             </div>
             <div v-if="tokenSet.github_token" class="setting-desc validity-desc">
-              Validity:
-              <span v-if="githubTokenValidity === 'valid'" class="status-valid">{{ githubTokenValidity }}</span>
-              <span v-else-if="githubTokenValidity === 'invalid'" class="status-invalid">{{ githubTokenValidity }}</span>
+              {{ t('settings.githubToken.validity') }}
+              <span v-if="githubTokenValidity === 'valid'" class="status-valid">{{ t('settings.valid') }}</span>
+              <span v-else-if="githubTokenValidity === 'invalid'" class="status-invalid">{{ t('settings.invalid') }}</span>
               <span v-else>&mdash;</span>
-              <button class="btn-small btn-secondary" @click="onCheckGithubToken">Check validity</button>
+              <button class="btn-small btn-secondary" @click="onCheckGithubToken">{{ t('settings.checkValidity') }}</button>
             </div>
           </div>
           <div class="input-right">
@@ -147,13 +134,12 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Libraries.io Resolver (optional)</div>
+        <div class="card-title">{{ t('settings.librariesio.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Enable libraries.io resolver</div>
+            <div class="setting-label">{{ t('settings.librariesio.enable') }}</div>
             <div class="setting-desc">
-              When enabled, libraries.io is used as a fallback resolver
-              when purl2repo cannot find a repository URL.
+              {{ t('settings.librariesio.enableDesc') }}
             </div>
           </div>
           <label class="toggle">
@@ -163,17 +149,16 @@
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">API Key</div>
+            <div class="setting-label">{{ t('settings.librariesio.apiKey') }}</div>
             <div class="setting-desc">
-              Optional API key for higher rate limits (60 req/min vs 10 req/min).
+              {{ t('settings.librariesio.apiKeyDesc') }}
             </div>
             <div class="setting-desc link-desc">
-              <a href="https://libraries.io/login" target="_blank">Log in to libraries.io</a>
-              → API Settings
+              <a href="https://libraries.io/login" target="_blank">{{ t('settings.librariesio.loginHint') }}</a>
             </div>
             <div class="setting-desc status-desc">
-              Status: <span :class="tokenSet.librariesio_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.librariesio_api_key ? 'set' : 'not set' }}</span>
-              <button v-if="tokenSet.librariesio_api_key" class="btn-danger btn-small" @click="clearLibrariesIoKey">Clear key</button>
+              {{ t('settings.librariesio.status') }} <span :class="tokenSet.librariesio_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.librariesio_api_key ? t('settings.set') : t('settings.notSet') }}</span>
+              <button v-if="tokenSet.librariesio_api_key" class="btn-danger btn-small" @click="clearLibrariesIoKey">{{ t('settings.clearKey') }}</button>
             </div>
           </div>
           <div class="input-right">
@@ -183,13 +168,12 @@
       </div>
 
       <div class="card">
-        <div class="card-title">ecosyste.ms Resolver (optional)</div>
+        <div class="card-title">{{ t('settings.ecosystems.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Enable ecosyste.ms resolver</div>
+            <div class="setting-label">{{ t('settings.ecosystems.enable') }}</div>
             <div class="setting-desc">
-              Live query to ecosyste.ms API for repository URL lookup.
-              Works without API key. Key is optional for higher rate limits.
+              {{ t('settings.ecosystems.enableDesc') }}
             </div>
           </div>
           <label class="toggle">
@@ -199,13 +183,13 @@
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">API Key (optional)</div>
+            <div class="setting-label">{{ t('settings.ecosystems.apiKey') }}</div>
             <div class="setting-desc">
-              Optional API key for higher rate limits.
+              {{ t('settings.ecosystems.apiKeyDesc') }}
             </div>
             <div class="setting-desc status-desc">
-              Status: <span :class="tokenSet.ecosystems_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.ecosystems_api_key ? 'set' : 'not set' }}</span>
-              <button v-if="tokenSet.ecosystems_api_key" class="btn-danger btn-small" @click="clearEcosystemsKey">Clear key</button>
+              {{ t('settings.ecosystems.status') }} <span :class="tokenSet.ecosystems_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.ecosystems_api_key ? t('settings.set') : t('settings.notSet') }}</span>
+              <button v-if="tokenSet.ecosystems_api_key" class="btn-danger btn-small" @click="clearEcosystemsKey">{{ t('settings.clearKey') }}</button>
             </div>
           </div>
           <div class="input-right">
@@ -214,10 +198,9 @@
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Max requests per second</div>
+            <div class="setting-label">{{ t('settings.ecosystems.maxRps') }}</div>
             <div class="setting-desc">
-              Rate limit for ecosyste.ms API requests (0.1–100 req/s).
-              Default: 2.0. Lower values reduce timeout risk under concurrent load.
+              {{ t('settings.ecosystems.maxRpsDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="ecosystemsMaxRequestsPerSecond" min="0.1" max="100" step="0.1" @change="debouncedAutoSave({ ecosystems_max_requests_per_second: ecosystemsMaxRequestsPerSecond })" class="num-input">
@@ -225,25 +208,21 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Resolver Behaviour</div>
+        <div class="card-title">{{ t('settings.resolverBehaviour.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Max retry attempts</div>
+            <div class="setting-label">{{ t('settings.resolverBehaviour.maxRetries') }}</div>
             <div class="setting-desc">
-              Maximum HTTP request attempts per resolver (including the first).
-              Applied to ecosyste.ms and libraries.io on timeout, rate limit (429), and server errors (5xx).
-              Default: 3. Range: 1–10.
+              {{ t('settings.resolverBehaviour.maxRetriesDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="retryMaxAttempts" min="1" max="10" @change="debouncedAutoSave({ retry_max_attempts: retryMaxAttempts })" class="num-input">
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Retry cooldown (seconds)</div>
+            <div class="setting-label">{{ t('settings.resolverBehaviour.cooldown') }}</div>
             <div class="setting-desc">
-              Base wait time between retries. Actual wait = cooldown × (attempt − 1).
-              Example: cooldown=5 → waits 5s before 2nd attempt, 10s before 3rd.
-              Range: 0.5–120 seconds.
+              {{ t('settings.resolverBehaviour.cooldownDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="retryBaseCooldownSeconds" min="0.5" max="120" step="0.5" @change="debouncedAutoSave({ retry_base_cooldown_seconds: retryBaseCooldownSeconds })" class="num-input">
@@ -251,30 +230,30 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Network & Performance</div>
+        <div class="card-title">{{ t('settings.network.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Batch concurrency limit</div>
+            <div class="setting-label">{{ t('settings.network.batchLimit') }}</div>
             <div class="setting-desc">
-              Maximum number of parallel PURL resolution requests in a batch (1–100). Default: 10.
+              {{ t('settings.network.batchLimitDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="batchSemaphoreLimit" min="1" max="100" @change="debouncedAutoSave({ batch_semaphore_limit: batchSemaphoreLimit })" class="num-input">
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Connectivity probe URL</div>
+            <div class="setting-label">{{ t('settings.network.probeUrl') }}</div>
             <div class="setting-desc">
-              Target URL used to check internet access before URL validation. Set to empty to disable the probe.
+              {{ t('settings.network.probeUrlDesc') }}
             </div>
           </div>
           <input type="text" v-model="connectivityUrl" @blur="debouncedAutoSave({ connectivity_url: connectivityUrl })" class="txt-input">
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Connectivity probe timeout (seconds)</div>
+            <div class="setting-label">{{ t('settings.network.probeTimeout') }}</div>
             <div class="setting-desc">
-              Timeout for the connectivity HEAD request (1–30 seconds). Default: 2.
+              {{ t('settings.network.probeTimeoutDesc') }}
             </div>
           </div>
           <input type="number" v-model.number="connectivityTimeout" min="1" max="30" @change="debouncedAutoSave({ connectivity_timeout: connectivityTimeout })" class="num-input">
@@ -282,13 +261,12 @@
         </div>
 
       <div class="card">
-        <div class="card-title">Logging</div>
+        <div class="card-title">{{ t('settings.logging.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Log level</div>
+            <div class="setting-label">{{ t('settings.logging.logLevel') }}</div>
             <div class="setting-desc">
-              Controls which log messages are shown in docker compose logs.
-              DEBUG – all messages, INFO – general operations, WARNING – errors only.
+              {{ t('settings.logging.logLevelDesc') }}
             </div>
           </div>
           <select v-model="logLevel" @change="debouncedAutoSave({ log_level: logLevel })" class="select-input">
@@ -302,18 +280,18 @@
       </div>
 
       <div class="card">
-        <div class="card-title">JSON Format</div>
+        <div class="card-title">{{ t('settings.jsonFormat.title') }}</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">JSON indent size</div>
+            <div class="setting-label">{{ t('settings.jsonFormat.indentSize') }}</div>
             <div class="setting-desc">
-              Number of spaces used when indenting JSON in downloaded files (SBOM, Images List).
+              {{ t('settings.jsonFormat.indentSizeDesc') }}
             </div>
           </div>
           <select v-model.number="jsonIndent" @change="debouncedAutoSave({ json_indent: jsonIndent })" class="select-input">
-            <option :value="1">1 space</option>
-            <option :value="2">2 spaces</option>
-            <option :value="4">4 spaces</option>
+            <option :value="1">{{ t('settings.jsonFormat.spaces', { count: 1 }) }}</option>
+            <option :value="2">{{ t('settings.jsonFormat.spaces', { count: 2 }) }}</option>
+            <option :value="4">{{ t('settings.jsonFormat.spaces', { count: 4 }) }}</option>
           </select>
         </div>
       </div>
@@ -368,12 +346,12 @@ function autoSave(partial: SettingsUpdate) {
   store.save(partial)
     .then(() => store.load())
     .then(() => {
-      showToast('Settings saved', false)
+      showToast(t('settings.savedToast'), false)
       if ('github_token' in partial) githubTokenInput.value = ''
       if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
       if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
     })
-    .catch((err: Error) => showToast(`Failed to save: ${err.message}`, true))
+    .catch((err: Error) => showToast(t('settings.saveFailedToast', { message: err.message }), true))
 }
 
 const debouncedAutoSave = debounce(autoSave, 500)
@@ -399,42 +377,42 @@ async function onEcosystemsKeyBlur() {
 async function clearToken() {
   try {
     await store.clearToken('github_token')
-    showToast('Token cleared', false)
+    showToast(t('settings.tokenCleared'), false)
     await store.load()
-  } catch { showToast('Failed to clear token', true) }
+  } catch { showToast(t('settings.errorMessages.tokenClearFailed'), true) }
 }
 
 async function onCheckGithubToken() {
   try {
     await store.checkGithubToken()
-    showToast('Token check complete', false)
+    showToast(t('settings.tokenCheckComplete'), false)
   } catch {
-    showToast('Failed to check token', true)
+    showToast(t('settings.errorMessages.tokenCheckFailed'), true)
   }
 }
 
 async function clearLibrariesIoKey() {
   try {
     await store.clearToken('librariesio_api_key')
-    showToast('Libraries.io key cleared', false)
+    showToast(t('settings.tokenCleared'), false)
     await store.load()
-  } catch { showToast('Failed to clear key', true) }
+  } catch { showToast(t('settings.errorMessages.keyClearFailed'), true) }
 }
 
 async function clearEcosystemsKey() {
   try {
     await store.clearToken('ecosystems_api_key')
-    showToast('ecosyste.ms key cleared', false)
+    showToast(t('settings.tokenCleared'), false)
     await store.load()
-  } catch { showToast('Failed to clear key', true) }
+  } catch { showToast(t('settings.errorMessages.keyClearFailed'), true) }
 }
 
 async function onClearValidationCache() {
   try {
     await clearValidationCache()
-    showToast('Validation cache cleared', false)
+    showToast(t('settings.cacheCleared'), false)
   } catch {
-    showToast('Failed to clear validation cache', true)
+    showToast(t('settings.errorMessages.cacheClearFailed'), true)
   }
 }
 
