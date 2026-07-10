@@ -58,7 +58,32 @@ class TestJobRepository:
     async def test_update_status(self, repo):
         conn = repo._pool.acquire.return_value.__aenter__.return_value
         await repo.update_status("job-1", "running", started_at="2026-07-10T12:00:00")
-        conn.execute.assert_called_once()
+        conn.execute.assert_called_once_with(
+            "UPDATE jobs SET status = $1, started_at = $2 WHERE id = $3",
+            "running", "2026-07-10T12:00:00", "job-1",
+        )
+
+    @pytest.mark.asyncio
+    async def test_list_all(self, repo):
+        conn = repo._pool.acquire.return_value.__aenter__.return_value
+        conn.fetch.return_value = []
+        results = await repo.list(limit=10, offset=0)
+        conn.fetch.assert_called_once_with(
+            "SELECT * FROM jobs ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+            10, 0,
+        )
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_list_with_type_filter(self, repo):
+        conn = repo._pool.acquire.return_value.__aenter__.return_value
+        conn.fetch.return_value = []
+        results = await repo.list(type_filter="sbom_enrich", limit=5, offset=0)
+        conn.fetch.assert_called_once_with(
+            "SELECT * FROM jobs WHERE type = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            "sbom_enrich", 5, 0,
+        )
+        assert results == []
 
     @pytest.mark.asyncio
     async def test_delete_success(self, repo):

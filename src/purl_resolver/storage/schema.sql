@@ -1,6 +1,5 @@
--- Table for persisting successful PURL→repository_url resolution results.
+-- Table for persisting SBOM enrichment job state and results.
 -- Auto-created on application startup via CREATE TABLE IF NOT EXISTS.
--- Schema is extensible — new columns should be nullable or have defaults.
 
 CREATE TABLE IF NOT EXISTS jobs (
     id               TEXT PRIMARY KEY,
@@ -19,6 +18,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     started_at       TEXT,
     finished_at      TEXT
 );
+
+-- Table for persisting successful PURL→repository_url resolution results.
+-- Auto-created on application startup via CREATE TABLE IF NOT EXISTS.
+-- Schema is extensible — new columns should be nullable or have defaults.
 
 CREATE TABLE IF NOT EXISTS resolved_purls (
     purl              TEXT PRIMARY KEY,
