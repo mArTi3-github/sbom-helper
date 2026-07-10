@@ -18,7 +18,7 @@ export interface ResolveResponse {
 
 export interface ErrorResponse {
   error: string
-  message: string
+  detail?: string
 }
 
 export interface SettingsTokenSet {

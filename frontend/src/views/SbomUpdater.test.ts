@@ -119,14 +119,14 @@ describe('SbomUpdater.vue', () => {
   })
 
   it('shows error message when saveIgnorePatterns fails with ApiError', async () => {
-    saveIgnorePatternsMock.mockRejectedValueOnce(new ApiError(400, 'bad_request', 'Invalid pattern'))
+    saveIgnorePatternsMock.mockRejectedValueOnce(new ApiError(400, 'bad_request'))
     const wrapper = mountUpdater()
     await flushPromises()
     const saveBtn = wrapper.findAll('.pattern-toolbar button').find((b) => b.text().includes('Сохранить'))
     await saveBtn!.trigger('click')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('Invalid pattern')
+    expect(wrapper.find('.error-msg').text()).toBe('bad_request')
   })
 
   it('processes SBOM and renders summary + results table', async () => {

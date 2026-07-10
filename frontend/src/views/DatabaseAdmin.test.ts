@@ -337,7 +337,7 @@ describe('DatabaseAdmin.vue', () => {
   })
 
   it('shows import error message on ApiError', async () => {
-    importCsvMock.mockRejectedValueOnce(new ApiError(400, 'bad_csv', 'Malformed CSV'))
+    importCsvMock.mockRejectedValueOnce(new ApiError(400, 'bad_csv'))
     const wrapper = mountAdmin()
     await flushPromises()
     await wrapper.findAll('.toolbar button').find((b) => b.text().includes('Import CSV'))!.trigger('click')
@@ -351,7 +351,7 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
 
     expect(document.querySelector('.modal-body .error-msg')).not.toBeNull()
-    expect(document.body.textContent).toContain('Malformed CSV')
+    expect(document.body.textContent).toContain('bad_csv')
   })
 
   it('paginates to next page when Next button is clicked', async () => {
@@ -392,11 +392,11 @@ describe('DatabaseAdmin.vue', () => {
   })
 
   it('shows API error message when listPurls rejects with ApiError', async () => {
-    listPurlsMock.mockRejectedValueOnce(new ApiError(500, 'server_error', 'Database unavailable'))
+    listPurlsMock.mockRejectedValueOnce(new ApiError(500, 'server_error'))
     const wrapper = mountAdmin()
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('Database unavailable')
+    expect(wrapper.find('.error-msg').text()).toBe('server_error')
   })
 
   it('shows network error message when listPurls rejects with generic Error', async () => {
