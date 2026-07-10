@@ -27,7 +27,7 @@ async def resolve_endpoint(body: ResolveRequest, request: Request) -> JSONRespon
     except ConnectionError as e:
         return JSONResponse(
             status_code=503,
-            content={"error": "network_unavailable", "message": str(e)},
+            content={"error": "network_unavailable"},
         )
 
     result = await request.app.state.resolution_service.resolve_purl(purl=body.purl)
@@ -53,7 +53,7 @@ async def resolve_sbom_endpoint(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "error": "file_too_large",
-                "message": f"File size exceeds maximum of {sbom_settings.max_file_size // (1024*1024)} MB",
+                "max_size_mb": sbom_settings.max_file_size // (1024*1024),
             },
         )
 
@@ -62,7 +62,7 @@ async def resolve_sbom_endpoint(
     except json.JSONDecodeError as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_json", "message": f"Invalid JSON: {e}"},
+            content={"error": "invalid_json"},
         )
 
     parsed_patterns: list[dict[str, str]] | None = None
@@ -84,7 +84,7 @@ async def resolve_sbom_endpoint(
     except ConnectionError as e:
         return JSONResponse(
             status_code=503,
-            content={"error": "network_unavailable", "message": str(e)},
+            content={"error": "network_unavailable"},
         )
 
     pipeline = SbomEnrichmentPipeline(
@@ -100,7 +100,7 @@ async def resolve_sbom_endpoint(
     except SbomParseError as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_sbom", "message": str(e)},
+            content={"error": "invalid_sbom", "detail": str(e)},
         )
 
     return JSONResponse(

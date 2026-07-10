@@ -32,7 +32,7 @@ async def update_purl_endpoint(
         status = 404 if error_msg == "PURL not found" else 400
         return JSONResponse(
             status_code=status,
-            content={"error": "not_found" if status == 404 else "invalid_update", "message": error_msg},
+            content={"error": "purl_not_found" if status == 404 else "invalid_update"},
         )
     return JSONResponse(status_code=200, content={"ok": True})
 
@@ -56,7 +56,7 @@ async def import_csv_endpoint(
     except UnicodeDecodeError:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_csv", "message": "File must be UTF-8 encoded"},
+            content={"error": "invalid_csv"},
         )
 
     service: DbAdminService = request.app.state.db_admin_service
@@ -65,7 +65,7 @@ async def import_csv_endpoint(
     except DbAdminError as e:
         return JSONResponse(
             status_code=e.status_code,
-            content={"error": "invalid_csv", "message": e.message},
+            content={"error": "invalid_csv"},
         )
     return JSONResponse(status_code=200, content=result.model_dump())
 

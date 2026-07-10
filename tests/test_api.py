@@ -71,7 +71,7 @@ class TestResolve:
         assert response.status_code == 400
         data = response.json()
         assert "error" in data
-        assert "message" in data
+        assert "detail" in data
 
     def test_unresolved_purl_returns_200_with_null(
         self, client: TestClient

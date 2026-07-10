@@ -22,9 +22,7 @@ async def convert_images_list(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "error": "file_too_large",
-                "message": (
-                    f"File size exceeds maximum of {sbom_settings.max_file_size // (1024*1024)} MB"
-                ),
+                "max_size_mb": sbom_settings.max_file_size // (1024*1024),
             },
         )
 
@@ -33,7 +31,7 @@ async def convert_images_list(
     except json.JSONDecodeError as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_json", "message": f"Invalid JSON: {e}"},
+            content={"error": "invalid_json"},
         )
 
     try:
@@ -41,7 +39,7 @@ async def convert_images_list(
     except SbomParseError as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_sbom", "message": str(e)},
+            content={"error": "invalid_sbom", "detail": str(e)},
         )
 
     return JSONResponse(

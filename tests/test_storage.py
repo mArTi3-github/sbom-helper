@@ -217,7 +217,7 @@ class TestResolvePurl:
         assert result.error_status == 400
         assert result.error_body is not None
         assert result.error_body["error"] == "invalid_purl"
-        assert isinstance(result.error_body["message"], str)
+        assert isinstance(result.error_body["detail"], str)
 
     @pytest.mark.asyncio
     async def test_invalid_purl_from_resolver_still_works(self, storage: InMemoryCache) -> None:
@@ -228,7 +228,7 @@ class TestResolvePurl:
 
         assert resolver.call_count == 1
         assert result.error_status == 400
-        assert result.error_body == {"error": "invalid_purl", "message": "unsupported ecosystem"}
+        assert result.error_body == {"error": "invalid_purl", "detail": "unsupported ecosystem"}
 
     @pytest.mark.asyncio
     async def test_all_resolvers_fail_returns_unresolved(self, storage: InMemoryCache) -> None:

@@ -43,10 +43,10 @@ class ResolveResult:
         return ResolveResult(response=response)
 
     @staticmethod
-    def err(status: int, error: str, message: str) -> ResolveResult:
+    def err(status_code: int, error: str, detail: str | None = None) -> ResolveResult:
         return ResolveResult(
-            error_status=status,
-            error_body={"error": error, "message": message},
+            error_status=status_code,
+            error_body={"error": error} if detail is None else {"error": error, "detail": detail},
         )
 
 

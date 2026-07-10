@@ -110,7 +110,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
             if not is_valid:
                 return JSONResponse(
                     status_code=400,
-                    content={"error": "invalid_token", "message": "GitHub token is invalid or expired"},
+                    content={"error": "invalid_token"},
                 )
 
     if "librariesio_api_key" in update_data:
@@ -123,7 +123,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
             if not await validate_librariesio_key(key_value):
                 return JSONResponse(
                     status_code=400,
-                    content={"error": "invalid_token", "message": "Libraries.io API key is invalid"},
+                    content={"error": "invalid_token"},
                 )
 
     if update_data:
@@ -175,7 +175,7 @@ async def check_github_token(request: Request) -> JSONResponse:
     if not token:
         return JSONResponse(
             status_code=400,
-            content={"error": "token_not_set", "message": "GitHub token is not set"},
+            content={"error": "token_not_set"},
         )
     is_valid = await validate_github_token(token)
     return JSONResponse(content={"status": "valid" if is_valid else "invalid"})
