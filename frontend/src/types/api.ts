@@ -87,6 +87,32 @@ export interface ImagesListResponse {
   images_list: unknown
 }
 
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+
+export interface JobRecord {
+  job_id: string
+  type: string
+  status: JobStatus
+  progress_current: number
+  progress_total: number
+  input_filename: string | null
+  summary: SbomSummary | null
+  results: SbomResultItem[] | null
+  error_message: string | null
+  created_at: string | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+export interface JobListResponse {
+  jobs: JobRecord[]
+}
+
+export interface JobCreateResponse {
+  job_id: string
+  status: JobStatus
+}
+
 export interface IgnorePatternItem {
   field: string
   pattern: string
