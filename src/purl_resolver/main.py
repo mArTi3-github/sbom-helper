@@ -25,6 +25,7 @@ class SPAStaticFiles(StaticFiles):
 
 from .config import settings, storage_settings
 from .db_admin_service import DbAdminService
+from .job_manager import JobManager
 from .ignore_patterns_store import IgnorePatternsStore
 from .resolver.factory import build_resolvers
 from .router import router
@@ -70,6 +71,19 @@ async def lifespan(app: FastAPI):
         validation_service=app.state.validation_service,
     )
 
+    # Job manager for async SBOM enrichment
+    if isinstance(app.state.storage, PostgresCache):
+        app.state.job_manager = JobManager(
+            pool=pool,
+            resolution_service=app.state.resolution_service,
+            job_ttl_hours=app_settings.job_ttl_hours,
+        )
+        await app.state.job_manager.start()
+        logger.info("Job manager started")
+    else:
+        logger.warning("PostgreSQL unavailable — job queue disabled")
+        app.state.job_manager = None
+
     spa_dir = pathlib.Path("/app/frontend/dist")
     if spa_dir.is_dir():
         app.mount("/", SPAStaticFiles(directory=str(spa_dir), html=True), name="spa")
@@ -92,6 +106,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         expire_task.cancel()
+        if app.state.job_manager is not None:
+            await app.state.job_manager.stop()
         if pool is not None:
             await pool.close()
 
