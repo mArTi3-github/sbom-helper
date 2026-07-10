@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const routes = [
-  { path: '/', name: 'PURL Resolver' },
-  { path: '/sbom-updater', name: 'SBOM Updater' },
-  { path: '/db-admin', name: 'Database Admin' },
-  { path: '/settings', name: 'Settings' },
-  { path: '/images-list-converter', name: 'Images List Converter' },
+  { path: '/', nameKey: 'nav.purlResolver' },
+  { path: '/sbom-updater', nameKey: 'nav.sbomUpdater' },
+  { path: '/db-admin', nameKey: 'nav.dbAdmin' },
+  { path: '/settings', nameKey: 'nav.settings' },
+  { path: '/images-list-converter', nameKey: 'nav.imagesListConverter' },
 ]
 </script>
 
@@ -17,7 +19,7 @@ const routes = [
       class="nav-link"
       active-class="nav-link--active"
     >
-      {{ route.name }}
+      {{ t(route.nameKey) }}
     </router-link>
   </nav>
 </template>

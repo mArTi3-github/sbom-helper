@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AppNav from './components/AppNav.vue'
+const { t } = useI18n()
 </script>
 
 <template>
@@ -8,7 +10,7 @@ import AppNav from './components/AppNav.vue'
     <main class="container">
       <router-view />
     </main>
-    <footer class="app-footer">Powered by sbom-helper</footer>
+    <footer class="app-footer">{{ t('common.poweredBy') }}</footer>
   </div>
 </template>
 
