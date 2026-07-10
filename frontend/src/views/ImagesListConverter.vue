@@ -1,16 +1,16 @@
 <template>
   <div class="container">
-    <h1>Images List Converter</h1>
-    <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы сформировать машиночитаемый список docker-образов продукта</p>
+    <h1>{{ t('imagesListConverter.title') }}</h1>
+    <p class="subtitle">{{ t('imagesListConverter.subtitle') }}</p>
 
     <FileUploadZone accept=".json" @file-selected="onFileSelected" />
 
     <div class="toolbar">
-      <button :disabled="!selectedFile || loading" @click="handleConvert">Конвертировать</button>
+      <button :disabled="!selectedFile || loading" @click="handleConvert">{{ t('imagesListConverter.convert') }}</button>
     </div>
 
     <div v-if="loading" class="loading">
-      <span class="spinner"></span> Обработка SBOM...
+      <span class="spinner"></span> {{ t('imagesListConverter.processing') }}
     </div>
 
     <div v-if="error" class="error-msg">{{ error }}</div>
@@ -18,10 +18,10 @@
     <div v-if="result" class="results">
       <div :class="['status-card', result.was_transformed ? 'status-transformed' : 'status-ok']">
         <span v-if="result.was_transformed">
-          &#9888; <strong>Выполнено преобразование</strong> — исходный SBOM был преобразован в список образов контейнеров.
+          &#9888; {{ t('imagesListConverter.wasTransformed') }}
         </span>
         <span v-else>
-          &#10003; <strong>Преобразований не требуется</strong> — переданный файл уже является корректным списком образов.
+          &#10003; {{ t('imagesListConverter.noTransformation') }}
         </span>
       </div>
 
@@ -29,12 +29,12 @@
         <table>
           <thead>
             <tr>
-              <th>Имя образа</th>
-              <th>Версия</th>
-              <th>Заполнены компоненты</th>
-              <th>Заполнено поле name</th>
-              <th>Заполнено поле Properties</th>
-              <th>Удалено дублей</th>
+              <th>{{ t('imagesListConverter.imageName') }}</th>
+              <th>{{ t('imagesListConverter.version') }}</th>
+              <th>{{ t('imagesListConverter.componentsPopulated') }}</th>
+              <th>{{ t('imagesListConverter.namePopulated') }}</th>
+              <th>{{ t('imagesListConverter.propertiesPopulated') }}</th>
+              <th>{{ t('imagesListConverter.duplicatesRemoved') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -68,7 +68,7 @@
       </div>
 
       <div class="toolbar">
-        <button @click="downloadResult">Скачать список образов</button>
+        <button @click="downloadResult">{{ t('imagesListConverter.downloadList') }}</button>
       </div>
     </div>
   </div>
@@ -76,12 +76,15 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import { convertImagesList } from '../api/images'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
 import type { ImagesListResponse } from '../types/api'
+
+const { t } = useI18n()
 
 const selectedFile = ref<File | null>(null)
 const loading = ref(false)
@@ -110,11 +113,11 @@ async function handleConvert() {
     imagesListData.value = res.images_list
   } catch (e: unknown) {
     if (e instanceof ApiError) {
-      error.value = e.message
+      error.value = t('errors.' + e.error, e.data)
     } else if (e instanceof Error) {
-      error.value = 'Network error: could not reach the server.'
+      error.value = t('errors.network_error')
     } else {
-      error.value = 'An unexpected error occurred.'
+      error.value = t('errors.unexpected_error')
     }
   } finally {
     loading.value = false
