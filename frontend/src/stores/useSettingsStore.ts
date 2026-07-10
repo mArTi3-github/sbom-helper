@@ -16,6 +16,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const ecosystemsEnabled = ref(false)
   const ecosystemsMaxRequestsPerSecond = ref(2)
   const batchSemaphoreLimit = ref(10)
+  const jobTtlHours = ref(24)
   const connectivityUrl = ref('https://github.com')
   const connectivityTimeout = ref(2)
   const jsonIndent = ref(4)
@@ -46,6 +47,7 @@ export const useSettingsStore = defineStore('settings', () => {
       ecosystemsEnabled.value = data.ecosystems_enabled
       ecosystemsMaxRequestsPerSecond.value = data.ecosystems_max_requests_per_second
       batchSemaphoreLimit.value = data.batch_semaphore_limit
+      jobTtlHours.value = data.job_ttl_hours
       connectivityUrl.value = data.connectivity_url
       connectivityTimeout.value = data.connectivity_timeout
       jsonIndent.value = data.json_indent
@@ -82,7 +84,7 @@ export const useSettingsStore = defineStore('settings', () => {
     validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
-    batchSemaphoreLimit, connectivityUrl, connectivityTimeout, jsonIndent,
+    batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
     language,
     tokenSet, githubToken, librariesioKey, ecosystemsKey, loading,
     githubTokenValidity,

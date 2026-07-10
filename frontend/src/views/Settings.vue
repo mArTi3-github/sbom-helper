@@ -261,6 +261,19 @@
       </div>
 
       <div class="card">
+        <div class="card-title">{{ t('settings.jobManagement.title') }}</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.jobManagement.ttlLabel') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.jobManagement.ttlDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="jobTtlHours" min="1" max="720" @change="debouncedAutoSave({ job_ttl_hours: jobTtlHours })" class="num-input">
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">{{ t('settings.logging.title') }}</div>
         <div class="setting-row">
           <div>
@@ -317,7 +330,7 @@ const {
   validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
-  batchSemaphoreLimit, connectivityUrl, connectivityTimeout,
+  batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout,
   tokenSet, loading, jsonIndent, githubTokenValidity,
 } = storeToRefs(store)
 

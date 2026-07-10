@@ -224,6 +224,11 @@
       "cooldown": "Retry cooldown (seconds)",
       "cooldownDesc": "Base wait time between retries. Actual wait = cooldown × (attempt − 1). Example: cooldown=5 → waits 5s before 2nd attempt, 10s before 3rd. Range: 0.5–120 seconds."
     },
+    "jobManagement": {
+      "title": "Job Management",
+      "ttlLabel": "Job result TTL (hours)",
+      "ttlDesc": "Completed, cancelled, and failed jobs are automatically deleted after this many hours."
+    },
     "network": {
       "title": "Network & Performance",
       "batchLimit": "Batch concurrency limit",

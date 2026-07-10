@@ -28,6 +28,7 @@ class AppSettings(BaseModel):
     retry_base_cooldown_seconds: float = Field(default=5.0, ge=0.5, le=120.0)
     log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     batch_semaphore_limit: int = Field(default=10, ge=1, le=100)
+    job_ttl_hours: int = Field(default=24, ge=1, le=720)
     connectivity_url: str = Field(default="https://github.com")
     connectivity_timeout: int = Field(default=2, ge=1, le=30)
     json_indent: Literal[1, 2, 4] = Field(default=4)

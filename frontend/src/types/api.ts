@@ -40,6 +40,7 @@ export interface SettingsResponse {
   ecosystems_enabled: boolean
   ecosystems_max_requests_per_second: number
   batch_semaphore_limit: number
+  job_ttl_hours: number
   connectivity_url: string
   connectivity_timeout: number
   json_indent: number
@@ -63,6 +64,7 @@ export interface SettingsUpdate {
   retry_base_cooldown_seconds?: number
   log_level?: string
   batch_semaphore_limit?: number
+  job_ttl_hours?: number
   connectivity_url?: string
   connectivity_timeout?: number
   json_indent?: number
