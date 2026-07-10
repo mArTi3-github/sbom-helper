@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, File, Form, Request, UploadFile, status
 from fastapi.responses import JSONResponse, FileResponse
 
 from ..config import sbom_settings
@@ -21,9 +21,9 @@ async def create_sbom_enrich_job(
 ) -> JSONResponse:
     raw = await file.read()
     if len(raw) > sbom_settings.max_file_size:
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail={
+            content={
                 "error": "file_too_large",
                 "max_size_mb": sbom_settings.max_file_size // (1024 * 1024),
             },
@@ -63,7 +63,7 @@ async def get_job(request: Request, job_id: str) -> JSONResponse:
     manager: JobManager = request.app.state.job_manager
     record = await manager.get_job(job_id)
     if not record:
-        raise HTTPException(status_code=404, detail={"error": "job_not_found"})
+        return JSONResponse(status_code=404, content={"error": "job_not_found"})
     return JSONResponse(content={
         "job_id": record.id,
         "type": record.type,
@@ -85,15 +85,15 @@ async def download_job_result(request: Request, job_id: str) -> FileResponse:
     manager: JobManager = request.app.state.job_manager
     record = await manager.get_job(job_id)
     if not record:
-        raise HTTPException(status_code=404, detail={"error": "job_not_found"})
+        return JSONResponse(status_code=404, content={"error": "job_not_found"})
     if record.status != "completed":
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail={"error": "result_not_ready", "status": record.status},
+            content={"error": "result_not_ready", "status": record.status},
         )
     path = Path(record.result_path) if record.result_path else None
     if not path or not path.exists():
-        raise HTTPException(status_code=404, detail={"error": "result_file_not_found"})
+        return JSONResponse(status_code=404, content={"error": "result_file_not_found"})
     return FileResponse(
         path=path,
         filename=record.input_filename.replace(".json", "") + "_enriched.json",
@@ -108,10 +108,10 @@ async def cancel_job(request: Request, job_id: str) -> JSONResponse:
     if not success:
         record = await manager.get_job(job_id)
         if not record:
-            raise HTTPException(status_code=404, detail={"error": "job_not_found"})
-        raise HTTPException(
+            return JSONResponse(status_code=404, content={"error": "job_not_found"})
+        return JSONResponse(
             status_code=409,
-            detail={"error": "job_already_terminal", "status": record.status},
+            content={"error": "job_already_terminal", "status": record.status},
         )
     return JSONResponse(content={"job_id": job_id, "status": "cancelled"})
 
@@ -121,7 +121,7 @@ async def delete_job(request: Request, job_id: str) -> JSONResponse:
     manager: JobManager = request.app.state.job_manager
     success = await manager.delete_job(job_id)
     if not success:
-        raise HTTPException(status_code=404, detail={"error": "job_not_found"})
+        return JSONResponse(status_code=404, content={"error": "job_not_found"})
     return JSONResponse(content={"job_id": job_id, "deleted": True})
 
 

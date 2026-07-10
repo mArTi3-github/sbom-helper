@@ -52,7 +52,7 @@ class TestCreateSbomEnrichJob:
             )
         assert response.status_code == 413
         data = response.json()
-        assert data["detail"]["error"] == "file_too_large"
+        assert data["error"] == "file_too_large"
 
     def test_invalid_json(self, client, mock_manager):
         response = client.post(
@@ -108,7 +108,7 @@ class TestGetJob:
         mock_manager.get_job.return_value = None
         response = client.get("/api/v1/jobs/nonexistent")
         assert response.status_code == 404
-        assert response.json() == {"detail": {"error": "job_not_found"}}
+        assert response.json() == {"error": "job_not_found"}
 
 
 class TestDownloadResult:
@@ -131,7 +131,7 @@ class TestDownloadResult:
         response = client.get("/api/v1/jobs/job-1/result")
         assert response.status_code == 400
         data = response.json()
-        assert data["detail"]["error"] == "result_not_ready"
+        assert data["error"] == "result_not_ready"
 
     def test_job_not_found(self, client, mock_manager):
         mock_manager.get_job.return_value = None
@@ -146,7 +146,7 @@ class TestDownloadResult:
         )
         response = client.get("/api/v1/jobs/job-1/result")
         assert response.status_code == 404
-        assert response.json() == {"detail": {"error": "result_file_not_found"}}
+        assert response.json() == {"error": "result_file_not_found"}
 
 
 class TestCancelJob:
@@ -164,7 +164,7 @@ class TestCancelJob:
         response = client.post("/api/v1/jobs/job-1/cancel")
         assert response.status_code == 409
         data = response.json()
-        assert data["detail"]["error"] == "job_already_terminal"
+        assert data["error"] == "job_already_terminal"
 
     def test_not_found(self, client, mock_manager):
         mock_manager.cancel_job.return_value = False
@@ -184,7 +184,7 @@ class TestDeleteJob:
         mock_manager.delete_job.return_value = False
         response = client.delete("/api/v1/jobs/nonexistent")
         assert response.status_code == 404
-        assert response.json() == {"detail": {"error": "job_not_found"}}
+        assert response.json() == {"error": "job_not_found"}
 
 
 class TestListJobs:
