@@ -1,39 +1,39 @@
 <template>
   <div class="container">
-    <h1>SBOM Updater</h1>
-    <p class="subtitle">Загрузите CycloneDX SBOM (JSON), чтобы обогатить компоненты ссылками на репозитории исходных текстов</p>
+    <h1>{{ t('sbomUpdater.title') }}</h1>
+    <p class="subtitle">{{ t('sbomUpdater.subtitle') }}</p>
 
     <FileUploadZone accept=".json" :max-size="200" @file-selected="onFileSelected" />
 
     <div class="options-section">
       <label class="checkbox-row">
         <input type="checkbox" v-model="removeUnresolved" />
-        <span>Удалять ненайденные компоненты без подкомпонентов</span>
+        <span>{{ t('sbomUpdater.removeUnresolved') }}</span>
       </label>
     </div>
 
     <div class="card">
-      <div class="card-title">Игнорировать компоненты с перечисленными признаками:</div>
+      <div class="card-title">{{ t('sbomUpdater.ignorePatterns') }}</div>
       <div class="pattern-rows">
         <div v-for="(row, idx) in patternRows" :key="idx" class="pattern-row">
-          <input type="text" v-model="row.field" placeholder="Поле" class="pattern-input" />
-          <span class="pattern-label">содержит</span>
-          <input type="text" v-model="row.pattern" placeholder="Значение" class="pattern-input" />
+          <input type="text" v-model="row.field" :placeholder="t('sbomUpdater.fieldPlaceholder')" class="pattern-input" />
+          <span class="pattern-label">{{ t('sbomUpdater.contains') }}</span>
+          <input type="text" v-model="row.pattern" :placeholder="t('sbomUpdater.valuePlaceholder')" class="pattern-input" />
           <button class="btn-delete" @click="removeRow(idx)">✕</button>
         </div>
       </div>
       <div class="pattern-toolbar">
-        <button class="btn-secondary" @click="addRow">Добавить строку</button>
-        <button class="btn-primary" @click="savePatterns" :disabled="savingPatterns">{{ patternsSaved ? 'Сохранено' : 'Сохранить' }}</button>
+        <button class="btn-secondary" @click="addRow">{{ t('sbomUpdater.addRow') }}</button>
+        <button class="btn-primary" @click="savePatterns" :disabled="savingPatterns">{{ patternsSaved ? t('sbomUpdater.saved') : t('sbomUpdater.save') }}</button>
       </div>
     </div>
 
     <div class="toolbar">
-      <button :disabled="!selectedFile || processing" @click="handleProcess">Обработать</button>
+      <button :disabled="!selectedFile || processing" @click="handleProcess">{{ t('sbomUpdater.process') }}</button>
     </div>
 
     <div v-if="processing" class="loading">
-      <span class="spinner"></span> Обработка SBOM...
+      <span class="spinner"></span> {{ t('sbomUpdater.processing') }}
     </div>
 
     <div v-if="error" class="error-msg">{{ error }}</div>
@@ -43,43 +43,43 @@
         <div class="summary-item">
           <div class="summary-value">{{ result.summary.total_purls }}</div>
           <div class="summary-label">
-            Всего
-            <span class="info-icon" data-tooltip="Уникальных PURL, направленных на обогащение">i</span>
+            {{ t('sbomUpdater.total') }}
+            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttUniquePurls')">i</span>
           </div>
         </div>
         <div class="summary-item summary-found">
           <div class="summary-value">{{ result.summary.found }}</div>
           <div class="summary-label">
-            Найдено
-            <span class="info-icon" data-tooltip="Уникальных PURL с найденным VCS-репозиторием">i</span>
+            {{ t('sbomUpdater.found') }}
+            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttFoundRepo')">i</span>
           </div>
         </div>
         <div class="summary-item summary-not-found">
           <div class="summary-value">{{ result.summary.not_found }}</div>
           <div class="summary-label">
-            Не найдено
-            <span class="info-icon" data-tooltip="Уникальных PURL без найденного VCS-репозитория">i</span>
+            {{ t('sbomUpdater.notFound') }}
+            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttNotFound')">i</span>
           </div>
         </div>
         <div v-if="result.summary.skipped > 0" class="summary-item summary-skipped">
           <div class="summary-value">{{ result.summary.skipped }}</div>
           <div class="summary-label">
-            Пропущено
-            <span class="info-icon" data-tooltip="PURL, пропущенные из-за ошибки нормализации">i</span>
+            {{ t('sbomUpdater.skipped') }}
+            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttSkipped')">i</span>
           </div>
         </div>
         <div v-if="result.summary.removed > 0" class="summary-item summary-removed">
           <div class="summary-value">{{ result.summary.removed }}</div>
           <div class="summary-label">
-            Удалено
-            <span class="info-icon" data-tooltip="Всего удалённых записей (включая повторяющиеся PURL на разных уровнях вложенности)">i</span>
+            {{ t('sbomUpdater.removed') }}
+            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttRemoved')">i</span>
           </div>
         </div>
         <div v-if="result.summary.ignored > 0" class="summary-item summary-ignored">
           <div class="summary-value">{{ result.summary.ignored }}</div>
           <div class="summary-label">
-            Игнорировано
-            <span class="info-icon" data-tooltip="Уникальных PURL, исключённых из обработки по правилам игнорирования">i</span>
+            {{ t('sbomUpdater.ignored') }}
+            <span class="info-icon" :data-tooltip="t('sbomUpdater.ttIgnored')">i</span>
           </div>
         </div>
       </div>
@@ -88,18 +88,18 @@
         <table>
           <thead>
             <tr>
-              <th>PURL</th>
-              <th>Статус</th>
-              <th>Repository URL</th>
-              <th>Found by</th>
-              <th>Resolver</th>
+              <th>{{ t('sbomUpdater.purl') }}</th>
+              <th>{{ t('sbomUpdater.status') }}</th>
+              <th>{{ t('sbomUpdater.repoUrl') }}</th>
+              <th>{{ t('sbomUpdater.foundBy') }}</th>
+              <th>{{ t('sbomUpdater.resolver') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(item, i) in result.results" :key="i">
               <td class="cell-purl">{{ item.purl }}</td>
               <td>
-                <span :class="['status-badge', 'status-' + item.status]">{{ statusLabel(item.status) }}</span>
+                <span :class="['status-badge', 'status-' + item.status]">{{ t('status.' + item.status) }}</span>
               </td>
               <td>
                 <a v-if="item.repository_url" :href="safeUrl(item.repository_url)" target="_blank">{{ item.repository_url }}</a>
@@ -113,7 +113,7 @@
       </div>
 
       <div class="toolbar">
-        <button @click="downloadResult">Скачать обогащённый SBOM</button>
+        <button @click="downloadResult">{{ t('sbomUpdater.downloadEnriched') }}</button>
       </div>
     </div>
   </div>
@@ -121,12 +121,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import { getIgnorePatterns, saveIgnorePatterns, resolveSbom } from '../api/sbom'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson, safeUrl } from '../composables/useDownload'
 import type { IgnorePatternItem, SbomResponse } from '../types/api'
+
+const { t } = useI18n()
 
 const selectedFile = ref<File | null>(null)
 const removeUnresolved = ref(false)
@@ -173,11 +176,11 @@ async function savePatterns() {
     }, 2000)
   } catch (e: unknown) {
     if (e instanceof ApiError) {
-      error.value = e.message
+      error.value = t('errors.' + e.error, e.data)
     } else if (e instanceof Error) {
-      error.value = 'Network error: could not reach the server.'
+      error.value = t('errors.network_error')
     } else {
-      error.value = 'An unexpected error occurred.'
+      error.value = t('errors.unexpected_error')
     }
   } finally {
     savingPatterns.value = false
@@ -206,11 +209,11 @@ async function handleProcess() {
   } catch (e: unknown) {
     if (e instanceof DOMException && e.name === 'AbortError') return
     if (e instanceof ApiError) {
-      error.value = e.message
+      error.value = t('errors.' + e.error, e.data)
     } else if (e instanceof Error) {
-      error.value = 'Network error: could not reach the server.'
+      error.value = t('errors.network_error')
     } else {
-      error.value = 'An unexpected error occurred.'
+      error.value = t('errors.unexpected_error')
     }
   } finally {
     processing.value = false
@@ -222,16 +225,6 @@ function downloadResult() {
   if (!enrichedSbom.value || !selectedFile.value) return
   const store = useSettingsStore()
   downloadJson(enrichedSbom.value, selectedFile.value.name.replace(/\.json$/, '') + '_enriched.json', store.jsonIndent)
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'found': return 'Found'
-    case 'not_found': return 'Not found'
-    case 'removed': return 'Removed'
-    case 'ignored': return 'Ignored'
-    default: return status
-  }
 }
 
 onMounted(async () => {

@@ -65,6 +65,7 @@
     "skipped": "Пропущено",
     "removed": "Удалено",
     "ignored": "Игнорировано",
+    "purl": "PURL",
     "status": "Статус",
     "repoUrl": "Repository URL",
     "foundBy": "Found by",
