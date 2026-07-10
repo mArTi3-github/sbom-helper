@@ -117,6 +117,8 @@
     "last": "Last",
     "edit": "Edit",
     "del": "Del",
+    "purl": "PURL",
+    "repositoryUrl": "Repository URL",
     "any": "Any",
     "actions": "Actions",
     "type": "Type",

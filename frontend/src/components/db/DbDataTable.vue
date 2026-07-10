@@ -1,12 +1,12 @@
 <template>
   <div>
     <div class="toolbar">
-      <button class="btn btn-secondary" :disabled="store.selectedPurls.size === 0" @click="handleExport">Export CSV ({{ store.selectedPurls.size }})</button>
-      <button class="btn btn-secondary" @click="store.showImportModal = true">Import CSV</button>
-      <button class="btn btn-danger" :disabled="store.selectedPurls.size === 0" @click="handleDeleteSelected">Delete Selected ({{ store.selectedPurls.size }})</button>
+      <button class="btn btn-secondary" :disabled="store.selectedPurls.size === 0" @click="handleExport">{{ t('dbAdmin.exportCsv') }} ({{ store.selectedPurls.size }})</button>
+      <button class="btn btn-secondary" @click="store.showImportModal = true">{{ t('dbAdmin.importCsv') }}</button>
+      <button class="btn btn-danger" :disabled="store.selectedPurls.size === 0" @click="handleDeleteSelected">{{ t('dbAdmin.deleteSelected') }} ({{ store.selectedPurls.size }})</button>
     </div>
 
-    <div v-if="store.loading" class="loading"><span class="spinner"></span> Loading...</div>
+    <div v-if="store.loading" class="loading"><span class="spinner"></span> {{ t('dbAdmin.loading') }}</div>
     <div v-if="store.errorMessage" class="error-msg">{{ store.errorMessage }}</div>
     <div v-if="store.successMessage" class="success-msg">{{ store.successMessage }}</div>
 
@@ -17,17 +17,17 @@
             <th class="col-check">
               <input type="checkbox" :checked="store.allSelected" :indeterminate="store.someSelected" @change="handleToggleAll">
             </th>
-            <th class="col-sortable" @click="store.setSort('purl')">PURL<span v-if="store.sortBy === 'purl'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('repository_url')">Repository URL<span v-if="store.sortBy === 'repository_url'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('resolver')">Resolver<span v-if="store.sortBy === 'resolver'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('repository_type')">Type<span v-if="store.sortBy === 'repository_type'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('repository_kind')">Kind<span v-if="store.sortBy === 'repository_kind'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('confidence')">Confidence<span v-if="store.sortBy === 'confidence'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('version_reference')">Version Ref<span v-if="store.sortBy === 'version_reference'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th>Evidence</th>
-            <th>Warnings</th>
-            <th class="col-sortable" @click="store.setSort('resolved_at')">Resolved At<span v-if="store.sortBy === 'resolved_at'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th>Actions</th>
+            <th class="col-sortable" @click="store.setSort('purl')">{{ t('dbAdmin.purl') }}<span v-if="store.sortBy === 'purl'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th class="col-sortable" @click="store.setSort('repository_url')">{{ t('dbAdmin.repositoryUrl') }}<span v-if="store.sortBy === 'repository_url'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th class="col-sortable" @click="store.setSort('resolver')">{{ t('dbAdmin.resolver') }}<span v-if="store.sortBy === 'resolver'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th class="col-sortable" @click="store.setSort('repository_type')">{{ t('dbAdmin.type') }}<span v-if="store.sortBy === 'repository_type'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th class="col-sortable" @click="store.setSort('repository_kind')">{{ t('dbAdmin.kind') }}<span v-if="store.sortBy === 'repository_kind'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th class="col-sortable" @click="store.setSort('confidence')">{{ t('dbAdmin.confidence') }}<span v-if="store.sortBy === 'confidence'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th class="col-sortable" @click="store.setSort('version_reference')">{{ t('dbAdmin.versionRef') }}<span v-if="store.sortBy === 'version_reference'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th>{{ t('dbAdmin.evidence') }}</th>
+            <th>{{ t('dbAdmin.warnings') }}</th>
+            <th class="col-sortable" @click="store.setSort('resolved_at')">{{ t('dbAdmin.resolvedAt') }}<span v-if="store.sortBy === 'resolved_at'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
+            <th>{{ t('dbAdmin.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -55,29 +55,29 @@
             <td :title="joinArray(row.warnings)">{{ truncate(joinArray(row.warnings)) }}</td>
             <td class="cell-nowrap">{{ formatDate(row.resolved_at) }}</td>
             <td class="col-actions">
-              <button class="btn btn-sm btn-secondary" @click="store.startEdit(row)">Edit</button>
-              <button class="btn btn-sm btn-danger" @click="handleDeleteRow(row.purl)">Del</button>
+              <button class="btn btn-sm btn-secondary" @click="store.startEdit(row)">{{ t('dbAdmin.edit') }}</button>
+              <button class="btn btn-sm btn-danger" @click="handleDeleteRow(row.purl)">{{ t('dbAdmin.del') }}</button>
             </td>
           </tr>
-          <tr v-if="store.rows.length === 0"><td colspan="12" class="empty-row">No records found</td></tr>
+          <tr v-if="store.rows.length === 0"><td colspan="12" class="empty-row">{{ t('dbAdmin.noRecords') }}</td></tr>
         </tbody>
       </table>
     </div>
 
     <div class="pagination">
-      <div class="pagination-info">Total: {{ store.total }} rows</div>
+      <div class="pagination-info">{{ t('dbAdmin.total') }} {{ store.total }} {{ t('dbAdmin.rows') }}</div>
       <div class="pagination-controls">
-        <button class="btn btn-sm" :disabled="store.page === 1" @click="store.goToPage(1)">&laquo; First</button>
-        <button class="btn btn-sm" :disabled="store.page === 1" @click="store.goToPage(store.page - 1)">&lsaquo; Prev</button>
+        <button class="btn btn-sm" :disabled="store.page === 1" @click="store.goToPage(1)">&laquo; {{ t('dbAdmin.first') }}</button>
+        <button class="btn btn-sm" :disabled="store.page === 1" @click="store.goToPage(store.page - 1)">&lsaquo; {{ t('dbAdmin.prev') }}</button>
         <template v-for="(p, i) in visiblePages" :key="i">
           <span v-if="p === '...'" class="pagination-ellipsis">...</span>
           <button v-else :class="['btn', 'btn-sm', p === store.page ? 'btn-active' : '']" @click="store.goToPage(p as number)">{{ p }}</button>
         </template>
-        <button class="btn btn-sm" :disabled="store.page === store.totalPages" @click="store.goToPage(store.page + 1)">Next &rsaquo;</button>
-        <button class="btn btn-sm" :disabled="store.page === store.totalPages" @click="store.goToPage(store.totalPages)">Last &raquo;</button>
+        <button class="btn btn-sm" :disabled="store.page === store.totalPages" @click="store.goToPage(store.page + 1)">{{ t('dbAdmin.next') }} &rsaquo;</button>
+        <button class="btn btn-sm" :disabled="store.page === store.totalPages" @click="store.goToPage(store.totalPages)">{{ t('dbAdmin.last') }} &raquo;</button>
       </div>
       <div class="pagination-size">
-        <label>Per page: <select v-model.number="localPageSize" @change="onPageSizeChange"><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option><option :value="200">200</option></select></label>
+        <label>{{ t('dbAdmin.perPage') }} <select v-model.number="localPageSize" @change="onPageSizeChange"><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option><option :value="200">200</option></select></label>
       </div>
     </div>
   </div>
@@ -85,10 +85,12 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDbAdminStore } from '../../stores/useDbAdminStore'
 import { safeUrl } from '../../composables/useDownload'
 import type { ResolveResponse } from '../../types/api'
 
+const { t } = useI18n()
 const store = useDbAdminStore()
 const localPageSize = ref(store.pageSize)
 
@@ -143,12 +145,12 @@ function handleKeydown(event: KeyboardEvent, row: ResolveResponse) {
 }
 
 function handleDeleteRow(purl: string) {
-  if (!confirm(`Delete record "${purl}"? This cannot be undone.`)) return
+  if (!confirm(t('dbAdmin.confirmDelete', { purl }))) return
   store.deleteRow(purl)
 }
 
 function handleDeleteSelected() {
-  if (!confirm(`Delete ${store.selectedPurls.size} selected record(s)? This cannot be undone.`)) return
+  if (!confirm(t('dbAdmin.confirmDeleteSelected', { count: store.selectedPurls.size }))) return
   store.deleteSelected()
 }
 

@@ -117,6 +117,8 @@
     "last": "В конец",
     "edit": "Edit",
     "del": "Del",
+    "purl": "PURL",
+    "repositoryUrl": "Repository URL",
     "any": "Любой",
     "actions": "Действия",
     "type": "Type",

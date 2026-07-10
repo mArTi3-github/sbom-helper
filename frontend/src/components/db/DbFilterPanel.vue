@@ -2,46 +2,48 @@
   <div class="card filter-panel">
     <div class="filter-row">
       <div class="filter-group">
-        <label for="search">Search by PURL</label>
-        <input id="search" v-model="store.search" type="text" placeholder="e.g. requests" @keyup.enter="store.applyFilters()">
+        <label for="search">{{ t('dbAdmin.searchByPurl') }}</label>
+        <input id="search" v-model="store.search" type="text" :placeholder="t('dbAdmin.searchPlaceholder')" @keyup.enter="store.applyFilters()">
       </div>
       <div class="filter-group">
-        <label for="resolver">Resolver</label>
+        <label for="resolver">{{ t('dbAdmin.resolver') }}</label>
         <select id="resolver" v-model="store.resolver">
-          <option value="">Any</option>
+          <option value="">{{ t('dbAdmin.any') }}</option>
           <option value="purl2repo">purl2repo</option>
         </select>
       </div>
       <div class="filter-group">
-        <label for="confidence">Confidence</label>
+        <label for="confidence">{{ t('dbAdmin.confidence') }}</label>
         <select id="confidence" v-model="store.confidence">
-          <option value="">Any</option>
+          <option value="">{{ t('dbAdmin.any') }}</option>
           <option value="high">high</option>
           <option value="medium">medium</option>
           <option value="low">low</option>
         </select>
       </div>
       <div class="filter-group">
-        <label for="date-from">Date From</label>
+        <label for="date-from">{{ t('dbAdmin.dateFrom') }}</label>
         <input id="date-from" v-model="store.dateFrom" type="date">
       </div>
       <div class="filter-group">
-        <label for="date-to">Date To</label>
+        <label for="date-to">{{ t('dbAdmin.dateTo') }}</label>
         <input id="date-to" v-model="store.dateTo" type="date">
       </div>
       <div class="filter-actions">
         <button class="btn btn-primary" @click="store.applyFilters()" :disabled="store.loading">
           <span v-if="store.loading" class="spinner"></span>
-          <span v-else>Apply</span>
+          <span v-else>{{ t('dbAdmin.apply') }}</span>
         </button>
-        <button class="btn btn-secondary" @click="store.resetFilters()">Reset</button>
+        <button class="btn btn-secondary" @click="store.resetFilters()">{{ t('dbAdmin.reset') }}</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useDbAdminStore } from '../../stores/useDbAdminStore'
+const { t } = useI18n()
 const store = useDbAdminStore()
 </script>
 

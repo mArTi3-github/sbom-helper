@@ -1,7 +1,7 @@
 <template>
   <div class="db-admin">
-    <h1>Database Admin</h1>
-    <p class="subtitle">View, edit, filter, import, and export the resolved_purls table</p>
+    <h1>{{ t('dbAdmin.title') }}</h1>
+    <p class="subtitle">{{ t('dbAdmin.subtitle') }}</p>
 
     <DbFilterPanel />
     <DbDataTable />
@@ -10,9 +10,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import DbFilterPanel from '../components/db/DbFilterPanel.vue'
 import DbDataTable from '../components/db/DbDataTable.vue'
 import DbImportModal from '../components/db/DbImportModal.vue'
+const { t } = useI18n()
 </script>
 
 <style scoped>

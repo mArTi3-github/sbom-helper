@@ -1,14 +1,14 @@
 <template>
-  <ModalDialog :show="store.showImportModal" title="Import CSV" @close="store.closeImportModal()">
+  <ModalDialog :show="store.showImportModal" :title="t('dbAdmin.importTitle')" @close="store.closeImportModal()">
     <FileUploadZone accept=".csv" @file-selected="store.handleImportFile" />
 
     <details class="csv-ref">
-      <summary>CSV Format Reference</summary>
+      <summary>{{ t('dbAdmin.csvRef') }}</summary>
       <div class="csv-ref-content">
-        <p>The CSV file must have a header row. Comma (<code>,</code>) delimiter. UTF-8 encoding (BOM handled automatically).</p>
-        <p>Required columns:</p>
+        <p>{{ t('dbAdmin.csvDesc') }}</p>
+        <p>{{ t('dbAdmin.csvRequired') }}</p>
         <ul><li><code>purl</code> — Package URL in format "scheme:type/namespace/name" (the part before "@"). The field "namespace" is optional</li><li><code>repository_url</code> — Repository URL</li></ul>
-        <p>Optional columns:</p>
+        <p>{{ t('dbAdmin.csvOptional') }}</p>
         <ul>
           <li><code>repository_type</code> — e.g. <code>github</code>, <code>gitlab</code></li>
           <li><code>repository_kind</code> — e.g. <code>source_code</code></li>
@@ -18,7 +18,7 @@
           <li><code>evidence</code> — JSON array, e.g. <code>["homepage","description"]</code></li>
           <li><code>warnings</code> — JSON array, e.g. <code>["low_confidence"]</code></li>
         </ul>
-        <p>Example:</p>
+        <p>{{ t('dbAdmin.csvExample') }}</p>
         <pre>purl,repository_url,confidence,resolver
 pkg:pypi/requests@2.31.0,https://github.com/psf/requests,high,import-csv
 pkg:pypi/flask@2.3.0,https://github.com/pallets/flask,medium,import-csv</pre>
@@ -26,24 +26,24 @@ pkg:pypi/flask@2.3.0,https://github.com/pallets/flask,medium,import-csv</pre>
     </details>
 
     <div class="import-strategy">
-      <label class="radio-label"><input type="radio" v-model="store.importStrategy" value="upsert"> Overwrite existing</label>
-      <label class="radio-label"><input type="radio" v-model="store.importStrategy" value="skip_existing"> Skip existing</label>
+      <label class="radio-label"><input type="radio" v-model="store.importStrategy" value="upsert"> {{ t('dbAdmin.importOverwrite') }}</label>
+      <label class="radio-label"><input type="radio" v-model="store.importStrategy" value="skip_existing"> {{ t('dbAdmin.importSkip') }}</label>
     </div>
 
     <div class="toolbar">
       <button class="btn btn-primary" :disabled="!store.importFile || store.importLoading" @click="store.handleImportUpload()">
-        {{ store.importLoading ? 'Uploading...' : 'Upload' }}
+        {{ store.importLoading ? t('dbAdmin.uploading') : t('dbAdmin.upload') }}
       </button>
     </div>
 
-    <div v-if="store.importLoading" class="loading"><span class="spinner"></span> Importing...</div>
+    <div v-if="store.importLoading" class="loading"><span class="spinner"></span> {{ t('dbAdmin.importing') }}</div>
     <div v-if="store.importError" class="error-msg">{{ store.importError }}</div>
 
     <div v-if="store.importResults" class="import-results">
-      <div class="import-stat">Imported: <strong>{{ store.importResults.imported }}</strong></div>
-      <div class="import-stat">Skipped: <strong>{{ store.importResults.skipped }}</strong></div>
+      <div class="import-stat">{{ t('dbAdmin.imported') }} <strong>{{ store.importResults.imported }}</strong></div>
+      <div class="import-stat">{{ t('dbAdmin.skipped') }} <strong>{{ store.importResults.skipped }}</strong></div>
       <div v-if="store.importResults.errors.length" class="import-errors">
-        <div class="import-stat import-stat-error">Errors: <strong>{{ store.importResults.errors.length }}</strong></div>
+        <div class="import-stat import-stat-error">{{ t('dbAdmin.errors') }} <strong>{{ store.importResults.errors.length }}</strong></div>
         <ul><li v-for="err in store.importResults.errors" :key="err.row">Row {{ err.row }}: {{ err.error }}</li></ul>
       </div>
     </div>
@@ -51,10 +51,12 @@ pkg:pypi/flask@2.3.0,https://github.com/pallets/flask,medium,import-csv</pre>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useDbAdminStore } from '../../stores/useDbAdminStore'
 import ModalDialog from '../ModalDialog.vue'
 import FileUploadZone from '../FileUploadZone.vue'
 
+const { t } = useI18n()
 const store = useDbAdminStore()
 </script>
 
