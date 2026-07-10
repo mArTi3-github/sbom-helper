@@ -1,28 +1,28 @@
 <template>
   <div class="container">
-    <h1>PURL Resolver</h1>
-    <p class="subtitle">Resolve a Package URL to its source code repository</p>
+    <h1>{{ t('purlResolver.title') }}</h1>
+    <p class="subtitle">{{ t('purlResolver.subtitle') }}</p>
 
     <form class="form-group" @submit.prevent="handleResolve">
       <input
         v-model="purlInput"
         type="text"
-        placeholder="pkg:pypi/requests@2.31.0"
+        :placeholder="t('purlResolver.placeholder')"
         required
       />
-      <button type="submit" :disabled="loading">Resolve</button>
+      <button type="submit" :disabled="loading">{{ t('purlResolver.resolve') }}</button>
     </form>
 
     <div v-if="loading" class="loading">
-      <span class="spinner"></span> Resolving...
+      <span class="spinner"></span> {{ t('purlResolver.resolving') }}
     </div>
 
     <div v-if="result" class="result">
       <div class="card">
-        <div class="card-title">Repository URL</div>
+        <div class="card-title">{{ t('purlResolver.repoUrl') }}</div>
         <div class="repo-url">
           <a v-if="result.repository_url" :href="result.repository_url" target="_blank">{{ result.repository_url }}</a>
-          <span v-else>No repository URL found</span>
+          <span v-else>{{ t('purlResolver.noRepoUrl') }}</span>
         </div>
         <div class="meta">
           <span :class="['badge', confidenceClass]">{{ result.confidence || 'unknown' }}</span>
@@ -32,20 +32,20 @@
           class="details-toggle"
           @click="showDetails = !showDetails"
         >
-          {{ showDetails ? 'Hide details' : 'Show details' }}
+          {{ showDetails ? t('purlResolver.hideDetails') : t('purlResolver.showDetails') }}
         </button>
         <div v-if="showDetails && hasDetails" class="details show">
           <dl>
             <template v-if="result.repository_type">
-              <dt>Repository Type</dt>
+              <dt>{{ t('purlResolver.repoType') }}</dt>
               <dd>{{ result.repository_type }}</dd>
             </template>
             <template v-if="result.repository_kind">
-              <dt>Repository Kind</dt>
+              <dt>{{ t('purlResolver.repoKind') }}</dt>
               <dd>{{ result.repository_kind }}</dd>
             </template>
             <template v-if="result.evidence && result.evidence.length">
-              <dt>Evidence</dt>
+              <dt>{{ t('purlResolver.evidence') }}</dt>
               <dd>
                 <ul>
                   <li v-for="(item, i) in result.evidence" :key="i">{{ item }}</li>
@@ -53,7 +53,7 @@
               </dd>
             </template>
             <template v-if="result.warnings && result.warnings.length">
-              <dt class="warning">Warnings</dt>
+              <dt class="warning">{{ t('purlResolver.warnings') }}</dt>
               <dd>
                 <ul>
                   <li v-for="(item, i) in result.warnings" :key="i" class="warning">{{ item }}</li>
@@ -61,17 +61,17 @@
               </dd>
             </template>
             <template v-if="result.version_reference">
-              <dt>Version Reference</dt>
+              <dt>{{ t('purlResolver.versionRef') }}</dt>
               <dd>
                 <a :href="result.version_reference" target="_blank">{{ result.version_reference }}</a>
               </dd>
             </template>
             <template v-if="result.found_by">
-              <dt>Found by</dt>
+              <dt>{{ t('purlResolver.foundBy') }}</dt>
               <dd>{{ result.found_by }}</dd>
             </template>
             <template v-if="result.resolver">
-              <dt>Resolver</dt>
+              <dt>{{ t('purlResolver.resolver') }}</dt>
               <dd>{{ result.resolver }}</dd>
             </template>
           </dl>
@@ -85,9 +85,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolvePurl } from '../api/purl'
 import { ApiError } from '../api/client'
 import type { ResolveResponse } from '../types/api'
+
+const { t } = useI18n()
 
 const purlInput = ref('')
 const loading = ref(false)
@@ -120,11 +123,11 @@ async function handleResolve() {
     result.value = res
   } catch (e: unknown) {
     if (e instanceof ApiError) {
-      error.value = e.message
+      error.value = t('errors.' + e.error, e.data)
     } else if (e instanceof Error) {
-      error.value = 'Network error: could not reach the server. Please try again.'
+      error.value = t('errors.network_error')
     } else {
-      error.value = 'An unexpected error occurred.'
+      error.value = t('errors.unexpected_error')
     }
   } finally {
     loading.value = false
