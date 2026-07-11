@@ -17,7 +17,7 @@
     "pageNotFound": "Page not found",
     "goHome": "Go to PURL Resolver",
     "noData": "No data",
-    "poweredByPrefix": "Powered by "
+    "githubPrefix": "GitHub: "
   },
   "nav": {
     "purlResolver": "PURL Resolver",
@@ -187,7 +187,7 @@
       "timeoutDesc": "Timeout for each HTTP HEAD and git ls-remote check (1–60 seconds).",
       "cooldown": "Re-validation cooldown (hours)",
       "cooldownDesc": "This setting controls how long a successfully validated URL remains in the validation cache before being re-checked. All validated URLs are treated equally regardless of origin (resolver, import, or database). Set to 0 to disable the cache and always re-validate.",
-      "infoText": "URLs returned by resolvers are always validated before being returned. Validation results are cached and reused across all contexts (local database, SBOM enrichment) within the configured cooldown period.",
+      "infoText": "URLs from resolvers are always validated before being returned. Validation results are cached and reused across all contexts (local database, SBOM enrichment) within the configured cooldown period.",
       "clearCache": "Clear validation cache",
       "clearCacheDesc": "Remove all cached URL validation results. The next validation for each URL will perform a full check.",
       "clearCacheBtn": "Clear cache"
