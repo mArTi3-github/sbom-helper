@@ -115,7 +115,7 @@ Client                    API Layer (router)         Service Layer             p
    |                          |                          |                        |                |                |
    |                          |                          | VALID → store(cached)  |                |                |
    |                          |                          |  (при отличии output.  |                |                |
-   |                          |                          |   final_url URL в кэше |                |                |
+   |                          |                          |   final_url URL в кеше |                |                |
    |                          |                          |   обновляется)         |                |                |
    |                          |                          | INVALID → delete, fall |                |                |
    |                          |                          | NETWORK_ERROR → return |                |                |

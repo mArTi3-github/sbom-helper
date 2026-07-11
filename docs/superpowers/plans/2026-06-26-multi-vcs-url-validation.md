@@ -898,17 +898,17 @@ Find the "URL Validator" term (around line 82). It currently reads:
 
 ```markdown
 **URL Validator**:
-Модуль `url_validator.py`, реализующий валидацию repository URL с помощью HTTP HEAD-запроса и `git ls-remote`. Используется сервисным слоем для проверки актуальности кэшированных URL (настройка `validate_db_urls`).
+Модуль `url_validator.py`, реализующий валидацию repository URL с помощью HTTP HEAD-запроса и `git ls-remote`. Используется сервисным слоем для проверки актуальности кешированных URL (настройка `validate_db_urls`).
 ```
 
 Replace it with:
 
 ```markdown
 **URL Validator**:
-Модуль `url_validator.py`, реализующий валидацию repository URL с помощью HTTP HEAD-запроса и много-VCS проверки (`_check_vcs`: git → svn → hg → fossil). Используется сервисным слоем для проверки актуальности кэшированных URL (настройка `validate_db_urls`).
+Модуль `url_validator.py`, реализующий валидацию repository URL с помощью HTTP HEAD-запроса и много-VCS проверки (`_check_vcs`: git → svn → hg → fossil). Используется сервисным слоем для проверки актуальности кешированных URL (настройка `validate_db_urls`).
 
 **Check VCS / Multi-VCS Probe**:
-Функция `_check_vcs(url, timeout, github_token=None) → bool | None` в `url_validator.py`. Последовательно проверяет, является ли URL git/svn/hg/fossil-репозиторием, с ранним выходом при первом успехе. Правило агрегации: `True` если хотя бы одна проба успешна; иначе `False` если хотя бы одна проба явно сказала "не репозиторий"; иначе `None` (все пробы неопределённые, например при таймаутах). Гарантирует, что валидные кэшированные URL не удаляются из БД при временных сетевых ошибках.
+Функция `_check_vcs(url, timeout, github_token=None) → bool | None` в `url_validator.py`. Последовательно проверяет, является ли URL git/svn/hg/fossil-репозиторием, с ранним выходом при первом успехе. Правило агрегации: `True` если хотя бы одна проба успешна; иначе `False` если хотя бы одна проба явно сказала "не репозиторий"; иначе `None` (все пробы неопределённые, например при таймаутах). Гарантирует, что валидные кешированные URL не удаляются из БД при временных сетевых ошибках.
 ```
 
 - [ ] **Step 5: Verify the spec updates**

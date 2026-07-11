@@ -178,7 +178,7 @@
       "validateDbUrls": "Validate URLs from local database",
       "validateDbUrlsDesc": "When enabled, repository URLs found in the local database are verified (HTTP HEAD + git ls-remote) before being returned. Invalid URLs are deleted and resolution continues through the resolver chain.",
       "validateSbomRefs": "Validate pre-existing URLs from SBOM",
-      "validateSbomRefsDesc": "When enabled, existing VCS and source-distribution URLs found in SBOM files are verified before enrichment. Invalid URLs trigger re-resolution of the component.",
+      "validateSbomRefsDesc": "When enabled, existing VCS URLs found in SBOM files are verified before enrichment. Invalid URLs trigger re-resolution of the component.",
       "multipleVcs": "Behavior when multiple valid VCS-links are found",
       "multipleVcsDesc": "When multiple VCS references are valid, choose whether to keep only the first one or keep all of them in the SBOM.",
       "keepFirst": "keep only first",
