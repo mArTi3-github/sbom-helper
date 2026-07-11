@@ -7,9 +7,11 @@ import os
 import shutil
 from pathlib import Path
 
+import asyncpg
+
 from .job_repository import JobRecord, JobRepository, _new_id, _now
-from .sbom_enrichment import SbomEnrichmentPipeline
 from .sbom.parser import SbomParseError
+from .sbom_enrichment import SbomEnrichmentPipeline
 from .service import PurlResolutionService
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,6 @@ JOBS_DIR = Path(os.environ.get("JOBS_DIR", "data/jobs"))
 
 
 class JobManager:
-
     def __init__(
         self,
         pool: asyncpg.Pool,
@@ -29,6 +30,7 @@ class JobManager:
         self._resolution_service = resolution_service
         self._job_ttl_hours = job_ttl_hours
         self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._running_tasks: dict[str, asyncio.Task] = {}
         self._worker_task: asyncio.Task | None = None
         self._cleanup_task: asyncio.Task | None = None
 
@@ -38,7 +40,8 @@ class JobManager:
         stuck = await self._repo.get_stuck_running()
         for job in stuck:
             await self._repo.update_status(
-                job.id, "failed",
+                job.id,
+                "failed",
                 error_message="Server restarted during processing",
                 finished_at=_now(),
             )
@@ -53,6 +56,12 @@ class JobManager:
         self._cleanup_task = asyncio.create_task(self._run_cleanup())
 
     async def stop(self) -> None:
+        for task in self._running_tasks.values():
+            if not task.done():
+                task.cancel()
+        if self._running_tasks:
+            await asyncio.gather(*self._running_tasks.values(), return_exceptions=True)
+            self._running_tasks.clear()
         if self._worker_task:
             self._worker_task.cancel()
             try:
@@ -104,7 +113,10 @@ class JobManager:
         record = await self._repo.get(job_id)
         if not record or record.status in ("completed", "failed", "cancelled"):
             return False
-        await self._repo.update_status(job_id, record.status, cancel_requested=1)
+        await self._repo.update_status(job_id, "cancelled", cancel_requested=1, finished_at=_now())
+        task = self._running_tasks.get(job_id)
+        if task is not None and not task.done():
+            task.cancel()
         return True
 
     async def delete_job(self, job_id: str) -> bool:
@@ -120,11 +132,19 @@ class JobManager:
     async def _run_worker(self) -> None:
         while True:
             job_id = await self._queue.get()
+            task = asyncio.create_task(self._process_job(job_id))
+            self._running_tasks[job_id] = task
             try:
-                await self._process_job(job_id)
+                await task
+            except asyncio.CancelledError:
+                logger.info("Job %s processing cancelled, discarding result", job_id)
+                job_dir = JOBS_DIR / job_id
+                if job_dir.exists():
+                    shutil.rmtree(job_dir)
             except Exception:
                 logger.exception("Unhandled error processing job %s", job_id)
             finally:
+                self._running_tasks.pop(job_id, None)
                 self._queue.task_done()
 
     async def _process_job(self, job_id: str) -> None:
@@ -132,19 +152,28 @@ class JobManager:
         if not record:
             return
 
-        if record.cancel_requested:
-            await self._repo.update_status(
-                job_id, "cancelled", finished_at=_now()
-            )
+        if record.status in ("cancelled",):
             job_dir = JOBS_DIR / job_id
             if job_dir.exists():
-                import shutil
                 shutil.rmtree(job_dir)
             return
 
-        await self._repo.update_status(
-            job_id, "running", started_at=_now()
-        )
+        if record.cancel_requested:
+            await self._repo.update_status(job_id, "cancelled", finished_at=_now())
+            job_dir = JOBS_DIR / job_id
+            if job_dir.exists():
+                shutil.rmtree(job_dir)
+            return
+
+        await self._repo.update_status(job_id, "running", started_at=_now())
+
+        record = await self._repo.get(job_id)
+        if record and record.cancel_requested:
+            await self._repo.update_status(job_id, "cancelled", finished_at=_now())
+            job_dir = JOBS_DIR / job_id
+            if job_dir.exists():
+                shutil.rmtree(job_dir)
+            return
 
         try:
             input_path = JOBS_DIR / job_id / "input.json"
@@ -162,13 +191,16 @@ class JobManager:
                 ignore_patterns=ignore_patterns,
             )
 
+            record = await self._repo.get(job_id)
+            if record and (record.status == "cancelled" or record.cancel_requested):
+                return
+
             result_path = JOBS_DIR / job_id / "result.json"
-            result_path.write_text(
-                json.dumps(result.enriched_sbom, indent=2)
-            )
+            result_path.write_text(json.dumps(result.enriched_sbom, indent=2))
 
             await self._repo.update_status(
-                job_id, "completed",
+                job_id,
+                "completed",
                 result_path=str(result_path),
                 summary_json=json.dumps(result.report),
                 results_json=json.dumps(result.report.get("results", [])),
@@ -177,13 +209,15 @@ class JobManager:
 
         except SbomParseError as e:
             await self._repo.update_status(
-                job_id, "failed",
+                job_id,
+                "failed",
                 error_message=f"Invalid SBOM: {e}",
                 finished_at=_now(),
             )
         except Exception as e:
             await self._repo.update_status(
-                job_id, "failed",
+                job_id,
+                "failed",
                 error_message=str(e),
                 finished_at=_now(),
             )
@@ -196,7 +230,6 @@ class JobManager:
                 for job in expired:
                     job_dir = JOBS_DIR / job.id
                     if job_dir.exists():
-                        import shutil
                         shutil.rmtree(job_dir)
                     await self._repo.delete(job.id)
                     logger.info("Cleaned up expired job %s", job.id)

@@ -46,15 +46,25 @@ def _new_id() -> str:
 
 
 _COLUMNS = (
-    "id", "type", "status", "progress_current", "progress_total",
-    "params_json", "input_filename", "result_path",
-    "summary_json", "results_json", "error_message",
-    "cancel_requested", "created_at", "started_at", "finished_at"
+    "id",
+    "type",
+    "status",
+    "progress_current",
+    "progress_total",
+    "params_json",
+    "input_filename",
+    "result_path",
+    "summary_json",
+    "results_json",
+    "error_message",
+    "cancel_requested",
+    "created_at",
+    "started_at",
+    "finished_at",
 )
 
 
 class JobRepository:
-
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
@@ -63,8 +73,8 @@ class JobRepository:
         async with self._pool.acquire() as conn:
             await conn.execute(
                 f"INSERT INTO jobs ({', '.join(_COLUMNS)}) "
-                f"VALUES ({', '.join(f'${i+1}' for i in range(len(_COLUMNS)))})",
-                *[getattr(record, c) for c in _COLUMNS]
+                f"VALUES ({', '.join(f'${i + 1}' for i in range(len(_COLUMNS)))})",
+                *[getattr(record, c) for c in _COLUMNS],
             )
 
     async def get(self, job_id: str) -> JobRecord | None:
@@ -103,10 +113,7 @@ class JobRepository:
             i += 1
         values.append(job_id)
         async with self._pool.acquire() as conn:
-            await conn.execute(
-                f"UPDATE jobs SET {', '.join(set_parts)} WHERE id = ${i}",
-                *values
-            )
+            await conn.execute(f"UPDATE jobs SET {', '.join(set_parts)} WHERE id = ${i}", *values)
 
     async def delete(self, job_id: str) -> bool:
         async with self._pool.acquire() as conn:
@@ -122,9 +129,7 @@ class JobRepository:
 
     async def get_stuck_running(self) -> list[JobRecord]:
         async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT * FROM jobs WHERE status = 'running'"
-            )
+            rows = await conn.fetch("SELECT * FROM jobs WHERE status = 'running'")
         return [self._row_to_record(r) for r in rows]
 
     async def get_expired(self, ttl_hours: int) -> list[JobRecord]:
@@ -132,8 +137,8 @@ class JobRepository:
             rows = await conn.fetch(
                 "SELECT * FROM jobs WHERE status IN ('completed','failed','cancelled') "
                 "AND finished_at IS NOT NULL "
-                "AND finished_at < NOW() - make_interval(hours => $1)",
-                ttl_hours
+                "AND finished_at::timestamptz < NOW() - make_interval(hours => $1)",
+                ttl_hours,
             )
         return [self._row_to_record(r) for r in rows]
 
