@@ -68,7 +68,7 @@ const routes = [
 }
 
 .nav-link {
-  color: var(--color-muted);
+  color: #7c7491;
   text-decoration: none;
   font-size: 0.875rem;
   padding: 0.5rem 0.75rem;
@@ -89,7 +89,6 @@ const routes = [
 
 .nav-link--settings {
   margin-left: auto;
-  color: var(--color-muted-light);
 }
 
 .nav-logo-link {
