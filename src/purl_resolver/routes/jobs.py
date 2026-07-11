@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, File, Form, Request, UploadFile, status
 from fastapi.responses import JSONResponse, FileResponse
 
 from ..config import sbom_settings
+
+if TYPE_CHECKING:
+    from ..job_manager import JobManager
 
 router = APIRouter()
 
