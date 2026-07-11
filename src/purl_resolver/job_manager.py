@@ -202,7 +202,7 @@ class JobManager:
                 job_id,
                 "completed",
                 result_path=str(result_path),
-                summary_json=json.dumps(result.report),
+                summary_json=json.dumps(result.report["summary"]),
                 results_json=json.dumps(result.report.get("results", [])),
                 finished_at=_now(),
             )
