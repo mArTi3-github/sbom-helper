@@ -8,7 +8,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 
 - `src/purl_resolver/router.py` — API endpoint handlers that call the Service Layer
 - `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `resolve_batch()` for concurrent resolution; `store_preexisting_references()` for SBOM pre-existing refs
-- `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report
+- `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
 - `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, ecosyste.ms wrapper, libraries.io wrapper, and factory module
 - `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; creates Purl2RepoResolver, conditionally adds EcosystemsResolver and LibrariesIoResolver based on settings
@@ -162,7 +162,6 @@ Client                    API Layer (router)         Service Layer             p
 - `TOKEN_INVALID` is returned **only** on HTTP 401 (invalid/expired token). HTTP 403 (rate limit, scope issues) does NOT trigger `TOKEN_INVALID` — the response is treated as a passthrough to VCS probes.
 - `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
 - `ensure_connectivity(github_token=None, url=None, timeout=None) → bool` — connectivity probe against configurable URL (default `https://github.com`); raises `ConnectionError` on failure
-- `_RateLimitTracker` — instance-based in-memory counter with `asyncio.Lock` (module-level singleton `_rate_limit_tracker`); after 5 consecutive rate-limited responses, all validation returns `RATE_LIMITED` for 60 seconds
 - `_check_vcs(url, timeout, github_token=None) → bool | None` — unified multi-VCS probe; runs git → svn → hg → fossil sequentially with early-exit on first success; aggregation: `True` if any probe is `True`, else `False` if any is `False`, else `None`; called with the resolved final URL by `validate_url()`
 - `_git_probe(url, timeout, github_token=None) → bool | None` — internal helper: `git ls-remote --exit-code <url>`; rewrites `github.com` URLs with `oauth2:token@` for authenticated calls
 - `_svn_probe(url, timeout) → bool | None` — internal helper: `svn ls <url>`; exit 0 → True, exit ≠0 → False

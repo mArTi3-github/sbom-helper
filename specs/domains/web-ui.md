@@ -17,6 +17,10 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/components/AppNav.vue` — Navigation bar shared across all pages
 - `frontend/src/components/FileUploadZone.vue` — Reusable drag-and-drop file upload zone
 - `frontend/src/components/ModalDialog.vue` — Reusable modal dialog
+- `frontend/src/components/RecentJobs.vue` — Background job status list with auto-polling
+- `frontend/src/components/db/DbDataTable.vue` — Sortable/filterable PURL data table for database admin
+- `frontend/src/components/db/DbFilterPanel.vue` — Search and filter controls for database admin
+- `frontend/src/components/db/DbImportModal.vue` — CSV import dialog with drag-and-drop upload
 - `frontend/src/api/client.ts` — Typed fetch wrapper with `ApiError` class
 - `frontend/src/api/purl.ts` — PURL resolution API client
 - `frontend/src/api/sbom.ts` — SBOM enrichment + ignore patterns API client
@@ -218,8 +222,9 @@ Frontend unit tests are written with **Vitest 4.1.9**, `@vue/test-utils 2.4.11`,
 - `frontend/src/views/ImagesListConverter.test.ts` — conversion flow, status cards (transformed / not transformed), JSON download.
 - `frontend/src/views/DatabaseAdmin.test.ts` — filter, sort, select, inline edit (Enter/Escape/blur), single and bulk delete (confirm branches), CSV export, CSV import (upsert / skip_existing), pagination (next page, page size), ApiError and network errors.
 - `frontend/src/composables/useDownload.test.ts` — `downloadJson` blob/anchor behaviour, `safeUrl` dangerous-protocol rejection (javascript, data, vbscript).
+- `frontend/src/components/RecentJobs.test.ts` — job status icons, polling, cancel/delete flow.
 
-**Deliberately not tested (YAGNI):** `NotFound.vue`, `AppNav.vue`, `FileUploadZone.vue`, `ModalDialog.vue` — trivial components with minimal logic; tests would yield low signal-to-noise.
+**Deliberately not tested (YAGNI):** `NotFound.vue`, `AppNav.vue`, `FileUploadZone.vue`, `ModalDialog.vue`, `DbDataTable.vue`, `DbFilterPanel.vue`, `DbImportModal.vue` — trivial or purely presentational components with minimal logic; tests would yield low signal-to-noise.
 
 Run all frontend tests:
 

@@ -111,95 +111,7 @@ Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mount
 
 ---
 
-### `POST /api/v1/resolve/sbom`
 
-Accepts a CycloneDX JSON SBOM file, extracts all PURL components that lack VCS or source-distribution external references, resolves each unique normalized PURL via the Service Layer, inserts `type: vcs` external references into the SBOM, and returns the enriched SBOM together with a resolution report. Resolved PURLs and pre-existing references are stored in the database with `resolver: "import-sbom"`. Components that already have VCS external references are stored in the database via `store_preexisting_references()` without resolution.
-
-#### Request
-
-`multipart/form-data` with field `file` containing a CycloneDX JSON file.
-
-- Maximum file size: 200 MB (configurable via `SBOM_MAX_FILE_SIZE`)
-- File must be valid JSON with `bomFormat: "CycloneDX"` and `specVersion: "1.6"`
-- JSON is parsed, the root dict is validated for required CycloneDX fields, then mutated in-place during enrichment
-- Optional field `remove_unresolved_no_subcomponents` (boolean, default: `false`) — when `true`, removes components that were not resolved and have no nested subcomponents
-- Optional field `validate_existing_refs` (boolean, default: `false`) — when `true`, existing VCS externalReferences in the SBOM are validated; invalid URLs trigger re-resolution
-- Optional field `ignore_patterns` (JSON string, default: `null`) — when provided, a JSON array of `{"field": "...", "pattern": "..."}` objects specifying component field/pattern pairs; components whose specified field values contain the pattern string are excluded from enrichment and reported with `status: "ignored"`
-
-#### Success Response (200)
-
-```json
-{
-  "summary": {
-    "total_purls": 10,
-    "found": 8,
-    "not_found": 1,
-    "skipped": 0,
-    "removed": 1
-  },
-  "results": [
-    {
-      "purl": "pkg:pypi/certifi",
-      "status": "found",
-      "repository_url": "https://github.com/certifi/python-certifi"
-    },
-    {
-      "purl": "pkg:pypi/unknown",
-      "status": "not_found",
-      "repository_url": null
-    },
-    {
-      "purl": "pkg:pypi/obscure",
-      "status": "removed",
-      "repository_url": null,
-      "name": "obscure",
-      "version": "1.0"
-    }
-  ],
-  "enriched_sbom": { "...": "..." }
-}
-```
-
-- `summary.total_purls` — number of unique PURLs that needed enrichment (excludes ignored components)
-- `summary.found` — how many resolved successfully
-- `summary.not_found` — how many had no repository URL found (excludes removed components)
-- `summary.skipped` — how many PURLs could not be parsed (invalid format)
-- `summary.removed` — how many components were removed (only when `remove_unresolved_no_subcomponents=true`)
-- `summary.ignored` — how many components were excluded via `ignore_patterns`
-- `results` — per-PURL report for components that needed enrichment; components already having VCS/source-distribution references are excluded; removed components appear only as `status: "removed"`, not as `status: "not_found"`; ignored components appear as `status: "ignored"`; each result includes `found_by` (either `"local_db"` or `"resolver"`) and `resolver` (resolver name) fields
-- `enriched_sbom` — the full enriched SBOM JSON (version incremented by 1, timestamp preserved); removed components are absent from `components` arrays
-
-#### Error Response (400) — invalid JSON
-
-```json
-{
-  "error": "invalid_json"
-}
-```
-
-#### Error Response (400) — invalid SBOM format
-
-```json
-{
-  "error": "invalid_sbom",
-  "detail": "Missing required field: bomFormat"
-}
-```
-
-#### Error Response (413) — file too large
-
-```json
-{
-  "error": "file_too_large",
-  "max_size_mb": 200
-}
-```
-
-#### Validation Error (422) — missing file field
-
-Standard FastAPI/Pydantic 422 response.
-
----
 
 ### `GET /api/v1/db/purls`
 
@@ -697,7 +609,7 @@ Standard FastAPI/Pydantic 422 response.
 
 1. Recursively walk all `components[]` arrays (including nested `components` inside components)
 2. For each component that has a `purl` AND (has no `externalReferences` OR has no `vcs`/`source-distribution` type in `externalReferences`): mark as needing enrichment
-3. If `validate_existing_refs=true`: for components with `vcs`/`source-distribution` externalReferences, validate the URL via HEAD + git ls-remote; `INVALID` results mark the component for re-resolution (clear `existing_references`, set `needs_enrichment=True`); `NETWORK_ERROR` and `RATE_LIMITED` leave the component unchanged
+3. If `validate_existing_refs=true`: for components with `vcs`/`source-distribution` externalReferences, validate the URL via HEAD + git ls-remote; `INVALID` and `NETWORK_ERROR` results remove the ref and may trigger re-resolution (if all refs invalid, `needs_enrichment=True`); `RATE_LIMITED` leaves the component unchanged
 4. For each component needing enrichment: validate and normalize the PURL explicitly via `validate()` + `normalize()`; invalid PURLs increment the `skipped` count and are excluded from resolution; valid unversioned PURLs are correctly normalized and included
 5. Normalize each PURL to `scheme:type/namespace/name`; deduplicate across the entire SBOM
 6. For each unique normalized PURL: call `service.resolve_purl()` (cache → resolver flow) with `resolver="import-sbom"`
