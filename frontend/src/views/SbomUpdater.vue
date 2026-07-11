@@ -23,13 +23,13 @@
         </div>
       </div>
       <div class="pattern-toolbar">
-        <button class="btn-secondary" @click="addRow">{{ t('sbomUpdater.addRow') }}</button>
-        <button class="btn-primary" @click="savePatterns" :disabled="savingPatterns">{{ patternsSaved ? t('sbomUpdater.saved') : t('sbomUpdater.save') }}</button>
+        <button class="btn btn-secondary" @click="addRow">{{ t('sbomUpdater.addRow') }}</button>
+        <button class="btn btn-primary" @click="savePatterns" :disabled="savingPatterns">{{ patternsSaved ? t('sbomUpdater.saved') : t('sbomUpdater.save') }}</button>
       </div>
     </div>
 
     <div class="toolbar">
-      <button :disabled="!selectedFile || submitting" @click="handleProcess">{{ t('sbomUpdater.process') }}</button>
+      <button class="btn btn-primary" :disabled="!selectedFile || submitting" @click="handleProcess">{{ t('sbomUpdater.process') }}</button>
     </div>
 
     <div v-if="error" class="error-msg">{{ error }}</div>
@@ -128,7 +128,7 @@
         </div>
 
         <div class="toolbar">
-          <a :href="downloadResultUrl()" class="btn-primary" download>
+          <a :href="downloadResultUrl()" class="btn btn-primary" download>
             {{ t('sbomUpdater.downloadEnriched') }}
           </a>
         </div>
@@ -146,7 +146,7 @@
 
       <!-- Delete button for terminal statuses -->
       <div v-if="isTerminal(activeJob.status)" class="toolbar">
-        <button class="btn-delete-job" @click="handleDelete" :disabled="deleting">
+        <button class="btn btn-danger" @click="handleDelete" :disabled="deleting">
           {{ t('common.delete') }}
         </button>
       </div>
@@ -460,65 +460,11 @@ h1 {
   margin-top: 0.75rem;
 }
 
-.btn-primary {
-  padding: 0.5rem 1rem;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 0.9rem;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.btn-primary:disabled {
-  background: var(--color-primary-disabled);
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background: var(--color-card-bg);
-  color: var(--color-body-text);
-  border: 1px solid var(--color-card-border);
-  border-radius: var(--border-radius);
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: var(--color-table-header-bg);
-}
-
 .toolbar {
   margin-top: 1rem;
   display: flex;
   gap: 0.5rem;
   align-items: center;
-}
-
-.toolbar button {
-  padding: 0.75rem 1.5rem;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.toolbar button:hover {
-  background: var(--color-primary-hover);
-}
-
-.toolbar button:disabled {
-  background: var(--color-primary-disabled);
-  cursor: not-allowed;
 }
 
 .loading {
@@ -547,25 +493,6 @@ h1 {
 
 .btn-cancel:hover {
   background: var(--color-error-bg);
-}
-
-.btn-delete-job {
-  padding: 0.75rem 1.5rem;
-  background: var(--color-error);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.btn-delete-job:hover {
-  opacity: 0.9;
-}
-
-.btn-delete-job:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .error-msg {

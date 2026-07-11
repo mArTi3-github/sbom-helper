@@ -99,7 +99,7 @@
               {{ t('settings.urlValidation.clearCacheDesc') }}
             </div>
           </div>
-          <button class="btn-secondary" @click="onClearValidationCache">{{ t('settings.urlValidation.clearCacheBtn') }}</button>
+          <button class="btn btn-secondary" @click="onClearValidationCache">{{ t('settings.urlValidation.clearCacheBtn') }}</button>
         </div>
       </div>
 
@@ -117,14 +117,14 @@
             </div>
             <div class="setting-desc status-desc">
               {{ t('settings.githubToken.status') }} <span :class="tokenSet.github_token ? 'status-set' : 'status-not-set'">{{ tokenSet.github_token ? t('settings.set') : t('settings.notSet') }}</span>
-              <button v-if="tokenSet.github_token" class="btn-danger btn-small" @click="clearToken">{{ t('settings.clearToken') }}</button>
+              <button v-if="tokenSet.github_token" class="btn btn-danger btn-sm" @click="clearToken">{{ t('settings.clearToken') }}</button>
             </div>
             <div v-if="tokenSet.github_token" class="setting-desc validity-desc">
               {{ t('settings.githubToken.validity') }}
               <span v-if="githubTokenValidity === 'valid'" class="status-valid">{{ t('settings.valid') }}</span>
               <span v-else-if="githubTokenValidity === 'invalid'" class="status-invalid">{{ t('settings.invalid') }}</span>
               <span v-else>&mdash;</span>
-              <button class="btn-small btn-secondary" @click="onCheckGithubToken">{{ t('settings.checkValidity') }}</button>
+              <button class="btn btn-sm btn-secondary" @click="onCheckGithubToken">{{ t('settings.checkValidity') }}</button>
             </div>
           </div>
           <div class="input-right">
@@ -158,7 +158,7 @@
             </div>
             <div class="setting-desc status-desc">
               {{ t('settings.librariesio.status') }} <span :class="tokenSet.librariesio_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.librariesio_api_key ? t('settings.set') : t('settings.notSet') }}</span>
-              <button v-if="tokenSet.librariesio_api_key" class="btn-danger btn-small" @click="clearLibrariesIoKey">{{ t('settings.clearKey') }}</button>
+              <button v-if="tokenSet.librariesio_api_key" class="btn btn-danger btn-sm" @click="clearLibrariesIoKey">{{ t('settings.clearKey') }}</button>
             </div>
           </div>
           <div class="input-right">
@@ -189,7 +189,7 @@
             </div>
             <div class="setting-desc status-desc">
               {{ t('settings.ecosystems.status') }} <span :class="tokenSet.ecosystems_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.ecosystems_api_key ? t('settings.set') : t('settings.notSet') }}</span>
-              <button v-if="tokenSet.ecosystems_api_key" class="btn-danger btn-small" @click="clearEcosystemsKey">{{ t('settings.clearKey') }}</button>
+              <button v-if="tokenSet.ecosystems_api_key" class="btn btn-danger btn-sm" @click="clearEcosystemsKey">{{ t('settings.clearKey') }}</button>
             </div>
           </div>
           <div class="input-right">
@@ -537,6 +537,10 @@ h1 {
 
 .status-desc {
   margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .status-set {
@@ -561,63 +565,10 @@ h1 {
 
 .validity-desc {
   margin-top: 0.25rem;
-}
-
-.btn-secondary {
-  background: var(--color-bg-secondary, #e2e8f0);
-  color: var(--color-text, #1a202c);
-  border: 1px solid var(--color-border, #cbd5e1);
-  border-radius: var(--border-radius);
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: var(--color-bg-secondary-hover, #cbd5e1);
-}
-
-.toggle {
-  position: relative;
-  width: 48px;
-  height: 26px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-toggle-off);
-  border-radius: 26px;
-  transition: background 0.2s;
-}
-
-.toggle-slider::before {
-  content: '';
-  position: absolute;
-  height: 20px;
-  width: 20px;
-  left: 3px;
-  bottom: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: transform 0.2s;
-}
-
-.toggle input:checked + .toggle-slider {
-  background: var(--color-toggle-on);
-}
-
-.toggle input:checked + .toggle-slider::before {
-  transform: translateX(22px);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .num-input {
@@ -676,21 +627,7 @@ h1 {
   border-color: var(--color-primary);
 }
 
-.btn-danger {
-  background: var(--color-danger);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  cursor: pointer;
-}
-
-.btn-danger:hover {
-  background: var(--color-danger-hover);
-}
-
 .btn-small {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.85rem;
   margin-left: 0.5rem;
 }
 

@@ -186,57 +186,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-card-border);
-  border-radius: var(--border-radius);
-  font-size: 0.9rem;
-  cursor: pointer;
-  background: var(--color-card-bg);
-  color: var(--color-body-text);
-  transition: background 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-
-.btn:hover {
-  background: var(--color-table-header-bg);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.btn-secondary {
-  background: var(--color-card-bg);
-  color: var(--color-body-text);
-}
-
-.btn-danger {
-  background: var(--color-danger);
-  color: #fff;
-  border-color: var(--color-danger);
-}
-
-.btn-danger:hover {
-  background: var(--color-danger-hover);
-}
-
-.btn-sm {
-  padding: 0.35rem 0.65rem;
-  font-size: 0.85rem;
-}
-
 .btn-active {
   background: var(--color-primary);
   color: #fff;
@@ -270,7 +219,6 @@ onMounted(() => {
 }
 
 .table-wrapper {
-  overflow-x: auto;
   background: var(--color-card-bg);
   border: 1px solid var(--color-card-border);
   border-radius: var(--border-radius-lg);
@@ -279,6 +227,7 @@ onMounted(() => {
 
 table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
@@ -311,9 +260,7 @@ td {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--color-row-border);
   font-size: 0.88rem;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 tr:last-child td {
@@ -330,6 +277,7 @@ tr:hover {
 }
 
 .col-actions {
+  overflow: visible;
   white-space: nowrap;
   width: 120px;
 }
@@ -339,16 +287,12 @@ tr:hover {
 }
 
 .cell-nowrap {
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .repo-link {
-  display: inline-block;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
+  display: inline;
+  word-break: break-all;
 }
 
 .null-value {

@@ -90,9 +90,9 @@ function openFileDialog() {
 
 <style scoped>
 .upload-area {
-  background: #fff;
-  border: 2px dashed #ccc;
-  border-radius: 8px;
+  background: var(--color-card-bg);
+  border: 2px dashed var(--color-input-border);
+  border-radius: var(--border-radius-lg);
   padding: 2rem;
   text-align: center;
   cursor: pointer;
@@ -100,28 +100,28 @@ function openFileDialog() {
 }
 .upload-area:hover,
 .upload-area.dragover {
-  border-color: #2563eb;
+  border-color: var(--color-primary);
 }
 .upload-label {
   font-size: 1rem;
-  color: #555;
+  color: var(--color-muted);
   cursor: pointer;
 }
 .upload-label strong {
-  color: #2563eb;
+  color: var(--color-primary);
 }
 .upload-hint {
   font-size: 0.8rem;
-  color: #999;
+  color: var(--color-muted-lighter);
   margin-top: 0.5rem;
 }
 .file-name {
   font-size: 0.9rem;
-  color: #555;
+  color: var(--color-muted);
   margin-top: 0.5rem;
 }
 .error-msg {
-  color: #b91c1c;
+  color: var(--color-danger);
   font-size: 0.85rem;
   margin-top: 0.5rem;
 }

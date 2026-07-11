@@ -10,7 +10,7 @@
         :placeholder="t('purlResolver.placeholder')"
         required
       />
-      <button type="submit" :disabled="loading">{{ t('purlResolver.resolve') }}</button>
+      <button type="submit" class="btn btn-primary" :disabled="loading">{{ t('purlResolver.resolve') }}</button>
     </form>
 
     <div v-if="loading" class="loading">
@@ -172,26 +172,6 @@ input[type="text"]:focus {
   box-shadow: 0 0 0 3px var(--color-primary-focus);
 }
 
-button {
-  padding: 0.75rem 1.5rem;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-button:hover {
-  background: var(--color-primary-hover);
-}
-
-button:disabled {
-  background: var(--color-primary-disabled);
-  cursor: not-allowed;
-}
-
 .result {
   margin-top: 1.5rem;
 }
@@ -234,7 +214,7 @@ button:disabled {
 .details {
   margin-top: 0.75rem;
   font-size: 0.875rem;
-  color: #555;
+  color: var(--color-muted);
 }
 
 .details dt {

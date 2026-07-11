@@ -39,12 +39,12 @@ const emit = defineEmits<{
   z-index: 1000;
 }
 .modal-card {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--color-card-bg);
+  border-radius: var(--border-radius-lg);
   padding: 1.5rem;
   min-width: 400px;
   max-width: 600px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .modal-header {
   display: flex;
@@ -60,9 +60,9 @@ const emit = defineEmits<{
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #666;
+  color: var(--color-muted);
 }
 .modal-close:hover {
-  color: #1a1a1a;
+  color: var(--color-body-text);
 }
 </style>

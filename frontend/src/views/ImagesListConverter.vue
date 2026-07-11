@@ -6,7 +6,7 @@
     <FileUploadZone accept=".json" @file-selected="onFileSelected" />
 
     <div class="toolbar">
-      <button :disabled="!selectedFile || loading" @click="handleConvert">{{ t('imagesListConverter.convert') }}</button>
+      <button class="btn btn-primary" :disabled="!selectedFile || loading" @click="handleConvert">{{ t('imagesListConverter.convert') }}</button>
     </div>
 
     <div v-if="loading" class="loading">
@@ -68,7 +68,7 @@
       </div>
 
       <div class="toolbar">
-        <button @click="downloadResult">{{ t('imagesListConverter.downloadList') }}</button>
+        <button class="btn btn-primary" @click="downloadResult">{{ t('imagesListConverter.downloadList') }}</button>
       </div>
     </div>
   </div>
@@ -156,45 +156,12 @@ h1 {
   align-items: center;
 }
 
-button {
-  padding: 0.75rem 1.5rem;
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-button:hover {
-  background: var(--color-primary-hover);
-}
-
-button:disabled {
-  background: var(--color-primary-disabled);
-  cursor: not-allowed;
-}
-
 .loading {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-top: 1rem;
   color: var(--color-muted);
-}
-
-.spinner {
-  display: inline-block;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 2px solid #e5e7eb;
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .error-msg {
@@ -211,19 +178,19 @@ button:disabled {
 }
 
 .status-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--border-radius-lg);
   padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--color-card-shadow);
 }
 
 .status-ok {
-  border-left: 4px solid #166534;
+  border-left: 4px solid var(--color-success);
 }
 
 .status-transformed {
-  border-left: 4px solid #b45309;
+  border-left: 4px solid var(--color-warning);
 }
 
 .table-wrapper {
@@ -234,32 +201,32 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 1rem;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--color-card-bg);
+  border-radius: var(--border-radius-lg);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: var(--color-card-shadow);
 }
 
 th {
-  background: #f9fafb;
+  background: var(--color-table-header-bg);
   font-size: 0.8rem;
   text-transform: uppercase;
-  color: #888;
+  color: var(--color-muted-light);
 }
 
 th, td {
   padding: 0.75rem 1rem;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-row-border);
 }
 
 .flag-present {
-  color: #991b1b;
+  color: var(--color-error);
   font-weight: 500;
 }
 
 .flag-ok {
-  color: #166534;
+  color: var(--color-success);
   font-weight: 500;
 }
 </style>

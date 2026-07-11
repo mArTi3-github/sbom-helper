@@ -247,7 +247,7 @@ describe('SbomUpdater.vue', () => {
     await jobRow.trigger('click')
     await flushPromises()
 
-    const deleteBtn = wrapper.find('.btn-delete-job')
+    const deleteBtn = wrapper.find('.btn.btn-danger')
     await deleteBtn.trigger('click')
     await flushPromises()
 

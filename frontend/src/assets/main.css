@@ -1,35 +1,37 @@
 :root {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-disabled: #93c5fd;
-  --color-primary-focus: rgba(37, 99, 235, 0.15);
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
-  --color-success: #166534;
-  --color-success-bg: #dcfce7;
-  --color-warning: #854d0e;
-  --color-warning-bg: #fef9c3;
-  --color-error: #991b1b;
-  --color-error-bg: #fee2e2;
-  --color-error-border: #fecaca;
-  --color-warning-border: #fde68a;
-  --color-body-bg: #f5f5f5;
-  --color-body-text: #1a1a1a;
-  --color-card-bg: #fff;
-  --color-card-border: #e5e7eb;
-  --color-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --color-muted: #666;
-  --color-muted-light: #888;
-  --color-muted-lighter: #999;
-  --color-input-border: #ccc;
-  --color-toggle-off: #ccc;
-  --color-toggle-on: #2563eb;
-  --color-delete-border: #ef4444;
-  --color-delete-bg-hover: #fef2f2;
-  --color-table-header-bg: #f9fafb;
-  --color-row-border: #e5e7eb;
-  --color-setting-border: #f3f4f6;
+  --color-primary: #6b8cff;
+  --color-primary-hover: #8aa4ff;
+  --color-primary-disabled: #3b4f8a;
+  --color-primary-focus: rgba(107, 140, 255, 0.2);
+  --color-accent: #a78bfa;
+  --color-danger: #f87171;
+  --color-danger-hover: #ef4444;
+  --color-success: #34d399;
+  --color-success-bg: #064e3b;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #451a03;
+  --color-error: #fca5a5;
+  --color-error-bg: #450a0a;
+  --color-error-border: #7f1d1d;
+  --color-warning-border: #78350f;
+  --color-body-bg: #141620;
+  --color-body-text: #e2e8f0;
+  --color-card-bg: #1a1d2e;
+  --color-card-border: #2a2d3e;
+  --color-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --color-muted: #94a3b8;
+  --color-muted-light: #64748b;
+  --color-muted-lighter: #475569;
+  --color-input-border: #3a3d4e;
+  --color-toggle-off: #3a3d4e;
+  --color-toggle-on: #6b8cff;
+  --color-delete-border: #f87171;
+  --color-delete-bg-hover: #2d0a0a;
+  --color-table-header-bg: #141725;
+  --color-row-border: #2a2d3e;
+  --color-setting-border: #1e2030;
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   --border-radius: 6px;
   --border-radius-lg: 8px;
   --border-radius-full: 999px;
@@ -129,6 +131,7 @@ a:hover {
   width: 48px;
   height: 26px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .toggle input {
@@ -155,7 +158,7 @@ a:hover {
   width: 20px;
   left: 3px;
   bottom: 3px;
-  background: white;
+  background: #e2e8f0;
   border-radius: 50%;
   transition: transform 0.2s;
 }
@@ -166,4 +169,89 @@ a:hover {
 
 .toggle input:checked + .toggle-slider::before {
   transform: translateX(22px);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--border-radius);
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  background: var(--color-card-bg);
+  color: var(--color-body-text);
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+  line-height: 1.4;
+}
+
+.btn:hover {
+  background: var(--color-table-header-bg);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-body-text);
+  border-color: var(--color-card-border);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: var(--color-danger);
+}
+
+.btn-danger:hover {
+  background: var(--color-danger-hover);
+}
+
+.btn-sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+input,
+select,
+textarea {
+  background: var(--color-card-bg);
+  color: var(--color-body-text);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--border-radius);
+  font-family: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-focus);
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
 }

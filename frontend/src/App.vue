@@ -10,7 +10,10 @@ const { t } = useI18n()
     <main class="container">
       <router-view />
     </main>
-    <footer class="app-footer">{{ t('common.poweredBy') }}</footer>
+    <footer class="app-footer">
+      {{ t('common.poweredBy') }}
+      <img src="/favicon.png" alt="" class="footer-icon"  style="opacity: 0.75" />
+    </footer>
   </div>
 </template>
 
@@ -29,7 +32,15 @@ const { t } = useI18n()
 .app-footer {
   text-align: center;
   padding: 1rem;
-  color: #999;
+  color: var(--color-muted-lighter);
   font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.footer-icon {
+  width: 20px;
+  height: 20px;
 }
 </style>
