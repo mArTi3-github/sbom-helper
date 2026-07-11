@@ -21,9 +21,14 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom/enricher.py` — Inserts VCS external references into SBOM components
 - `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
-- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys)
+- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, batch_semaphore_limit, job_ttl_hours, connectivity settings)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
-- `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url_with_retry()` with SettingsStore injection; consumed by `PurlResolutionService` and accessed by `SbomEnrichmentPipeline` through `PurlResolutionService.validation_service` property
+- `src/purl_resolver/url_validation_cache.py` — `UrlValidationCache`: diskcache-based URL validation result cache with TTL expiry; used by `UrlValidationService`
+- `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url_with_retry()` with SettingsStore injection and UrlValidationCache; consumed by `PurlResolutionService` and accessed by `SbomEnrichmentPipeline` through `PurlResolutionService.validation_service` property
+- `src/purl_resolver/db_admin_service.py` — `DbAdminService`: encapsulates database admin operations (list, edit, import/export CSV) between API routes and Storage Layer
+- `src/purl_resolver/job_manager.py` — `JobManager`: async background job processing for SBOM enrichment; manages job queue, worker tasks, cleanup
+- `src/purl_resolver/job_repository.py` — `JobRepository`: PostgreSQL persistence for job records (`JobRecord` dataclass)
+- `src/purl_resolver/routes/jobs.py` — Async SBOM enrichment job endpoints (`POST /api/v1/jobs/sbom-enrich`, `GET /api/v1/jobs`, etc.)
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
 
@@ -171,9 +176,10 @@ Client                    API Layer (router)         Service Layer             p
 ## UrlValidationService
 
 ### Service Wrapper (`validation_service.py`)
-- `UrlValidationService` wraps `validate_url_with_retry()` with SettingsStore injection
-- `UrlValidationService.__init__(settings_store: SettingsStore)` — receives `SettingsStore` for token/cooldown/retry config
-- `UrlValidationService.validate_url(url, timeout, github_token=None) → UrlValidationOutput` — delegates to `validate_url_with_retry()` with the injected `settings_store`
+- `UrlValidationService` wraps `validate_url_with_retry()` with SettingsStore injection and UrlValidationCache
+- `UrlValidationService.__init__(settings_store: SettingsStore, cache: UrlValidationCache)` — receives `SettingsStore` for token/cooldown/retry config and `UrlValidationCache` for caching validation results
+- `UrlValidationService.validate_url(url, timeout, github_token=None) → UrlValidationOutput` — checks cache first (within cooldown window), then delegates to `validate_url_with_retry()` with the injected `settings_store`; caches VALID results
+- `UrlValidationService.clear_cache() → None` — clears the entire validation cache
 - Consumed by `PurlResolutionService` as an optional dependency; when not provided, callers fall back to direct `validate_url_with_retry()` calls. `SbomEnrichmentPipeline` accesses `validation_service` through `PurlResolutionService.validation_service` property.
 - Decouples URL validation setup from resolution orchestration; single point for validation configuration changes
 
@@ -243,6 +249,8 @@ Client                    API Layer (router)         Service Layer             p
 | Key | Default | Description |
 |---|---|---|
 | `validate_db_urls` | `false` | Enable URL validation for cached repository URLs |
+| `validate_sbom_refs` | `false` | Enable URL validation for existing VCS references in SBOM files |
+| `sbom_multiple_vcs_behavior` | `"keep-first"` | Behavior when SBOM component has multiple VCS refs (`"keep-first"` or `"keep-all"`) |
 | `url_validation_timeout` | `5` | Timeout in seconds for HEAD and multi-VCS probe checks (1–60) |
 | `github_token` | `null` | GitHub Personal Access Token for authenticated requests (multi-VCS git probe, HTTP HEAD) |
 | `librariesio_enabled` | `false` | Enable libraries.io as a fallback resolver after purl2repo |
@@ -253,6 +261,10 @@ Client                    API Layer (router)         Service Layer             p
 | `ecosystems_max_requests_per_second` | `2.0` | Rate limit for ecosyste.ms API requests (0.1–100) |
 | `retry_max_attempts` | `3` | Maximum HTTP request attempts per resolver (1–10). Applied to ecosyste.ms and libraries.io on timeout, 429, and 5xx errors. |
 | `retry_base_cooldown_seconds` | `5.0` | Base wait time between retries; actual wait = cooldown × (attempt − 1). Range: 0.5–120. |
+| `batch_semaphore_limit` | `10` | Maximum concurrent resolution requests in batch mode (1–100) |
+| `job_ttl_hours` | `24` | Time-to-live in hours for async job records (1–720) |
+| `connectivity_url` | `"https://github.com"` | URL used for connectivity probes |
+| `connectivity_timeout` | `2` | Timeout in seconds for connectivity probes (1–30) |
 | `log_level` | `"INFO"` | Application log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
 | `language` | `"en"` | UI language (`"en"` or `"ru"`) |
 | `json_indent` | `4` | Number of spaces for JSON indentation in downloaded files (1, 2, or 4) |

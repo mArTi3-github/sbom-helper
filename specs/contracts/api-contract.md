@@ -305,6 +305,8 @@ Return current application settings.
 ```
 
 - `validate_db_urls`: boolean — enable URL validation for cached repository URLs (default: `false`)
+- `validate_sbom_refs`: boolean — enable URL validation for existing VCS references in SBOM files (default: `false`)
+- `sbom_multiple_vcs_behavior`: string — behavior when SBOM component has multiple VCS references (`"keep-first"` or `"keep-all"`; default: `"keep-first"`)
 - `url_validation_timeout`: integer — timeout in seconds for HEAD and git ls-remote checks (1–60, default: `5`)
 - `revalidation_cooldown_hours`: integer — cooldown in hours for trusted resolver entries (0–720, default: `24`; `0` disables cooldown)
 - `librariesio_enabled`: boolean — whether the libraries.io resolver is active
@@ -313,6 +315,10 @@ Return current application settings.
 - `retry_max_attempts`: integer — maximum HTTP retry attempts for fallback resolvers (1–10, default: `3`)
 - `retry_base_cooldown_seconds`: float — base wait between retries in seconds (0.5–120, default: `5.0`)
 - `log_level`: string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default: `"INFO"`)
+- `batch_semaphore_limit`: integer — maximum number of concurrent resolution requests in batch mode (1–100, default: `10`)
+- `connectivity_url`: string — URL used for connectivity probes (default: `"https://github.com"`)
+- `connectivity_timeout`: integer — timeout in seconds for connectivity probes (1–30, default: `2`)
+- `job_ttl_hours`: integer — time-to-live in hours for async job records (1–720, default: `24`)
 - `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
@@ -345,6 +351,8 @@ Partially update application settings.
 All fields optional. Only provided fields are updated.
 
 - `validate_db_urls`: optional bool — enable/disable URL validation for cached repository URLs.
+- `validate_sbom_refs`: optional bool — enable/disable URL validation for existing VCS references in SBOM files.
+- `sbom_multiple_vcs_behavior`: optional string — behavior when SBOM component has multiple VCS references (`"keep-first"` or `"keep-all"`).
 - `url_validation_timeout`: optional int — timeout in seconds for HEAD and git ls-remote checks (1–60).
 - `revalidation_cooldown_hours`: optional int — cooldown in hours for trusted resolver entries (0–720, 0 disables cooldown).
 - `github_token`: optional string — GitHub Personal Access Token. Set to `null` to clear the token. Empty string is ignored. Invalid tokens are rejected with `400 invalid_token`.
@@ -356,6 +364,10 @@ All fields optional. Only provided fields are updated.
 - `retry_max_attempts`: optional int — maximum HTTP retry attempts for fallback resolvers (1–10).
 - `retry_base_cooldown_seconds`: optional float — base wait between retries in seconds (0.5–120).
 - `log_level`: optional string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+- `batch_semaphore_limit`: optional int — maximum concurrent resolution requests in batch mode (1–100).
+- `job_ttl_hours`: optional int — time-to-live for async job records in hours (1–720).
+- `connectivity_url`: optional string — URL for connectivity probes.
+- `connectivity_timeout`: optional int — timeout in seconds for connectivity probes (1–30).
 - `language`: optional string — UI language (`"en"` or `"ru"`).
 - `json_indent`: optional int — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`).
 
@@ -395,6 +407,220 @@ Manually validate the currently stored GitHub token. No request body.
 {
   "error": "token_not_set"
 }
+```
+
+---
+
+### `POST /api/v1/settings/clear-validation-cache`
+
+Clear the in-memory URL validation cache, forcing re-validation on the next URL check.
+
+#### Response (200)
+
+```json
+{ "status": "ok" }
+```
+
+---
+
+### `POST /api/v1/jobs/sbom-enrich`
+
+Asynchronously enrich a CycloneDX SBOM file via a background job. Accepts the same parameters as `POST /api/v1/resolve/sbom` but returns immediately with a job ID instead of blocking.
+
+#### Request
+
+`multipart/form-data` with field `file` containing a CycloneDX JSON file.
+
+- Maximum file size: 200 MB (configurable via `SBOM_MAX_FILE_SIZE`)
+- File must be valid JSON with `bomFormat: "CycloneDX"` and `specVersion: "1.6"`
+- Optional field `remove_unresolved_no_subcomponents` (boolean, default: `false`)
+- Optional field `ignore_patterns` (JSON string, default: `null`) — JSON array of `{"field": "...", "pattern": "..."}` objects
+
+#### Success Response (202)
+
+```json
+{
+  "job_id": "a1b2c3d4-...",
+  "status": "queued"
+}
+```
+
+#### Error Response (400) — invalid JSON
+
+```json
+{ "error": "invalid_json" }
+```
+
+#### Error Response (413) — file too large
+
+```json
+{
+  "error": "file_too_large",
+  "max_size_mb": 200
+}
+```
+
+#### Error Response (503) — job queue unavailable
+
+```json
+{
+  "error": "job_queue_unavailable"
+}
+```
+
+---
+
+### `GET /api/v1/jobs`
+
+List background enrichment jobs.
+
+#### Query Parameters
+
+- `limit`: integer, max results (default: `20`)
+- `offset`: integer, pagination offset (default: `0`)
+
+#### Response (200)
+
+```json
+{
+  "jobs": [
+    {
+      "job_id": "a1b2c3d4-...",
+      "type": "sbom-enrich",
+      "status": "queued",
+      "progress_current": 0,
+      "progress_total": 0,
+      "input_filename": "sbom.json",
+      "summary": null,
+      "error_message": null,
+      "created_at": "2026-07-11T12:00:00Z",
+      "started_at": null,
+      "finished_at": null
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/v1/jobs/{job_id}`
+
+Get the current status and results of a background enrichment job.
+
+#### Response (200)
+
+```json
+{
+  "job_id": "a1b2c3d4-...",
+  "type": "sbom-enrich",
+  "status": "completed",
+  "progress_current": 10,
+  "progress_total": 10,
+  "input_filename": "sbom.json",
+  "summary": {
+    "total_purls": 10,
+    "found": 8,
+    "not_found": 1,
+    "skipped": 0,
+    "removed": 1
+  },
+  "results": [
+    {
+      "purl": "pkg:pypi/certifi",
+      "status": "found",
+      "repository_url": "https://github.com/certifi/python-certifi"
+    }
+  ],
+  "error_message": null,
+  "created_at": "2026-07-11T12:00:00Z",
+  "started_at": "2026-07-11T12:00:01Z",
+  "finished_at": "2026-07-11T12:00:10Z"
+}
+```
+
+- `status`: one of `queued`, `running`, `completed`, `failed`, `cancelled`
+- `summary` and `results` are `null` until the job completes
+
+#### Error Response (404)
+
+```json
+{ "error": "job_not_found" }
+```
+
+---
+
+### `GET /api/v1/jobs/{job_id}/result`
+
+Download the enriched SBOM file for a completed job.
+
+#### Response (200)
+
+Content-Type: `application/json`. Returns the enriched SBOM file.
+
+#### Error Response (400) — result not ready
+
+```json
+{
+  "error": "result_not_ready",
+  "status": "running"
+}
+```
+
+#### Error Response (404)
+
+```json
+{ "error": "job_not_found" }
+```
+
+#### Error Response (404) — result file missing
+
+```json
+{ "error": "result_file_not_found" }
+```
+
+---
+
+### `POST /api/v1/jobs/{job_id}/cancel`
+
+Request cancellation of a running job.
+
+#### Response (200)
+
+```json
+{ "job_id": "a1b2c3d4-...", "status": "cancelled" }
+```
+
+#### Error Response (404)
+
+```json
+{ "error": "job_not_found" }
+```
+
+#### Error Response (409) — job already in terminal state
+
+```json
+{
+  "error": "job_already_terminal",
+  "status": "completed"
+}
+```
+
+---
+
+### `DELETE /api/v1/jobs/{job_id}`
+
+Delete a job record and its associated result file.
+
+#### Response (200)
+
+```json
+{ "job_id": "a1b2c3d4-...", "deleted": true }
+```
+
+#### Error Response (404)
+
+```json
+{ "error": "job_not_found" }
 ```
 
 ---
@@ -500,6 +726,11 @@ Standard FastAPI/Pydantic 422 response.
 | Images list conversion: missing file field | 422 | (Pydantic validation) |
 | GitHub token check with no token stored | 400 | `token_not_set` |
 | Network unavailable (GitHub connectivity check failed) | 503 | `network_unavailable` |
+| Job queue unavailable (no PostgreSQL) | 503 | `job_queue_unavailable` |
+| Job not found | 404 | `job_not_found` |
+| Job result not ready | 400 | `result_not_ready` |
+| Job result file missing | 404 | `result_file_not_found` |
+| Job already in terminal state (cancel) | 409 | `job_already_terminal` |
 
 ## Breaking Change Checklist
 

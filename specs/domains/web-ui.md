@@ -26,10 +26,12 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/i18n/locales/en.json` — English UI strings (241 keys, grouped by domain)
 - `frontend/src/i18n/locales/ru.json` — Russian UI strings (identical key structure)
 - `frontend/src/tests/i18n.ts` — `mountWithI18n` helper for test mounting with vue-i18n plugin
+- `frontend/src/api/jobs.ts` — Background job API client (create, poll, download, cancel, list)
 - `frontend/src/api/images.ts` — Images list conversion API client
 - `frontend/src/types/api.ts` — TypeScript interfaces mirroring backend `schemas.py`
-- `frontend/src/composables/usePagination.ts` — Pagination state composable (DatabaseAdmin)
 - `frontend/src/composables/useDownload.ts` — File download helper composable
+- `frontend/src/stores/useSettingsStore.ts` — Pinia store for application settings state (shared across views)
+- `frontend/src/stores/useDbAdminStore.ts` — Pinia store for database admin state (filtering, sorting, selection, pagination, page size, goToPage, changePageSize)
 - `frontend/src/assets/main.css` — Global CSS variables and resets
 - `src/purl_resolver/main.py` — Mounts SPA via `SPAStaticFiles` at `/` after all API routes
 
@@ -153,7 +155,7 @@ User                   Browser (Vue SPA)             API Layer
 - Import modal includes a collapsible CSV format reference section listing required/optional columns and a multi-column example using `,` delimiter
 - Import strategy radio labels: "Overwrite existing" (upsert) and "Skip existing" (skip_existing)
 - Import modal supports drag-and-drop for CSV files (via `FileUploadZone` and `ModalDialog` components)
-- Pagination is managed by `usePagination` composable
+- Pagination is managed by `useDbAdminStore` (Pinia store with `goToPage`, `changePageSize`, `totalPages` computed state)
 
 ### Settings Page
 
@@ -216,7 +218,6 @@ Frontend unit tests are written with **Vitest 4.1.9**, `@vue/test-utils 2.4.11`,
 - `frontend/src/views/ImagesListConverter.test.ts` — conversion flow, status cards (transformed / not transformed), JSON download.
 - `frontend/src/views/DatabaseAdmin.test.ts` — filter, sort, select, inline edit (Enter/Escape/blur), single and bulk delete (confirm branches), CSV export, CSV import (upsert / skip_existing), pagination (next page, page size), ApiError and network errors.
 - `frontend/src/composables/useDownload.test.ts` — `downloadJson` blob/anchor behaviour, `safeUrl` dangerous-protocol rejection (javascript, data, vbscript).
-- `frontend/src/composables/usePagination.test.ts` — initial state, `totalPages` computation, `goToPage` guard logic, `changePageSize` resets page.
 
 **Deliberately not tested (YAGNI):** `NotFound.vue`, `AppNav.vue`, `FileUploadZone.vue`, `ModalDialog.vue` — trivial components with minimal logic; tests would yield low signal-to-noise.
 

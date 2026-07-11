@@ -98,9 +98,22 @@
 |  |    final URL, returns       |                   |
 |  |    UrlValidationOutput      |                   |
 |  |    with final_url field     |                   |
+|  +----+------------------------+                   |
+|       |                                            |
+|       | diskcache                                  |
+|       v                                            |
+|  +-----------------------------+                   |
+|  |  URL Validation Cache       |                   |
+|  |  url_validation_cache.py    |                   |
+|  |                             |                   |
+|  |  UrlValidationCache         |                   |
+|  |    .get(url, max_age)       |                   |
+|  |    .put(url)                |                   |
+|  |    .expire(max_age)         |                   |
+|  |    .clear()                 |                   |
+|  |  diskcache-based            |                   |
 |  +-----------------------------+                   |
 |                                                    |
-|  +-----------------------------+                   |
 |  |     Settings Store          |                   |
 |  |  settings_store.py          |                   |
 |  |                             |                   |
@@ -148,8 +161,35 @@
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
-|  |     Config Layer            |                   |
-|  |  src/purl_resolver/config   |                   |
+|  |  DB Admin Service           |                   |
+|  |  db_admin_service.py        |                   |
+|  |                             |                   |
+|  |  DbAdminService             |                   |
+|  |    .list_purls()            |                   |
+|  |    .update_purl()           |                   |
+|  |    .delete_purls()          |                   |
+|  |    .import_csv()            |                   |
+|  |    .export_csv()            |                   |
+|  |  wraps csv_io + Storage     |                   |
+|  +-----------------------------+                   |
+|                                                    |
+|  +-----------------------------+                   |
+|  |  Job Manager                |                   |
+|  |  job_manager.py             |                   |
+|  |  job_repository.py          |                   |
+|  |                             |                   |
+|  |  JobManager                 |                   |
+|  |    .create_job()            |                   |
+|  |    .get_job() / .list_jobs()|                   |
+|  |    .cancel_job()            |                   |
+|  |    .delete_job()            |                   |
+|  |  JobRecord dataclass        |                   |
+|  |  Async queue + workers      |                   |
+|  |  PostgreSQL-backed          |                   |
+|  |  TTL-based cleanup          |                   |
+|  +-----------------------------+                   |
+|                                                    |
+|  |  src/purl_resolver/config.py|                   |
 |  |                             |                   |
 |  |  Pydantic Settings          |                   |
 |  |  PURL2REPO_* prefix         |                   |
@@ -178,12 +218,12 @@
 
 ## Import Rules
 
-- **API Layer** (`router.py` includes sub-routers from `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`)
+- **API Layer** (`router.py` includes sub-routers from `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`)
 - **API Layer (routes/)** imports **Service Layer** (`service.py`) and **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) — but not vice versa
 - **API Layer (routes/)** imports **csv_io** module for CSV parsing/rendering
 - **API Layer (routes/settings.py)** imports **Config Layer** (settings) and **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
 - **API Layer (routes/)** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
-- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), **Validation Service** (`validation_service.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`, `validation_service`); exposes `settings_store` and `validation_service` as read-only properties for downstream consumers; dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`)
+- **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), **Validation Service** (`validation_service.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`, `validation_service`); exposes `settings_store` and `validation_service` as read-only properties for downstream consumers; dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`); `resolve_batch()` uses `batch_semaphore_limit` from `AppSettings` for concurrency control
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`PurlResolutionService`), **SBOM Module** (`sbom/`), and **PURL Utils Layer** (`purl_utils/`); receives only `PurlResolutionService` via constructor injection, accessing `settings_store` and `validation_service` through its properties
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
@@ -193,19 +233,23 @@
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
 - **Web UI Layer** (`frontend/`) is a standalone Vue 3 SPA; communicates with the API Layer via HTTP (`fetch` → API endpoints); FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass with `index.html` fallback for client-side routing); SPA is mounted after all API routes
-- Tests (`tests/`) import `main:app` and FastAPI TestClient; unit tests for storage/service/purl_utils import them directly
+- **API Layer (routes/jobs.py)** imports **Job Manager** (`job_manager.py`) for async SBOM enrichment; job endpoints are available only when PostgreSQL is available
+- **Service Layer** depends on **DbAdminService** (`db_admin_service.py`) for database admin operations that wrap CSV I/O and Storage
+- **Job Manager** (`job_manager.py`) imports **Job Repository** (`job_repository.py`), **SBOM Enrichment Pipeline** (`sbom_enrichment.py`), and **Service Layer** (`PurlResolutionService`)
+- Tests (`tests/`) import `main:app` and FastAPI TestClient; unit tests for storage/service/purl_utils/resolvers/url_validator/sbom import them directly
 
 ## Layer Responsibilities
 
 ### API Layer (`routes/`)
-- Define HTTP endpoints (routes, methods, status codes) — split across `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`
+- Define HTTP endpoints (routes, methods, status codes) — split across `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
-- Delegate DB admin operations to Storage Layer (`storage.list_purls()`, `storage.update_purl()`, etc.)
+- Delegate DB admin operations to `DbAdminService` (`db_admin_service.list_purls()`, `db_admin_service.update_purl()`, etc.) which wraps Storage Layer and CSV I/O
+- Delegate async SBOM enrichment to Job Manager via `routes/jobs.py` — creates background jobs (`POST /api/v1/jobs/sbom-enrich`), queries status (`GET /api/v1/jobs/{job_id}`), downloads results (`GET /api/v1/jobs/{job_id}/result`), cancels (`POST /api/v1/jobs/{job_id}/cancel`), deletes (`DELETE /api/v1/jobs/{job_id}`), lists (`GET /api/v1/jobs`)
 - Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, deduplicates by `purl`, returns conversion result with completeness flags and duplicate counts
-- Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`
+- Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`; clear validation cache via `POST /api/v1/settings/clear-validation-cache`
 - Handle error responses from Service Layer and Pipeline
 - Serve the Vue 3 SPA via `SPAStaticFiles` mounted at `/` in `main.py` (after all API routes); `SPAStaticFiles` falls back to `index.html` for any unmatched path, enabling Vue Router client-side routing
 
@@ -213,7 +257,7 @@
 - `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`, `validation_service: UrlValidationService | None = None`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver chain (iterates resolvers, first success wins) → storage store; uses `resolver.name` property to tag stored records with the actual resolver identifier (e.g. `"purl2repo"`, `"libraries.io"`)
 - URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if within cooldown window (trusted resolvers respect `revalidation_cooldown_hours`); remove invalid tokens from settings automatically. Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url_with_retry()` directly.
-- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit of 10; returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
+- Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit from `AppSettings.batch_semaphore_limit` (default: 10); returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `self._storage.store()`
 - Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format; tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
@@ -226,6 +270,29 @@
 - Decouples HTTP layer (router) from domain orchestration logic
 - Testable without FastAPI TestClient — can be instantiated with mock storage and resolvers
 - Returns `SbomEnrichmentResult` dataclass with `report` and `enriched_sbom` fields
+
+### DB Admin Service (`db_admin_service.py`)
+- `DbAdminService` class with constructor injection (`storage: Storage`)
+- Encapsulates database admin operations between API routes and Storage Layer
+- `list_purls(params: PurlListParams) → PurlListResponse` — paginated listing with search/filter/sort
+- `update_purl(purl_key: str, update: PurlUpdateRequest)` — inline edit of a PURL row
+- `delete_purls(purls: list[str]) → int` — bulk delete
+- `import_csv(text, strategy) → ImportResponse` — delegates to `csv_io.parse_csv_import()` then bulk-stores via Storage Layer
+- `export_csv(purls: list[str]) → str` — fetches from Storage Layer, delegates to `csv_io.render_csv_export()`
+- Testable without FastAPI TestClient — pure service with injectable Storage dependency
+
+### Job Manager (`job_manager.py`, `job_repository.py`)
+- `JobManager` class with constructor injection (`pool: asyncpg.Pool`, `resolution_service: PurlResolutionService`, `job_ttl_hours: int`)
+- Async background job processing for SBOM enrichment; available only when PostgreSQL is connected
+- `create_job(raw_input, filename, params) → JobRecord` — saves SBOM file to disk, creates job record with `status: queued`, enqueues job for async processing
+- Background worker processes jobs: runs `SbomEnrichmentPipeline.process()` with the uploaded SBOM data, stores enriched result to disk, updates progress
+- `get_job(job_id) → JobRecord | None` — returns current job status and results
+- `list_jobs(limit, offset) → list[JobRecord]` — paginated job listing
+- `cancel_job(job_id) → bool` — sets `cancel_requested` flag; worker checks flag between processing steps
+- `delete_job(job_id) → bool` — removes job record and associated result file
+- TTL-based cleanup: expired jobs are cleaned up by a periodic background task
+- `JobRepository` provides PostgreSQL persistence for `JobRecord` dataclass (id, type, status, progress, params, result paths, timestamps)
+- Job status lifecycle: `queued` → `running` → `completed` | `failed` | `cancelled`
 
 ### CSV I/O Module (`csv_io.py`)
 - Pure functions for CSV parsing and rendering, no HTTP or Storage dependencies
@@ -259,11 +326,9 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, language, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
-- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120)
-- `ServiceTokens` dataclass for extracting API tokens from settings (extensible for future services)
-- `AppSettings.service_tokens() → ServiceTokens` method
+- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
 - Graceful handling: missing file → create with defaults; corrupt JSON → log warning, return defaults
 
@@ -273,6 +338,15 @@
 - File path default: `./data/sbom_components_ignore_patterns.json`
 - Graceful handling: missing file → return empty list; corrupt JSON → log warning, return empty list
 - Exposed via API endpoints `GET/POST /api/v1/sbom/ignore-patterns` in `routes/ignore_patterns.py`
+
+### URL Validation Cache (`url_validation_cache.py`)
+- `UrlValidationCache` class wrapping `diskcache.Cache` for persistent URL validation result caching
+- `get(url, max_age_seconds) → str | None` — returns cached URL if within TTL, `None` otherwise
+- `put(url)` — records current timestamp for the URL
+- `expire(max_age_seconds)` — removes entries older than max age
+- `clear()` — clears the entire cache
+- Used by `UrlValidationService` to avoid re-validating recently validated URLs within the cooldown window
+- A background task in `main.py` calls `expire()` daily with `revalidation_cooldown_hours` setting as TTL
 
 ### URL Validator (`url_validator.py`)
 - Validates repository URLs via HTTP HEAD + multi-VCS probe to verify the URL exists and is reachable
@@ -295,7 +369,8 @@
 - Vue 3 SPA built with Vite + TypeScript, source in `frontend/src/`
 - **Views** (`src/views/`): `PurlResolver.vue`, `SbomUpdater.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
 - **Components** (`src/components/`): `AppNav.vue` (navigation bar), `FileUploadZone.vue` (drag-and-drop upload), `ModalDialog.vue` (reusable modal)
-- **Composables** (`src/composables/`): `usePagination.ts` (pagination state), `useDownload.ts` (file download helper)
+- **Composables** (`src/composables/`): `useDownload.ts` (file download helper)
+- **Stores** (`src/stores/`): `useSettingsStore.ts` (Pinia store for settings), `useDbAdminStore.ts` (Pinia store for database admin state — includes pagination logic via `goToPage`, `changePageSize`, `totalPages`)
 - **i18n** (`src/i18n/`): `index.ts` (vue-i18n configuration with `legacy: false`), `locales/en.json` (English), `locales/ru.json` (Russian); `@intlify/unplugin-vue-i18n` Vite plugin for compile-time message compilation
 - **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts`, `db.ts`, `settings.ts`, `images.ts`
 - **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`

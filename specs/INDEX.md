@@ -30,6 +30,10 @@
 | Change resolver error handling | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Remove unresolved SBOM components | `contracts/api-contract.md`, `domains/purl-resolution.md`, `domains/web-ui.md` |
 | Convert SBOM to images list (container list) | `contracts/api-contract.md`, `domains/web-ui.md`, `architecture/layers.md` |
+| Add async SBOM enrichment (background jobs) | `contracts/api-contract.md`, `architecture/layers.md` |
+| Change job manager configuration (TTL, queue) | `architecture/layers.md`, `domains/purl-resolution.md` |
+| Modify DB admin behavior (list, edit, CSV) | `architecture/layers.md`, `contracts/api-contract.md` |
+| Add or change URL validation cache | `architecture/layers.md` |
 | Add or change SBOM component ignore patterns | `architecture/layers.md`, `contracts/api-contract.md` |
 | Configure resolver retry, rate limit, or log level | `domains/purl-resolution.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 | Add multilingual support (i18n) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
@@ -64,12 +68,12 @@ specs/
 ├── INDEX.md                         — This file
 ├── WORKFLOW.md                      — Agent workflows
 ├── architecture/
-│   └── layers.md                    — Layer hierarchy and import rules
+│   └── layers.md                    — Layer hierarchy, import rules, DbAdminService, JobManager, UrlValidationCache
 ├── domains/
-│   ├── purl-resolution.md           — Core resolution capability
-│   └── web-ui.md                    — Browser interface (five pages, Vue SPA)
+│   ├── purl-resolution.md           — Core resolution capability (sync + async batch)
+│   └── web-ui.md                    — Browser interface (five pages, Vue SPA, Pinia stores)
 ├── contracts/
-│   └── api-contract.md              — HTTP API contract (including db-admin and settings endpoints)
+│   └── api-contract.md              — HTTP API contract (including db-admin, settings, and jobs endpoints)
 └── decisions/
     ├── _template.md                              — ADR template
     ├── 0001-purl2repo-as-primary-resolver.md     — purl2repo as primary resolver
