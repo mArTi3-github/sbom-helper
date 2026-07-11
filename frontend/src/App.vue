@@ -11,7 +11,7 @@ const { t } = useI18n()
       <router-view />
     </main>
     <footer class="app-footer">
-      {{ t('common.poweredByPrefix') }}<a href="https://github.com/mArTi3-github/sbom-helper" target="_blank" rel="noopener noreferrer">sbom-helper</a>
+      {{ t('common.githubPrefix') }}<a href="https://github.com/mArTi3-github/sbom-helper" target="_blank" rel="noopener noreferrer">sbom-helper</a>
     </footer>
   </div>
 </template>

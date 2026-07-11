@@ -10,8 +10,17 @@ const routes = [
 
 <template>
   <nav class="nav-bar">
-    <img src="/logo_64x64.png" alt="" class="nav-icon" />
+    <router-link to="/" class="nav-logo-link">
+      <img src="/logo_64x64.png" alt="" class="nav-icon" />
+    </router-link>
     <div class="nav-links">
+      <router-link
+        to="/"
+        class="nav-link"
+        active-class="nav-link--active"
+      >
+        {{ t('nav.purlResolver') }}
+      </router-link>
       <router-link
         v-for="route in routes"
         :key="route.path"
@@ -83,11 +92,22 @@ const routes = [
   color: var(--color-muted-light);
 }
 
+.nav-logo-link {
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+
 .nav-icon {
   width: 32px;
   height: 32px;
   margin-right: 0.25rem;
   flex-shrink: 0;
   opacity: 0.75;
+  transition: opacity 0.15s;
+}
+
+.nav-logo-link:hover .nav-icon {
+  opacity: 1;
 }
 </style>
