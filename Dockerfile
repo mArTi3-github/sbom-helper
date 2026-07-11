@@ -25,7 +25,8 @@ RUN pip install --no-cache-dir -e ".[dev]" && \
 
 COPY scripts/ ./scripts/
 COPY --from=frontend-build /frontend/dist/ /app/frontend/dist/
-RUN bash scripts/generate-ssl-cert.sh && \
+RUN chmod -R a+r /app/frontend/dist/ && \
+    bash scripts/generate-ssl-cert.sh && \
     chown -R app:app /app
 
 EXPOSE 8443
@@ -55,7 +56,8 @@ RUN pip install --no-cache-dir . && \
 
 COPY scripts/ ./scripts/
 COPY --from=frontend-build /frontend/dist/ /app/frontend/dist/
-RUN bash scripts/generate-ssl-cert.sh && \
+RUN chmod -R a+r /app/frontend/dist/ && \
+    bash scripts/generate-ssl-cert.sh && \
     chown -R app:app /app
 
 EXPOSE 8443

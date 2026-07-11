@@ -17,7 +17,7 @@
     "pageNotFound": "Page not found",
     "goHome": "Go to PURL Resolver",
     "noData": "No data",
-    "poweredBy": "Powered by sbom-helper"
+    "poweredByPrefix": "Powered by "
   },
   "nav": {
     "purlResolver": "PURL Resolver",

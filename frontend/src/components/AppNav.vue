@@ -2,7 +2,6 @@
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 const routes = [
-  { path: '/', nameKey: 'nav.purlResolver' },
   { path: '/sbom-updater', nameKey: 'nav.sbomUpdater' },
   { path: '/db-admin', nameKey: 'nav.dbAdmin' },
   { path: '/images-list-converter', nameKey: 'nav.imagesListConverter' },
@@ -11,6 +10,7 @@ const routes = [
 
 <template>
   <nav class="nav-bar">
+    <img src="/logo_64x64.png" alt="" class="nav-icon" />
     <div class="nav-links">
       <router-link
         v-for="route in routes"
@@ -36,7 +36,7 @@ const routes = [
 .nav-bar {
   display: flex;
   align-items: center;
-  padding: 0 2rem;
+  padding: 0 2rem 0 0.75rem;
   height: 48px;
   background: var(--color-body-bg);
   border-bottom: 1px solid var(--color-card-border);
@@ -81,5 +81,13 @@ const routes = [
 .nav-link--settings {
   margin-left: auto;
   color: var(--color-muted-light);
+}
+
+.nav-icon {
+  width: 32px;
+  height: 32px;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+  opacity: 0.75;
 }
 </style>

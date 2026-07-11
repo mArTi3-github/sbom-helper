@@ -17,7 +17,7 @@
     "pageNotFound": "Страница не найдена",
     "goHome": "На главную (PURL Resolver)",
     "noData": "Нет данных",
-    "poweredBy": "Работает на sbom-helper"
+    "poweredByPrefix": "Работает на "
   },
   "nav": {
     "purlResolver": "PURL Resolver",
