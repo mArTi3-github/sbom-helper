@@ -49,12 +49,6 @@ class PostgresCache(Storage):
         return PurlRow(
             purl=row["purl"],
             repository_url=row["repository_url"],
-            repository_type=row.get("repository_type"),
-            repository_kind=row.get("repository_kind"),
-            confidence=row.get("confidence"),
-            evidence=self._decode_jsonb(row.get("evidence")),
-            warnings=self._decode_jsonb(row.get("warnings")),
-            version_reference=row.get("version_reference"),
             resolver=row.get("resolver", ""),
             resolved_at=str(row.get("resolved_at", "")),
         ).to_resolve_response()
@@ -64,34 +58,21 @@ class PostgresCache(Storage):
             await conn.execute(
                 """
                 INSERT INTO resolved_purls (
-                    purl, repository_url, repository_type, repository_kind,
-                    confidence, evidence, warnings, version_reference, resolver
-                ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
+                    purl, repository_url, resolver
+                ) VALUES ($1, $2, $3)
                 ON CONFLICT (purl) DO UPDATE SET
                     repository_url = EXCLUDED.repository_url,
-                    repository_type = EXCLUDED.repository_type,
-                    repository_kind = EXCLUDED.repository_kind,
-                    confidence = EXCLUDED.confidence,
-                    evidence = EXCLUDED.evidence,
-                    warnings = EXCLUDED.warnings,
-                    version_reference = EXCLUDED.version_reference,
                     resolver = EXCLUDED.resolver,
                     resolved_at = NOW()
                 """,
                 result.purl,
                 result.repository_url,
-                result.repository_type,
-                result.repository_kind,
-                result.confidence,
-                json.dumps(result.evidence),
-                json.dumps(result.warnings),
-                result.version_reference,
                 result.resolver or "purl2repo",
             )
 
 
     _SORTABLE_COLUMNS: frozenset[str] = frozenset({
-        "purl", "repository_url", "resolver", "confidence", "resolved_at",
+        "purl", "repository_url", "resolver", "resolved_at",
     })
 
     @staticmethod
@@ -110,10 +91,6 @@ class PostgresCache(Storage):
         if filters.resolver is not None:
             clauses.append(f"resolver = ${idx}")
             params.append(filters.resolver)
-            idx += 1
-        if filters.confidence is not None:
-            clauses.append(f"confidence = ${idx}")
-            params.append(filters.confidence)
             idx += 1
         if filters.date_from is not None:
             clauses.append(f"resolved_at >= ${idx}")
@@ -154,12 +131,6 @@ class PostgresCache(Storage):
             PurlRow(
                 purl=r["purl"],
                 repository_url=r["repository_url"],
-                repository_type=r.get("repository_type"),
-                repository_kind=r.get("repository_kind"),
-                confidence=r.get("confidence"),
-                evidence=self._decode_jsonb(r.get("evidence")),
-                warnings=self._decode_jsonb(r.get("warnings")),
-                version_reference=r.get("version_reference"),
                 resolver=r.get("resolver", "purl2repo"),
                 resolved_at=str(r["resolved_at"]),
             )
@@ -186,7 +157,8 @@ class PostgresCache(Storage):
                     return False
                 if old_purl == purl:
                     await conn.execute(
-                        "UPDATE resolved_purls SET repository_url = $1, resolved_at = NOW() WHERE purl = $2",
+                        "UPDATE resolved_purls SET repository_url = $1,"
+                        " resolved_at = NOW() WHERE purl = $2",
                         repository_url, old_purl,
                     )
                 else:
@@ -195,17 +167,10 @@ class PostgresCache(Storage):
                     )
                     await conn.execute(
                         """INSERT INTO resolved_purls (
-                            purl, repository_url, repository_type, repository_kind,
-                            confidence, evidence, warnings, version_reference, resolver
-                        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)""",
+                            purl, repository_url, resolver
+                        ) VALUES ($1, $2, $3)""",
                         purl,
                         repository_url,
-                        existing.get("repository_type"),
-                        existing.get("repository_kind"),
-                        existing.get("confidence"),
-                        json.dumps(self._decode_jsonb(existing.get("evidence"))),
-                        json.dumps(self._decode_jsonb(existing.get("warnings"))),
-                        existing.get("version_reference"),
                         existing.get("resolver", "purl2repo"),
                     )
                 return True
@@ -234,27 +199,14 @@ class PostgresCache(Storage):
 
                     await conn.execute(
                         """INSERT INTO resolved_purls (
-                            purl, repository_url, repository_type, repository_kind,
-                            confidence, evidence, warnings, version_reference, resolver
-                        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
+                            purl, repository_url, resolver
+                        ) VALUES ($1, $2, $3)
                         ON CONFLICT (purl) DO UPDATE SET
                             repository_url = EXCLUDED.repository_url,
-                            repository_type = EXCLUDED.repository_type,
-                            repository_kind = EXCLUDED.repository_kind,
-                            confidence = EXCLUDED.confidence,
-                            evidence = EXCLUDED.evidence,
-                            warnings = EXCLUDED.warnings,
-                            version_reference = EXCLUDED.version_reference,
                             resolver = EXCLUDED.resolver,
                             resolved_at = NOW()""",
                         row.purl,
                         row.repository_url,
-                        row.repository_type,
-                        row.repository_kind,
-                        row.confidence,
-                        json.dumps(row.evidence),
-                        json.dumps(row.warnings),
-                        row.version_reference,
                         row.resolver,
                     )
                     upserted += 1
