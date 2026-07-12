@@ -39,6 +39,7 @@ def manager(mock_repo, mock_resolution_service):
     mgr._queue.put = AsyncMock()
     mgr._queue.get = AsyncMock()
     mgr._queue.task_done = MagicMock()
+    mgr._running_tasks = {}
     mgr._worker_task = None
     mgr._cleanup_task = None
     return mgr
@@ -107,9 +108,11 @@ class TestJobManager:
 
         result = await manager.cancel_job("j1")
         assert result is True
-        manager._repo.update_status.assert_called_once_with(
-            "j1", "running", cancel_requested=1
-        )
+        manager._repo.update_status.assert_called_once()
+        args, kwargs = manager._repo.update_status.call_args
+        assert args == ("j1", "cancelled")
+        assert kwargs.get("cancel_requested") == 1
+        assert "finished_at" in kwargs
 
     async def test_cancel_job_already_terminal(self, manager):
         for status in ("completed", "failed", "cancelled"):
