@@ -14,6 +14,7 @@
         <div class="setting-row">
           <div>
             <div class="setting-label">{{ t('settings.language') }}</div>
+            <div class="setting-desc">{{ t('settings.languageDesc') }}</div>
           </div>
           <select
             :value="locale"
@@ -433,28 +434,15 @@ async function onClearValidationCache() {
   }
 }
 
-async function setLanguage(e: Event) {
-  const lang = (e.target as HTMLSelectElement).value
-  try {
-    await store.save({ language: lang } as SettingsUpdate)
-    locale.value = lang
-    localStorage.setItem('locale', lang)
-    showToast(t('settings.savedToast'), false)
-  } catch (err) {
-    const apiErr = err as import('../api/client').ApiError
-    const msg = apiErr.error ? t('errors.' + apiErr.error, apiErr.data) : t('settings.errorMessages.loadFailed')
-    showToast(msg, true)
-  }
+function setLanguage(e: Event) {
+  const lang = (e.target as HTMLSelectElement).value as 'en' | 'ru'
+  locale.value = lang
+  localStorage.setItem('locale', lang)
 }
 
 onMounted(async () => {
   try {
     await store.load()
-    // Sync language from backend
-    if (store.language && store.language !== locale.value) {
-      locale.value = store.language
-      localStorage.setItem('locale', store.language)
-    }
   } catch {
     showToast(t('settings.errorMessages.loadFailed'), true)
   }
