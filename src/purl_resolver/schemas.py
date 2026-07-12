@@ -16,12 +16,7 @@ class ResolveRequest(BaseModel):
 class ResolveResponse(BaseModel):
     purl: str
     repository_url: str | None = None
-    repository_type: str | None = None
-    repository_kind: str | None = None
-    confidence: str | None = None
-    evidence: list[str] = []
     warnings: list[str] = []
-    version_reference: str | None = None
     resolver: str = ""
     found_by: str = ""
     resolved_at: str = ""
@@ -56,7 +51,6 @@ class PurlListParams(BaseModel):
     page_size: int = Field(50, ge=1, le=500)
     search: str | None = None
     resolver: str | None = None
-    confidence: str | None = None
     date_from: date | None = None
     date_to: date | None = None
     sort_by: str = "resolved_at"
