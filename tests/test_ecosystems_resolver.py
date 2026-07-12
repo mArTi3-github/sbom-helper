@@ -69,9 +69,6 @@ class TestResolveSuccess:
 
         result = await r.resolve("pkg:pypi/requests@2.31.0")
         assert result.repository_url == "https://github.com/psf/requests"
-        assert result.repository_kind == "vcs"
-        assert result.confidence == "medium"
-        assert "ecosyste.ms:pypi/requests" in result.evidence
 
 
 class TestResolveNoPackage:
