@@ -10,3 +10,4 @@ openspec/specs/
 .misc/addictional_materials/
 data/
 .misc/\[old]/
+docker-compose.override.yml
