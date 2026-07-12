@@ -141,12 +141,7 @@ class PurlResolutionService:
             response = ResolveResponse(
                 purl=purl_key,
                 repository_url=repo_url,
-                repository_type=resolution.repository_type,
-                repository_kind=resolution.repository_kind,
-                confidence=resolution.confidence,
-                evidence=list(resolution.evidence),
                 warnings=list(resolution.warnings),
-                version_reference=resolution.version_reference,
                 resolver=r.name,
                 found_by="resolver",
             )
@@ -206,7 +201,6 @@ class PurlResolutionService:
                 await self._storage.store(ResolveResponse(
                     purl=purl_key,
                     repository_url=vcs_refs[0]["url"],
-                    evidence=["from SBOM externalReferences"],
                     resolver=resolver,
                 ))
 
