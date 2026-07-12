@@ -23,16 +23,10 @@ def populated_storage(storage):
         ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
         ),
         ResolveResponse(
             purl="pkg:npm/express",
             repository_url="https://github.com/expressjs/express",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="low",
         ),
     ]
     for e in entries:

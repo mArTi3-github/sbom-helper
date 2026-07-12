@@ -89,12 +89,6 @@ def resolver():
     r.name = "test_resolver"
     r.resolve = AsyncMock(return_value=AsyncMock(
         repository_url="https://github.com/new/repo",
-        repository_type="git",
-        repository_kind="github",
-        confidence="high",
-        evidence=["test"],
-        warnings=[],
-        version_reference=None,
     ))
     return r
 
@@ -261,23 +255,11 @@ class TestFreshResolverValidation:
         first.name = "first_resolver"
         first.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/not-found/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="low",
-            evidence=["ecosyste.ms:npm/archy"],
-            warnings=[],
-            version_reference=None,
         ))
         second = AsyncMock()
         second.name = "second_resolver"
         second.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/valid/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="high",
-            evidence=["libraries.io:npm/archy"],
-            warnings=[],
-            version_reference=None,
         ))
         mock_storage.lookup = AsyncMock(return_value=None)
 
@@ -305,12 +287,6 @@ class TestFreshResolverValidation:
         resolver.name = "test_resolver"
         resolver.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/valid/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="high",
-            evidence=["test"],
-            warnings=[],
-            version_reference=None,
         ))
 
         result = await PurlResolutionService(
@@ -330,12 +306,6 @@ class TestFreshResolverValidation:
         resolver.name = "test_resolver"
         resolver.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/some/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="high",
-            evidence=["test"],
-            warnings=[],
-            version_reference=None,
         ))
 
         mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.NETWORK_ERROR)
@@ -358,12 +328,6 @@ class TestFreshResolverValidation:
         resolver.name = "test_resolver"
         resolver.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/any/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="high",
-            evidence=["test"],
-            warnings=[],
-            version_reference=None,
         ))
 
         result = await PurlResolutionService(
@@ -380,15 +344,11 @@ class TestFreshResolverValidation:
         first.name = "first"
         first.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/gone/repo",
-            repository_type="git", repository_kind="vcs",
-            confidence="low", evidence=["ecosyste.ms"], warnings=[], version_reference=None,
         ))
         second = AsyncMock()
         second.name = "second"
         second.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/gone2/repo",
-            repository_type="git", repository_kind="vcs",
-            confidence="low", evidence=["libraries.io"], warnings=[], version_reference=None,
         ))
 
         mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.INVALID)
@@ -410,12 +370,6 @@ class TestFreshResolverValidation:
         resolver.name = "test_resolver"
         resolver.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://old-url.com/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="high",
-            evidence=["test"],
-            warnings=[],
-            version_reference=None,
         ))
 
         mock_validation_service.validate_url.return_value = _url_output(
@@ -464,12 +418,6 @@ class TestValidationServiceDelegation:
         resolver.name = "test_resolver"
         resolver.resolve = AsyncMock(return_value=AsyncMock(
             repository_url="https://github.com/valid/repo",
-            repository_type="git",
-            repository_kind="vcs",
-            confidence="high",
-            evidence=["test"],
-            warnings=[],
-            version_reference=None,
         ))
 
         result = await PurlResolutionService(

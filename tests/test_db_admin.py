@@ -25,29 +25,14 @@ def populated_storage(storage):
         ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
-            evidence=["homepage from PyPI"],
-            warnings=[],
         ),
         ResolveResponse(
             purl="pkg:npm/express",
             repository_url="https://github.com/expressjs/express",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="low",
-            evidence=[],
-            warnings=["registry mismatch"],
         ),
         ResolveResponse(
             purl="pkg:pypi/flask",
             repository_url="https://github.com/pallets/flask",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
-            evidence=["homepage from PyPI"],
-            warnings=[],
         ),
     ]
     for e in entries:
@@ -94,17 +79,10 @@ class TestAdminListPurls:
         assert data["total"] == 1
         assert data["rows"][0]["purl"] == "pkg:pypi/requests"
 
-    def test_list_confidence_filter(self, populated_storage, admin_client):
-        response = admin_client.get("/api/v1/db/purls?confidence=high")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] == 2
-
     def test_list_exports_all_columns(self, populated_storage, admin_client):
         response = admin_client.get("/api/v1/db/purls")
         row = response.json()["rows"][0]
-        for col in ("purl", "repository_url", "repository_type", "repository_kind",
-                     "confidence", "evidence", "warnings", "version_reference", "resolver"):
+        for col in ("purl", "repository_url", "resolver"):
             assert col in row
 
 
@@ -246,8 +224,8 @@ class TestAdminImport:
 
     def test_import_optional_columns(self, storage, admin_client):
         csv_content = (
-            "purl,repository_url,confidence,resolver\n"
-            "pkg:pypi/pkg1,https://github.com/owner/pkg1,high,custom-resolver\n"
+            "purl,repository_url,resolver\n"
+            "pkg:pypi/pkg1,https://github.com/owner/pkg1,custom-resolver\n"
         )
         response = admin_client.post(
             "/api/v1/db/import",
@@ -343,7 +321,7 @@ class TestAdminImportBom:
         assert "pkg:pypi/trailing" in storage._store
 
     def test_import_commas_in_values(self, storage, admin_client):
-        csv_content = 'purl,repository_url,evidence,warnings\npkg:pypi/semi,https://github.com/semi/test,"[""value,with,commas""]","[""warn,1""]"\n'
+        csv_content = "purl,repository_url\npkg:pypi/semi,https://github.com/semi/test\n"
         response = admin_client.post(
             "/api/v1/db/import",
             files={"file": ("test.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
