@@ -91,9 +91,6 @@ class EcosystemsResolver(Resolver):
         if not repo_url:
             return Resolution(purl=purl, warnings=[f"No repository URL found on ecosyste.ms for {purl}"])
 
-        ecosystem = package.get("ecosystem", "unknown")
-        name = package.get("name", "unknown")
-
         return Resolution(
             purl=purl,
             repository_url=repo_url,
