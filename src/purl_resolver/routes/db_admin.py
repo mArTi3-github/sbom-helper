@@ -15,6 +15,13 @@ from ..schemas import (
 router = APIRouter()
 
 
+@router.get("/api/v1/db/resolvers")
+async def list_resolvers_endpoint(request: Request):
+    service: DbAdminService = request.app.state.db_admin_service
+    resolvers = await service.list_resolvers()
+    return JSONResponse(status_code=200, content=resolvers)
+
+
 @router.get("/api/v1/db/purls")
 async def list_purls_endpoint(request: Request, params: PurlListParams = Query()):
     service: DbAdminService = request.app.state.db_admin_service
