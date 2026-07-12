@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppNav from './components/AppNav.vue'
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+watch(locale, (lang) => {
+  document.documentElement.lang = lang
+}, { immediate: true })
 </script>
 
 <template>
