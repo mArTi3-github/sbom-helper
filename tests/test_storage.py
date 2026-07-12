@@ -26,9 +26,6 @@ class TestInMemoryCache:
         response = ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
         )
         await storage.store(response)
         cached = await storage.lookup("pkg:pypi/requests")
@@ -69,7 +66,6 @@ class TestResolvePurl:
         cached_response = ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
-            confidence="high",
         )
         await storage.store(cached_response)
 
@@ -89,7 +85,6 @@ class TestResolvePurl:
         cached_response = ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
-            confidence="high",
         )
         await storage.store(cached_response)
 
@@ -109,10 +104,6 @@ class TestResolvePurl:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                repository_type="github",
-                repository_kind="source_code",
-                confidence="high",
-                evidence=["homepage from PyPI metadata"],
             )
         )
 
@@ -144,9 +135,6 @@ class TestResolvePurl:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                repository_type="github",
-                repository_kind="source_code",
-                confidence="high",
             )
         )
 
@@ -172,9 +160,6 @@ class TestResolvePurl:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                repository_type="github",
-                repository_kind="source_code",
-                confidence="high",
             )
         )
 

@@ -24,10 +24,6 @@ def client() -> TestClient:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                repository_type="github",
-                repository_kind="source_code",
-                confidence="high",
-                evidence=["verified"],
             ),
         ),
     ]
@@ -59,8 +55,6 @@ class TestResolve:
         data = response.json()
         assert data["repository_url"] == "https://github.com/psf/requests"
         assert data["purl"] == "pkg:pypi/requests"
-        assert data["confidence"] == "high"
-        assert isinstance(data["evidence"], list)
         assert isinstance(data["warnings"], list)
 
     def test_invalid_purl_returns_400(self, client: TestClient) -> None:
