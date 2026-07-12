@@ -6,8 +6,6 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-REPOSITORY_KINDS: frozenset[str] = frozenset({"vcs", "source-distribution"})
-
 
 class ResolveRequest(BaseModel):
     purl: str = Field(..., min_length=1, description="Package URL to resolve")
