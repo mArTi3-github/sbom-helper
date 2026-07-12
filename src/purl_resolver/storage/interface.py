@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 from ..schemas import ResolveResponse
@@ -11,7 +11,6 @@ from ..schemas import ResolveResponse
 class PurlFilters:
     search: str | None = None
     resolver: str | None = None
-    confidence: str | None = None
     date_from: date | None = None
     date_to: date | None = None
 
@@ -20,12 +19,6 @@ class PurlFilters:
 class PurlRow:
     purl: str
     repository_url: str
-    repository_type: str | None
-    repository_kind: str | None
-    confidence: str | None
-    evidence: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    version_reference: str | None = None
     resolver: str = ""
     resolved_at: str = ""
 
@@ -34,12 +27,6 @@ class PurlRow:
         return cls(
             purl=r.purl,
             repository_url=r.repository_url,
-            repository_type=r.repository_type,
-            repository_kind=r.repository_kind,
-            confidence=r.confidence,
-            evidence=r.evidence,
-            warnings=r.warnings,
-            version_reference=r.version_reference,
             resolver=r.resolver,
             resolved_at=r.resolved_at or "",
         )
@@ -48,12 +35,6 @@ class PurlRow:
         return ResolveResponse(
             purl=self.purl,
             repository_url=self.repository_url,
-            repository_type=self.repository_type,
-            repository_kind=self.repository_kind,
-            confidence=self.confidence,
-            evidence=self.evidence,
-            warnings=self.warnings,
-            version_reference=self.version_reference,
             resolver=self.resolver,
             resolved_at=self.resolved_at,
         )
@@ -63,12 +44,6 @@ class PurlRow:
 class UpsertRow:
     purl: str
     repository_url: str
-    repository_type: str | None = None
-    repository_kind: str | None = None
-    confidence: str | None = None
-    evidence: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    version_reference: str | None = None
     resolver: str = "purl2repo"
 
 
