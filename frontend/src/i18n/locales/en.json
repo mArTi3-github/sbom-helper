@@ -154,7 +154,8 @@
     "language": "Language",
     "languageEn": "English",
     "languageRu": "Russian",
-    "languageDesc": "Interface language — stored in your browser",
+    "browserSection": "Browser",
+    "languageDesc": "Interface language",
     "savedToast": "Settings saved",
     "saveFailedToast": "Failed to save: {message}",
     "errorMessages": {

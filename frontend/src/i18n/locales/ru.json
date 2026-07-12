@@ -154,7 +154,8 @@
     "language": "Язык",
     "languageEn": "Английский",
     "languageRu": "Русский",
-    "languageDesc": "Язык веб-интерфейса — сохраняется на стороне браузера",
+    "browserSection": "Браузер",
+    "languageDesc": "Язык веб-интерфейса",
     "savedToast": "Настройки сохранены",
     "saveFailedToast": "Ошибка сохранения: {message}",
     "errorMessages": {

@@ -10,7 +10,7 @@
 
     <template v-if="!loading">
       <div class="card">
-        <div class="card-title">{{ t('settings.language') }}</div>
+        <div class="card-title">{{ t('settings.browserSection') }}</div>
         <div class="setting-row">
           <div>
             <div class="setting-label">{{ t('settings.language') }}</div>
