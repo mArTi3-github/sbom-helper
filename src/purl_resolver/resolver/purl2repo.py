@@ -71,12 +71,5 @@ class Purl2RepoResolver(Resolver):
         return Resolution(
             purl=purl,
             repository_url=result.repository_url,
-            repository_type=result.repository_type,
-            repository_kind=result.repository_kind,
-            confidence=result.confidence,
-            evidence=list(result.evidence),
             warnings=list(result.warnings),
-            version_reference=result.version_reference.url
-            if result.version_reference
-            else None,
         )

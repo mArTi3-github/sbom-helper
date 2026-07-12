@@ -90,10 +90,6 @@ class LibrariesIoResolver(Resolver):
         return Resolution(
             purl=purl,
             repository_url=repo_url,
-            repository_type=None,
-            repository_kind="vcs",
-            confidence="medium",
-            evidence=[f"libraries.io:{platform}/{name}"],
         )
 
     async def _rate_limit_wait(self) -> None:
