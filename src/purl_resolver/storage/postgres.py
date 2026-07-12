@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 
 import asyncpg
@@ -28,16 +27,6 @@ class PostgresCache(Storage):
 
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
-
-    @staticmethod
-    def _decode_jsonb(val: object) -> list[str]:
-        if val is None:
-            return []
-        if isinstance(val, str):
-            return json.loads(val)
-        if isinstance(val, list):
-            return val
-        return []
 
     async def lookup(self, purl: str) -> ResolveResponse | None:
         async with self._pool.acquire() as conn:
