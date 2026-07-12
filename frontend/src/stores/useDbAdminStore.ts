@@ -8,7 +8,6 @@ import { ApiError } from '../api/client'
 export const useDbAdminStore = defineStore('dbAdmin', () => {
   const search = ref('')
   const resolver = ref('')
-  const confidence = ref('')
   const dateFrom = ref('')
   const dateTo = ref('')
 
@@ -48,7 +47,6 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
         page_size: pageSize.value,
         search: search.value || undefined,
         resolver: resolver.value || undefined,
-        confidence: confidence.value || undefined,
         date_from: dateFrom.value || undefined,
         date_to: dateTo.value || undefined,
         sort_by: sortBy.value,
@@ -78,7 +76,6 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
   function resetFilters() {
     search.value = ''
     resolver.value = ''
-    confidence.value = ''
     dateFrom.value = ''
     dateTo.value = ''
     sortBy.value = 'resolved_at'
@@ -239,7 +236,7 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
   }
 
   return {
-    search, resolver, confidence, dateFrom, dateTo,
+    search, resolver, dateFrom, dateTo,
     sortBy, sortOrder,
     page, pageSize, total, totalPages,
     rows, selectedPurls, allSelected, someSelected,

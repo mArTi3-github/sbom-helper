@@ -20,12 +20,6 @@
             <th class="col-sortable" @click="store.setSort('purl')">{{ t('dbAdmin.purl') }}<span v-if="store.sortBy === 'purl'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
             <th class="col-sortable" @click="store.setSort('repository_url')">{{ t('dbAdmin.repositoryUrl') }}<span v-if="store.sortBy === 'repository_url'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
             <th class="col-sortable" @click="store.setSort('resolver')">{{ t('dbAdmin.resolver') }}<span v-if="store.sortBy === 'resolver'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('repository_type')">{{ t('dbAdmin.type') }}<span v-if="store.sortBy === 'repository_type'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('repository_kind')">{{ t('dbAdmin.kind') }}<span v-if="store.sortBy === 'repository_kind'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('confidence')">{{ t('dbAdmin.confidence') }}<span v-if="store.sortBy === 'confidence'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th class="col-sortable" @click="store.setSort('version_reference')">{{ t('dbAdmin.versionRef') }}<span v-if="store.sortBy === 'version_reference'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
-            <th>{{ t('dbAdmin.evidence') }}</th>
-            <th>{{ t('dbAdmin.warnings') }}</th>
             <th class="col-sortable" @click="store.setSort('resolved_at')">{{ t('dbAdmin.resolvedAt') }}<span v-if="store.sortBy === 'resolved_at'" class="sort-indicator">{{ store.sortOrder === 'asc' ? '\u25B2' : '\u25BC' }}</span></th>
             <th>{{ t('dbAdmin.actions') }}</th>
           </tr>
@@ -47,19 +41,13 @@
               <span v-else class="null-value">\u2014</span>
             </td>
             <td>{{ row.resolver }}</td>
-            <td>{{ row.repository_type || '\u2014' }}</td>
-            <td>{{ row.repository_kind || '\u2014' }}</td>
-            <td><span v-if="row.confidence" :class="['badge', 'badge-' + row.confidence]">{{ row.confidence }}</span><span v-else class="null-value">\u2014</span></td>
-            <td>{{ row.version_reference || '\u2014' }}</td>
-            <td :title="joinArray(row.evidence)">{{ truncate(joinArray(row.evidence)) }}</td>
-            <td :title="joinArray(row.warnings)">{{ truncate(joinArray(row.warnings)) }}</td>
             <td class="cell-nowrap">{{ formatDate(row.resolved_at) }}</td>
             <td class="col-actions">
               <button class="btn btn-sm btn-secondary" @click="store.startEdit(row)">{{ t('dbAdmin.edit') }}</button>
               <button class="btn btn-sm btn-danger" @click="handleDeleteRow(row.purl)">{{ t('dbAdmin.del') }}</button>
             </td>
           </tr>
-          <tr v-if="store.rows.length === 0"><td colspan="12" class="empty-row">{{ t('dbAdmin.noRecords') }}</td></tr>
+          <tr v-if="store.rows.length === 0"><td colspan="7" class="empty-row">{{ t('dbAdmin.noRecords') }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -107,15 +95,6 @@ const visiblePages = computed(() => {
   pages.push(tp)
   return pages
 })
-
-function joinArray(arr: string[] | null | undefined): string {
-  if (!arr || arr.length === 0) return '\u2014'
-  return arr.join('; ')
-}
-
-function truncate(val: string, max = 80): string {
-  return val.length <= max ? val : val.substring(0, max) + '...'
-}
 
 function formatDate(iso: string): string {
   if (!iso) return '\u2014'

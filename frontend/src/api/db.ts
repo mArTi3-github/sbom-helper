@@ -6,7 +6,6 @@ export interface PurlListParams {
   page_size?: number
   search?: string
   resolver?: string
-  confidence?: string
   date_from?: string
   date_to?: string
   sort_by?: string
@@ -19,7 +18,6 @@ function buildPurlQuery(params: PurlListParams): URLSearchParams {
   if (params.page_size !== undefined) query.set('page_size', String(params.page_size))
   if (params.search) query.set('search', params.search)
   if (params.resolver) query.set('resolver', params.resolver)
-  if (params.confidence) query.set('confidence', params.confidence)
   if (params.date_from) query.set('date_from', params.date_from)
   if (params.date_to) query.set('date_to', params.date_to)
   if (params.sort_by) query.set('sort_by', params.sort_by)

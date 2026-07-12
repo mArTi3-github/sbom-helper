@@ -5,12 +5,7 @@ export interface ResolveRequest {
 export interface ResolveResponse {
   purl: string
   repository_url: string | null
-  repository_type: string | null
-  repository_kind: string | null
-  confidence: string | null
-  evidence: string[]
   warnings: string[]
-  version_reference: string | null
   resolver: string
   found_by: string
   resolved_at: string

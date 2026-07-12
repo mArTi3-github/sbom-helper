@@ -24,9 +24,6 @@
           <a v-if="result.repository_url" :href="result.repository_url" target="_blank">{{ result.repository_url }}</a>
           <span v-else>{{ t('purlResolver.noRepoUrl') }}</span>
         </div>
-        <div class="meta">
-          <span :class="['badge', confidenceClass]">{{ result.confidence || t('purlResolver.unknown') }}</span>
-        </div>
         <button
           v-if="hasDetails"
           class="details-toggle"
@@ -36,34 +33,12 @@
         </button>
         <div v-if="showDetails && hasDetails" class="details show">
           <dl>
-            <template v-if="result.repository_type">
-              <dt>{{ t('purlResolver.repoType') }}</dt>
-              <dd>{{ result.repository_type }}</dd>
-            </template>
-            <template v-if="result.repository_kind">
-              <dt>{{ t('purlResolver.repoKind') }}</dt>
-              <dd>{{ result.repository_kind }}</dd>
-            </template>
-            <template v-if="result.evidence && result.evidence.length">
-              <dt>{{ t('purlResolver.evidence') }}</dt>
-              <dd>
-                <ul>
-                  <li v-for="(item, i) in result.evidence" :key="i">{{ item }}</li>
-                </ul>
-              </dd>
-            </template>
             <template v-if="result.warnings && result.warnings.length">
               <dt class="warning">{{ t('purlResolver.warnings') }}</dt>
               <dd>
                 <ul>
                   <li v-for="(item, i) in result.warnings" :key="i" class="warning">{{ item }}</li>
                 </ul>
-              </dd>
-            </template>
-            <template v-if="result.version_reference">
-              <dt>{{ t('purlResolver.versionRef') }}</dt>
-              <dd>
-                <a :href="result.version_reference" target="_blank">{{ result.version_reference }}</a>
               </dd>
             </template>
             <template v-if="result.found_by">
@@ -98,15 +73,10 @@ const result = ref<ResolveResponse | null>(null)
 const error = ref<string | null>(null)
 const showDetails = ref(false)
 
-const confidenceClass = computed(() => {
-  if (!result.value?.confidence) return 'badge-low'
-  return 'badge-' + result.value.confidence
-})
-
 const hasDetails = computed(() => {
   const r = result.value
   if (!r) return false
-  return !!(r.repository_type || r.repository_kind || (r.evidence && r.evidence.length) || (r.warnings && r.warnings.length) || r.version_reference || r.found_by || r.resolver)
+  return !!((r.warnings && r.warnings.length) || r.found_by || r.resolver)
 })
 
 async function handleResolve() {

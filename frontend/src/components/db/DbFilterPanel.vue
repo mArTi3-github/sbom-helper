@@ -13,15 +13,6 @@
         </select>
       </div>
       <div class="filter-group">
-        <label for="confidence">{{ t('dbAdmin.confidence') }}</label>
-        <select id="confidence" v-model="store.confidence">
-          <option value="">{{ t('dbAdmin.any') }}</option>
-          <option value="high">high</option>
-          <option value="medium">medium</option>
-          <option value="low">low</option>
-        </select>
-      </div>
-      <div class="filter-group">
         <label for="date-from">{{ t('dbAdmin.dateFrom') }}</label>
         <input id="date-from" v-model="store.dateFrom" type="date">
       </div>

@@ -13,12 +13,7 @@ function makeRow(purl: string, overrides: Partial<ResolveResponse> = {}): Resolv
   return {
     purl,
     repository_url: `https://github.com/${purl.split('/')[1]}`,
-    repository_type: 'github',
-    repository_kind: 'source_code',
-    confidence: 'high',
-    evidence: [],
     warnings: [],
-    version_reference: null,
     resolver: 'purl2repo',
     found_by: 'purl2repo',
     resolved_at: '2026-06-25T10:00:00',
@@ -28,8 +23,8 @@ function makeRow(purl: string, overrides: Partial<ResolveResponse> = {}): Resolv
 
 const rows = [
   makeRow('pkg:pypi/requests@2.31.0'),
-  makeRow('pkg:pypi/flask@2.3.0', { confidence: 'medium' }),
-  makeRow('pkg:pypi/numpy@1.25.0', { confidence: 'low', repository_url: null }),
+  makeRow('pkg:pypi/flask@2.3.0'),
+  makeRow('pkg:pypi/numpy@1.25.0', { repository_url: null }),
 ]
 
 const defaultListResponse: PurlListResponse = { rows, total: 3, page: 1, page_size: 50 }
@@ -101,15 +96,12 @@ describe('DatabaseAdmin.vue', () => {
     await flushPromises()
     const fp = wrapper.findComponent(DbFilterPanel)
     await fp.find('#search').setValue('requests')
-    await fp.find('#confidence').setValue('high')
     await fp.findAll('.filter-actions button').find((b) => b.text() === 'Reset')!.trigger('click')
     await flushPromises()
 
     expect((fp.find('#search').element as HTMLInputElement).value).toBe('')
-    expect((fp.find('#confidence').element as HTMLSelectElement).value).toBe('')
     const params = listPurlsMock.mock.calls[listPurlsMock.mock.calls.length - 1][0] as Record<string, unknown>
     expect(params.search).toBeUndefined()
-    expect(params.confidence).toBeUndefined()
     expect(params.sort_by).toBe('resolved_at')
     expect(params.sort_order).toBe('desc')
   })

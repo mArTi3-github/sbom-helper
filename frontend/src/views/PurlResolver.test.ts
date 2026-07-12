@@ -8,12 +8,7 @@ import type { ResolveResponse } from '../types/api'
 const successResponse: ResolveResponse = {
   purl: 'pkg:pypi/requests@2.31.0',
   repository_url: 'https://github.com/psf/requests',
-  repository_type: 'github',
-  repository_kind: 'source_code',
-  confidence: 'high',
-  evidence: ['homepage', 'description'],
   warnings: [],
-  version_reference: 'https://github.com/psf/requests/tree/v2.31.0',
   resolver: 'purl2repo',
   found_by: 'purl2repo',
   resolved_at: '2026-06-25T10:00:00',
@@ -82,10 +77,10 @@ describe('PurlResolver.vue', () => {
     await toggle.trigger('click')
     expect(wrapper.find('.details').exists()).toBe(true)
     const detailsText = wrapper.find('.details').text()
-    expect(detailsText).toContain('Repository Type')
-    expect(detailsText).toContain('github')
-    expect(detailsText).toContain('Evidence')
-    expect(detailsText).toContain('homepage')
+    expect(detailsText).toContain('Found by')
+    expect(detailsText).toContain('purl2repo')
+    expect(detailsText).toContain('Resolver')
+    expect(detailsText).toContain('purl2repo')
 
     await toggle.trigger('click')
     expect(wrapper.find('.details').exists()).toBe(false)
@@ -118,12 +113,6 @@ describe('PurlResolver.vue', () => {
     resolvePurlMock.mockResolvedValueOnce({
       ...successResponse,
       repository_url: null,
-      confidence: null,
-      repository_type: null,
-      repository_kind: null,
-      evidence: [],
-      warnings: [],
-      version_reference: null,
     })
     const wrapper = mountResolver()
     await flushPromises()
