@@ -49,6 +49,22 @@ class TestInMemoryCache:
         assert cached.repository_url == "https://github.com/new/example"
 
     @pytest.mark.asyncio
+    async def test_list_resolvers(self, storage: InMemoryCache) -> None:
+        r1 = ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a", resolver="purl2repo")
+        r2 = ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b", resolver="import-csv")
+        r3 = ResolveResponse(purl="pkg:pypi/c", repository_url="https://example.com/c", resolver="purl2repo")
+        await storage.store(r1)
+        await storage.store(r2)
+        await storage.store(r3)
+        result = await storage.list_resolvers()
+        assert result == ["import-csv", "purl2repo"]
+
+    @pytest.mark.asyncio
+    async def test_list_resolvers_empty(self, storage: InMemoryCache) -> None:
+        result = await storage.list_resolvers()
+        assert result == []
+
+    @pytest.mark.asyncio
     async def test_clear_removes_all(self, storage: InMemoryCache) -> None:
         response = ResolveResponse(
             purl="pkg:pypi/requests",

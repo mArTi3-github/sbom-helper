@@ -133,6 +133,25 @@ class TestDbAdminServiceImport:
         assert result.skipped == 1
 
 
+class TestDbAdminServiceListResolvers:
+    @pytest.mark.asyncio
+    async def test_list_resolvers(self, populated_storage, service):
+        result = await service.list_resolvers()
+        assert result == []  # populated_storage entries have no resolver set, so default ""
+
+    @pytest.mark.asyncio
+    async def test_list_resolvers_with_data(self, storage, service):
+        entries = [
+            ResolveResponse(purl="pkg:pypi/a", repository_url="https://a.com", resolver="purl2repo"),
+            ResolveResponse(purl="pkg:pypi/b", repository_url="https://b.com", resolver="import-csv"),
+        ]
+        for e in entries:
+            storage._store[e.purl] = e
+        result = await service.list_resolvers()
+        assert "purl2repo" in result
+        assert "import-csv" in result
+
+
 class TestDbAdminServiceExport:
     @pytest.mark.asyncio
     async def test_export_selected_empty(self, service):

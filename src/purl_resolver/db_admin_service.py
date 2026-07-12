@@ -71,6 +71,9 @@ class DbAdminService:
     async def delete_purls(self, purls: list[str]) -> int:
         return await self._storage.delete_purls(purls)
 
+    async def list_resolvers(self) -> list[str]:
+        return await self._storage.list_resolvers()
+
     async def import_csv(self, text: str, strategy: ImportStrategy) -> ImportResponse:
         rows, errors = parse_csv_import(text)
         if not rows and errors:

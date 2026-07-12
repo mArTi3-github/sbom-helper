@@ -98,6 +98,13 @@ class InMemoryCache(Storage):
                 deleted += 1
         return deleted
 
+    async def list_resolvers(self) -> list[str]:
+        resolvers: set[str] = set()
+        for r in self._store.values():
+            if r.resolver:
+                resolvers.add(r.resolver)
+        return sorted(resolvers)
+
     async def upsert_many(
         self, rows: list[UpsertRow]
     ) -> tuple[int, int]:

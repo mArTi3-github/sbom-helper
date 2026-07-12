@@ -80,3 +80,6 @@ class Storage(ABC):
     async def upsert_many(
         self, rows: list[UpsertRow]
     ) -> tuple[int, int]: ...
+
+    @abstractmethod
+    async def list_resolvers(self) -> list[str]: ...

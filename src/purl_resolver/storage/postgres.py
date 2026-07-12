@@ -173,6 +173,13 @@ class PostgresCache(Storage):
             deleted = int(result.split()[-1]) if result else 0
             return deleted
 
+    async def list_resolvers(self) -> list[str]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT DISTINCT resolver FROM resolved_purls ORDER BY resolver"
+            )
+            return [r["resolver"] for r in rows]
+
     async def upsert_many(
         self, rows: list[UpsertRow]
     ) -> tuple[int, int]:
@@ -211,5 +218,8 @@ async def create_pool() -> asyncpg.Pool:
     )
     async with pool.acquire() as conn:
         await conn.execute(_load_schema())
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_resolved_purls_resolver ON resolved_purls (resolver)"
+        )
         logger.info("Table 'resolved_purls' ensured")
     return pool
