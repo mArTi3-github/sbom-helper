@@ -12,3 +12,4 @@ data/
 .misc/\[old]/
 docker-compose.override.yml
 docs/
+.superpowers
