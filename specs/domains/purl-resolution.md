@@ -2,7 +2,7 @@
 
 ## Description
 
-Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with confidence, evidence, and metadata. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → ecosyste.ms → libraries.io), storing successful results for future lookups.
+Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → ecosyste.ms → libraries.io), storing successful results for future lookups.
 
 ## Key Files
 
@@ -41,12 +41,7 @@ class ResolveRequest(BaseModel):
 class ResolveResponse(BaseModel):
     purl: str  # normalized form: scheme:type/namespace/name
     repository_url: str | None = None
-    repository_type: str | None = None
-    repository_kind: str | None = None
-    confidence: str | None = None
-    evidence: list[str] = []
     warnings: list[str] = []
-    version_reference: str | None = None
     resolver: str = ""
     found_by: str = ""
     resolved_at: str = ""
@@ -190,7 +185,6 @@ Client                    API Layer (router)         Service Layer             p
 - Upstream errors (registry timeout, network failure) always return HTTP 502
 - The response format is canonical — it does not expose purl2repo's internal structure
 - Empty purl strings are rejected at the Pydantic validation level (HTTP 422)
-- `version_reference` is a URL string (not the purl2repo ReleaseLink object)
 - **Normalized cache keys**: storage uses `scheme:type/namespace/name` form — version/qualifiers/subpath are stripped
 - **Resolver receives original PURL**: the full string (with version, qualifiers, subpath) is passed unmodified to resolvers
 - **DB cache hit**: if a result is found in PostgreSQL, the resolver is NOT called (unless URL validation is enabled and the entry is outside the cooldown window — for trusted resolvers, cooldown is `revalidation_cooldown_hours`; for untrusted resolvers, cooldown is always bypassed)
@@ -208,12 +202,14 @@ Client                    API Layer (router)         Service Layer             p
 - **Non-HTTP/HTTPS URLs skip redirect resolution**: URLs are validated by syntax (non-empty hostname) and SSRF guard (non-private IP) before VCS probes. HTTP/HTTPS URLs additionally undergo HEAD redirect resolution and token-invalidity detection (401/403). Non-HTTP/HTTPS URLs skip redirect resolution and go directly to VCS probes.
 - **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
 - **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
+- **Four-column table**: `resolved_purls` stores only `purl`, `repository_url`, `resolver`, `resolved_at` — all other fields from earlier schema versions have been removed
+- **Warnings are runtime-only**: `warnings` is retained in `Resolution` dataclass, `ResolveResponse` model, and API response but is never persisted to the database, CSV export, or in-memory storage
+- **Index on resolver**: `idx_resolved_purls_resolver` is created on startup in `create_pool()` to accelerate `SELECT DISTINCT resolver` queries for the dynamic resolver filter
 - **URL redirects are resolved on validation**: `validate_url()` and `validate_url_with_retry()` return `UrlValidationOutput` containing the final URL after all 3xx redirects; `final_url` is `str(resp.url)` from httpx with `follow_redirects=True`
 - **VCS probe uses the resolved final URL**: `_check_vcs()` receives the final redirect target, not the original URL
 - **Cache entries updated with final URL on VALID**: `_validate_cached_url()` updates `cached.repository_url` when `final_url` differs from the stored URL on `VALID` result only
 - **Fresh resolver results use final URL**: `resolve_purl()` stores and returns the resolved final URL for any non-INVALID validation result (including `NETWORK_ERROR`/`RATE_LIMITED`)
 - **SBOM refs updated on any non-INVALID result**: `sbom_enrichment.py` updates `ref["url"]` with `final_url` when the ref redirected, regardless of whether validation result was `VALID`, `NETWORK_ERROR`, or `RATE_LIMITED`
-- **Canonical repository_kind values**: `repository_kind` uses `"vcs"` for VCS repository URLs (GitHub, GitLab, etc.) and `"source-distribution"` for source distribution/tarball URLs; the `REPOSITORY_KINDS` constant in `schemas.py` defines the valid set; `collector.py` uses the same values to identify existing source references
 - **SBOM enrichment uses resolver="import-sbom"**: both `PurlResolutionService.resolve_batch()` and `PurlResolutionService.store_preexisting_references()` in the SBOM flow store records with `resolver: "import-sbom"`
 - **SBOM deduplication validates each PURL explicitly**: the deduplication loop calls `validate()` then `normalize()` on every component PURL; unversioned valid PURLs (e.g. `pkg:pypi/ptaf-task-manager`) are correctly normalized and added to the resolution queue — only truly invalid PURLs are counted as skipped
 - **CSV import uses resolver="import-csv"**: when the `resolver` column is absent from the imported CSV, the value `"import-csv"` is used as default
@@ -276,13 +272,7 @@ The `resolved_purls` table stores resolution results:
 |---|---|---|
 | `purl` | `TEXT` | `PRIMARY KEY` |
 | `repository_url` | `TEXT` | `NOT NULL` |
-| `repository_type` | `TEXT` | nullable |
-| `repository_kind` | `TEXT` | nullable |
-| `confidence` | `TEXT` | nullable |
-| `evidence` | `JSONB` | `DEFAULT '[]'` |
-| `warnings` | `JSONB` | `DEFAULT '[]'` |
-| `version_reference` | `TEXT` | nullable |
-| `resolver` | `TEXT` | `NOT NULL DEFAULT 'purl2repo'` |
+| `resolver` | `TEXT` | `NOT NULL` |
 | `resolved_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` |
 
-Created on startup via `CREATE TABLE IF NOT EXISTS`. All new columns must be nullable or have a DEFAULT value to ensure backward compatibility.
+Created on startup via `CREATE TABLE IF NOT EXISTS`. Schema is defined in `storage/schema.sql` alongside the `jobs` table. An index on `resolver` column (`idx_resolved_purls_resolver`) is created after the table to accelerate `SELECT DISTINCT resolver` queries.

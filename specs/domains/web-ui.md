@@ -6,7 +6,7 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 
 ## Key Files
 
-- `frontend/src/views/PurlResolver.vue` — PURL resolver page: input, resolve button, result card with confidence/evidence
+- `frontend/src/views/PurlResolver.vue` — PURL resolver page: input, resolve button, result card with warnings and resolver metadata
 - `frontend/src/views/SbomUpdater.vue` — SBOM-updater page: file upload, options, ignore patterns editor, results summary and table
 - `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete
 - `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, GitHub token, ecosyste.ms, Libraries.io cards
@@ -19,7 +19,7 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/components/ModalDialog.vue` — Reusable modal dialog
 - `frontend/src/components/RecentJobs.vue` — Background job status list with auto-polling
 - `frontend/src/components/db/DbDataTable.vue` — Sortable/filterable PURL data table for database admin
-- `frontend/src/components/db/DbFilterPanel.vue` — Search and filter controls for database admin
+- `frontend/src/components/db/DbFilterPanel.vue` — Search, resolver filter (dynamically populated from `GET /api/v1/db/resolvers`), and date range controls for database admin
 - `frontend/src/components/db/DbImportModal.vue` — CSV import dialog with drag-and-drop upload
 - `frontend/src/api/client.ts` — Typed fetch wrapper with `ApiError` class
 - `frontend/src/api/purl.ts` — PURL resolution API client
@@ -35,7 +35,7 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/types/api.ts` — TypeScript interfaces mirroring backend `schemas.py`
 - `frontend/src/composables/useDownload.ts` — File download helper composable
 - `frontend/src/stores/useSettingsStore.ts` — Pinia store for application settings state (shared across views)
-- `frontend/src/stores/useDbAdminStore.ts` — Pinia store for database admin state (filtering, sorting, selection, pagination, page size, goToPage, changePageSize)
+- `frontend/src/stores/useDbAdminStore.ts` — Pinia store for database admin state (filtering, sorting, selection, pagination, page size, goToPage, changePageSize, resolver list via `resolvers` ref and `fetchResolvers()` action)
 - `frontend/src/assets/main.css` — Global CSS variables and resets
 - `src/purl_resolver/main.py` — Mounts SPA via `SPAStaticFiles` at `/` after all API routes
 
@@ -129,8 +129,7 @@ User                   Browser (Vue SPA)             API Layer
 - The page never reloads during resolution (Vue reactivity, no full-page navigation)
 - Submit button is disabled while a request is in flight
 - All states (loading, success, unresolved, error, network failure) have distinct visual representations
-- `version_reference` in details is rendered as a clickable link
-- Evidence items are listed as an unordered list in the details section
+
 - Warnings within the resolved result card are shown in red; the unresolved fallback message is shown in yellow; errors in red
 - `found_by` and `resolver` fields are displayed in the details section when present
 
@@ -151,11 +150,12 @@ User                   Browser (Vue SPA)             API Layer
 ### DB-Admin Page
 
 - The page never reloads during data operations (Vue reactivity, no full-page navigation)
+- Resolver filter dropdown is dynamically populated on mount via `fetchResolvers()` call to `GET /api/v1/db/resolvers`; on fetch failure, dropdown shows only «Any» (graceful degradation)
 - All columns are displayed by default (no visibility checkboxes)
 - All states (loading, empty, error, success) have distinct visual representations
 - Edits update via PATCH and re-fetch the current page
 - Export exports the currently selected rows via comma (`,`) delimited CSV; button shows selected count and is disabled when no rows are selected
-- Import accepts comma (`,`) delimiter; UTF-8 encoding (BOM handled automatically); first row must contain headers; required columns: `purl`, `repository_url`; optional columns: `repository_type`, `repository_kind`, `confidence`, `version_reference`, `resolver` (default `import-csv`), `evidence` (JSON array string), `warnings` (JSON array string); values containing commas must be quoted per RFC 4180
+- Import accepts comma (`,`) delimiter; UTF-8 encoding (BOM handled automatically); first row must contain headers; required columns: `purl`, `repository_url`; optional columns: `resolver` (default `import-csv`), `resolved_at`; values containing commas must be quoted per RFC 4180
 - Import modal includes a collapsible CSV format reference section listing required/optional columns and a multi-column example using `,` delimiter
 - Import strategy radio labels: "Overwrite existing" (upsert) and "Skip existing" (skip_existing)
 - Import modal supports drag-and-drop for CSV files (via `FileUploadZone` and `ModalDialog` components)

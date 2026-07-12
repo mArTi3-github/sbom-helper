@@ -31,18 +31,14 @@ Resolve a single PURL to its repository URL.
 {
   "purl": "pkg:pypi/requests",
   "repository_url": "https://github.com/psf/requests",
-  "repository_type": "github",
-  "repository_kind": "vcs",
-  "confidence": "high",
-  "evidence": ["homepage from PyPI metadata"],
   "warnings": [],
-  "version_reference": "https://github.com/psf/requests/tree/v2.31.0",
   "resolver": "purl2repo",
+  "found_by": "resolver",
   "resolved_at": "2026-05-31T12:00:00Z"
 }
 ```
 
-Note: `purl` field contains the normalized form (version, qualifiers, subpath stripped). The original PURL is only used internally for resolver processing. `repository_kind` uses canonical values: `"vcs"` for VCS repository URLs, `"source-distribution"` for source distribution/tarball URLs.
+Note: `purl` field contains the normalized form (version, qualifiers, subpath stripped). The original PURL is only used internally for resolver processing.
 
 #### Success Response (200) — unresolved
 
@@ -50,12 +46,7 @@ Note: `purl` field contains the normalized form (version, qualifiers, subpath st
 {
   "purl": "pkg:pypi/obscure-package",
   "repository_url": null,
-  "repository_type": null,
-  "repository_kind": null,
-  "confidence": null,
-  "evidence": [],
-  "warnings": ["No repository URL found for this PURL"],
-  "version_reference": null
+  "warnings": ["No repository URL found for this PURL"]
 }
 ```
 
@@ -117,7 +108,7 @@ Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mount
 
 List PURLs with pagination, filtering, and sorting.
 
-Query parameters: `page`, `page_size`, `search`, `resolver`, `confidence`, `date_from`, `date_to`, `sort_by`, `sort_order`.
+Query parameters: `page`, `page_size`, `search`, `resolver`, `date_from`, `date_to`, `sort_by`, `sort_order`.
 
 Response (200):
 ```json
@@ -131,7 +122,7 @@ Response (200):
 
 ### `PATCH /api/v1/db/purls/{purl:path}`
 
-Edit a PURL row. Body: `{ "purl": "...", "repository_url": "..." }` (both optional).
+Edit a PURL row. Body: `{ "purl": "...", "repository_url": "..." }` (both optional; when `repository_url` is omitted, the existing value is preserved).
 
 Response (200): `{ "ok": true }`
 Response (404): `{ "error": "purl_not_found" }`
@@ -142,11 +133,25 @@ Bulk delete. Body: `{ "purls": ["...", "..."] }`.
 
 Response (200): `{ "deleted": N }`
 
+### `GET /api/v1/db/resolvers`
+
+List distinct resolver names from the `resolved_purls` table. Used to dynamically populate the resolver filter dropdown in the DB Admin page.
+
+#### Response (200)
+
+```
+["ecosyste.ms", "import-csv", "libraries.io", "purl2repo"]
+```
+
+Flat JSON array of strings, sorted alphabetically.
+
+---
+
 ### `POST /api/v1/db/import`
 
 Import CSV. Multipart: `file` (CSV) + `strategy` (`"upsert"` or `"skip_existing"`).
 
-CSV format: comma (`,`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `repository_type`, `repository_kind`, `confidence`, `evidence` (JSON array), `warnings` (JSON array), `version_reference`, `resolver` (default: `"import-csv"` when absent), `resolved_at`. Values containing commas must be quoted per RFC 4180.
+CSV format: comma (`,`) delimiter, UTF-8 encoding (BOM handled automatically). First row must contain headers. Required columns: `purl`, `repository_url`. Optional: `resolver` (default: `"import-csv"` when absent), `resolved_at`. Values containing commas must be quoted per RFC 4180.
 
 Response (200): `{ "imported": N, "skipped": N, "errors": [...] }`
 Response (400): `{ "error": "invalid_csv" }` (missing columns, wrong format)
@@ -167,7 +172,7 @@ Export selected PURLs as CSV. Accepts a list of PURLs to export; returns a comma
 
 `Content-Type: text/csv`, `Content-Disposition: attachment; filename="purls_export.csv"`
 
-CSV format: comma (`,`) delimiter, UTF-8 encoding. All 10 columns exported. JSONB fields (`evidence`, `warnings`) serialized as JSON strings within quoted CSV cells. Non-existing PURLs are silently skipped.
+CSV format: comma (`,`) delimiter, UTF-8 encoding. Four columns exported: `purl`, `repository_url`, `resolver`, `resolved_at`. Non-existing PURLs are silently skipped.
 
 ### `GET /db-admin`
 

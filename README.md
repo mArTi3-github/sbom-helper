@@ -1,6 +1,6 @@
 # sbom-helper
 
-Resolve Package URLs (PURLs) to source code repository URLs with confidence scoring and evidence.
+Resolve Package URLs (PURLs) to source code repository URLs with resolver attribution and warnings.
 
 ## Quick Start
 
@@ -42,6 +42,7 @@ docker compose -f docker-compose.yml up -d
 | `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references (optional: remove unresolved components, validate existing VCS references) |
 | `POST /api/v1/convert/images-list` | Convert a CycloneDX SBOM to a machine-readable list of Docker container images |
 | `GET /api/v1/db/purls` | List PURLs with pagination and filtering |
+| `GET /api/v1/db/resolvers` | List distinct resolver names for filter dropdown |
 | `PATCH /api/v1/db/purls/{purl}` | Edit a PURL row |
 | `DELETE /api/v1/db/purls` | Bulk delete PURL rows |
 | `POST /api/v1/db/import` | Import PURLs from CSV (comma delimiter) |

@@ -26,6 +26,7 @@
 |  |  GET /images-list-converter |
 |  |  GET /settings             |                   |
 |  |  GET /api/v1/db/purls      |                   |
+|  |  GET /api/v1/db/resolvers  |                   |
 |  |  PATCH /api/v1/db/purls/   |                   |
 |  |  DELETE /api/v1/db/purls   |                   |
 |  |  POST /api/v1/db/import    |                   |
@@ -245,7 +246,7 @@
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) via async jobs (routes/jobs.py) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
-- Delegate DB admin operations to `DbAdminService` (`db_admin_service.list_purls()`, `db_admin_service.update_purl()`, etc.) which wraps Storage Layer and CSV I/O
+- Delegate DB admin operations to `DbAdminService` (`db_admin_service.list_purls()`, `db_admin_service.update_purl()`, `db_admin_service.list_resolvers()`, etc.) which wraps Storage Layer and CSV I/O
 - Delegate async SBOM enrichment to Job Manager via `routes/jobs.py` — creates background jobs (`POST /api/v1/jobs/sbom-enrich`), queries status (`GET /api/v1/jobs/{job_id}`), downloads results (`GET /api/v1/jobs/{job_id}/result`), cancels (`POST /api/v1/jobs/{job_id}/cancel`), deletes (`DELETE /api/v1/jobs/{job_id}`), lists (`GET /api/v1/jobs`)
 - Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, deduplicates by `purl`, returns conversion result with completeness flags and duplicate counts
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`; clear validation cache via `POST /api/v1/settings/clear-validation-cache`
@@ -258,7 +259,7 @@
 - URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if within cooldown window (trusted resolvers respect `revalidation_cooldown_hours`); remove invalid tokens from settings automatically. Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url_with_retry()` directly.
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit from `AppSettings.batch_semaphore_limit` (default: 10); returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `self._storage.store()`
-- Map purl2repo `ResolutionResult` to canonical `ResolveResponse` format; tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
+- Map resolver `Resolution` to canonical `ResolveResponse` format (purl, repository_url, warnings, resolver, found_by, resolved_at); tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
 
@@ -276,6 +277,7 @@
 - `list_purls(params: PurlListParams) → PurlListResponse` — paginated listing with search/filter/sort
 - `update_purl(purl_key: str, update: PurlUpdateRequest)` — inline edit of a PURL row
 - `delete_purls(purls: list[str]) → int` — bulk delete
+- `list_resolvers() → list[str]` — returns distinct resolver values from storage; consumed by `GET /api/v1/db/resolvers`
 - `import_csv(text, strategy) → ImportResponse` — delegates to `csv_io.parse_csv_import()` then bulk-stores via Storage Layer
 - `export_csv(purls: list[str]) → str` — fetches from Storage Layer, delegates to `csv_io.render_csv_export()`
 - Testable without FastAPI TestClient — pure service with injectable Storage dependency
@@ -295,8 +297,8 @@
 
 ### CSV I/O Module (`csv_io.py`)
 - Pure functions for CSV parsing and rendering, no HTTP or Storage dependencies
-- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, comma delimiter, required column validation, RFC 4180 quoting; when `resolver` column is absent, defaults to `"import-csv"`
-- `render_csv_export(rows: list[PurlRow]) → str` — renders PurlRow objects as comma-delimited CSV string with automatic RFC 4180 quoting
+- `parse_csv_import(text) → tuple[list[UpsertRow], list[dict]]` — parses CSV into typed UpsertRow objects and error list; handles BOM, comma delimiter, required column validation (`purl`, `repository_url`), RFC 4180 quoting; when `resolver` column is absent, defaults to `"import-csv"`
+- `render_csv_export(rows: list[PurlRow]) → str` — renders PurlRow objects as comma-delimited CSV string with four columns (`purl`, `repository_url`, `resolver`, `resolved_at`) and automatic RFC 4180 quoting
 - Dependencies: only `csv`, `io`, `json` from stdlib
 
 ### PURL Utils Layer (`purl_utils/`)
@@ -379,14 +381,14 @@
 - Build output: `frontend/dist/` (copied into Docker image via multi-stage build)
 
 ### Domain Layer (`purl2repo`)
-- Resolve PURL strings to repository URLs with confidence/evidence
+- Resolve PURL strings to repository URLs with warnings and resolver attribution
 - Manage internal file-based caching (independent of the Storage Layer)
 - Our code does not import or modify purl2repo directly
 
 ### Resolver Layer (`resolver/`)
-- **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"libraries.io"`) and `async resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `repository_type`, `repository_kind`, `confidence`, `evidence`, `warnings`, `version_reference`
+- **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"libraries.io"`) and `async resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `warnings`
 - **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; creates `Purl2RepoResolver` from `Settings`, conditionally adds `EcosystemsResolver` (if `ecosystems_enabled`) and `LibrariesIoResolver` (if `librariesio_enabled` and API key present); used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
-- **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; async implementation uses `asyncio.to_thread()` to offload synchronous purl2repo calls to a thread pool; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`; extracts `version_reference.url` from ReleaseLink objects
+- **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; async implementation uses `asyncio.to_thread()` to offload synchronous purl2repo calls to a thread pool; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`
 - **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; async implementation uses `httpx.AsyncClient` and `asyncio.sleep()` for rate limiting; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms; rate-limited (1 req/sec via `asyncio.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; async implementation uses `httpx.AsyncClient`; enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); configurable rate limiting via `ecosystems_max_requests_per_second` app setting; URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **retry.py** — `RetryConfig` dataclass, `RetryableErrorPolicy` (retryable error classification), `RetryHelper` (async retry loop with linear backoff)
