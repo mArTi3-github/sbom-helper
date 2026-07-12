@@ -20,7 +20,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const connectivityUrl = ref('https://github.com')
   const connectivityTimeout = ref(2)
   const jsonIndent = ref(4)
-  const language = ref('en')
   const tokenSet = ref({ github_token: false, librariesio_api_key: false, ecosystems_api_key: false })
   const githubTokenValidity = ref<'valid' | 'invalid' | null>(null)
   const githubToken = ref('')
@@ -51,7 +50,6 @@ export const useSettingsStore = defineStore('settings', () => {
       connectivityUrl.value = data.connectivity_url
       connectivityTimeout.value = data.connectivity_timeout
       jsonIndent.value = data.json_indent
-      language.value = data.language
       tokenSet.value = data.token_set
     } catch {
       throw new Error('Failed to load settings')
@@ -61,7 +59,6 @@ export const useSettingsStore = defineStore('settings', () => {
   async function save(partial: SettingsUpdate) {
     const data = await updateSettings(partial)
     tokenSet.value = data.token_set
-    language.value = data.language
     if ('github_token' in partial) {
       githubToken.value = ''
       githubTokenValidity.value = 'valid'
@@ -85,7 +82,6 @@ export const useSettingsStore = defineStore('settings', () => {
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
-    language,
     tokenSet, githubToken, librariesioKey, ecosystemsKey, loading,
     githubTokenValidity,
     hasAnyToken, load, save, clearToken, checkGithubToken,
