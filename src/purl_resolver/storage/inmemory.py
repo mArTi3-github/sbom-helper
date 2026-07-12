@@ -37,7 +37,6 @@ class InMemoryCache(Storage):
             "purl": lambda x: x.purl,
             "repository_url": lambda x: x.repository_url,
             "resolver": lambda x: x.resolver,
-            "confidence": lambda x: x.confidence or "",
             "resolved_at": lambda x: x.resolved_at,
         }
         key_fn = sort_keys.get(sort_by, sort_keys["resolved_at"])
@@ -51,8 +50,6 @@ class InMemoryCache(Storage):
         if filters.search and filters.search.lower() not in r.purl.lower():
             return False
         if filters.resolver and filters.resolver != (r.resolver or ""):
-            return False
-        if filters.confidence and filters.confidence != r.confidence:
             return False
         if filters.date_from and r.resolved_at:
             try:
@@ -85,12 +82,6 @@ class InMemoryCache(Storage):
         updated = ResolveResponse(
             purl=purl,
             repository_url=repository_url,
-            repository_type=existing.repository_type,
-            repository_kind=existing.repository_kind,
-            confidence=existing.confidence,
-            evidence=existing.evidence,
-            warnings=existing.warnings,
-            version_reference=existing.version_reference,
         )
         if old_purl != purl:
             del self._store[old_purl]
@@ -117,12 +108,6 @@ class InMemoryCache(Storage):
             self._store[row.purl] = ResolveResponse(
                 purl=row.purl,
                 repository_url=row.repository_url,
-                repository_type=row.repository_type,
-                repository_kind=row.repository_kind,
-                confidence=row.confidence,
-                evidence=row.evidence,
-                warnings=row.warnings,
-                version_reference=row.version_reference,
             )
             upserted += 1
         return (upserted, errors)
