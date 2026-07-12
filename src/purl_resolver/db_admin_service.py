@@ -32,7 +32,6 @@ class DbAdminService:
         filters = PurlFilters(
             search=params.search,
             resolver=params.resolver,
-            confidence=params.confidence,
             date_from=params.date_from,
             date_to=params.date_to,
         )
