@@ -57,6 +57,10 @@ export function importCsv(file: File, strategy: 'upsert' | 'skip_existing'): Pro
   })
 }
 
+export function listResolvers(): Promise<string[]> {
+  return apiFetch<string[]>('/api/v1/db/resolvers')
+}
+
 export function exportSelectedCsv(purls: string[]): Promise<Blob> {
   return apiFetch<Blob>('/api/v1/db/export', {
     method: 'POST',

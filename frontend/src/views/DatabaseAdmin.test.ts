@@ -34,6 +34,7 @@ const updatePurlMock = vi.fn()
 const deletePurlsMock = vi.fn()
 const importCsvMock = vi.fn()
 const exportCsvMock = vi.fn()
+const listResolversMock = vi.fn()
 
 vi.mock('../api/db', () => ({
   listPurls: (params: unknown) => listPurlsMock(params),
@@ -41,6 +42,7 @@ vi.mock('../api/db', () => ({
   deletePurls: (purls: string[]) => deletePurlsMock(purls),
   importCsv: (file: File, strategy: string) => importCsvMock(file, strategy),
   exportSelectedCsv: (purls: string[]) => exportCsvMock(purls),
+  listResolvers: () => listResolversMock(),
 }))
 
 function mountAdmin() {
@@ -56,6 +58,7 @@ describe('DatabaseAdmin.vue', () => {
     deletePurlsMock.mockResolvedValue({ deleted: 1 })
     importCsvMock.mockResolvedValue({ imported: 2, skipped: 0, errors: [] })
     exportCsvMock.mockResolvedValue(new Blob(['csv'], { type: 'text/csv' }))
+    listResolversMock.mockResolvedValue([])
     vi.stubGlobal('confirm', vi.fn(() => true))
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})

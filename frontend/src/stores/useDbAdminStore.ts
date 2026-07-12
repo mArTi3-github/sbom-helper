@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { listPurls, updatePurl, deletePurls, importCsv, exportSelectedCsv as apiExportCsv } from '../api/db'
+import { listPurls, listResolvers, updatePurl, deletePurls, importCsv, exportSelectedCsv as apiExportCsv } from '../api/db'
 import type { PurlListParams } from '../api/db'
 import type { ResolveResponse, ImportResponse } from '../types/api'
 import { ApiError } from '../api/client'
@@ -8,6 +8,7 @@ import { ApiError } from '../api/client'
 export const useDbAdminStore = defineStore('dbAdmin', () => {
   const search = ref('')
   const resolver = ref('')
+  const resolvers = ref<string[]>([])
   const dateFrom = ref('')
   const dateTo = ref('')
 
@@ -72,6 +73,14 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
   }
 
   function applyFilters() { page.value = 1; fetchData() }
+
+  async function fetchResolvers() {
+    try {
+      resolvers.value = await listResolvers()
+    } catch {
+      resolvers.value = []
+    }
+  }
 
   function resetFilters() {
     search.value = ''
@@ -236,7 +245,7 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
   }
 
   return {
-    search, resolver, dateFrom, dateTo,
+    search, resolver, resolvers, dateFrom, dateTo,
     sortBy, sortOrder,
     page, pageSize, total, totalPages,
     rows, selectedPurls, allSelected, someSelected,
@@ -244,6 +253,7 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
     showImportModal, importFile, importStrategy, importResults, importLoading, importError,
     loading, errorMessage, successMessage,
     fetchData, applyFilters, resetFilters, setSort,
+    fetchResolvers,
     toggleSelectAll, toggleRow, startEdit, cancelEdit, saveEdit,
     deleteRow, deleteSelected, exportCsv,
     handleImportFile, handleImportUpload, closeImportModal,
