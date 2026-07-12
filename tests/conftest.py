@@ -13,10 +13,6 @@ def fake_resolvers() -> list[FakeResolver]:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                repository_type="github",
-                repository_kind="vcs",
-                confidence="high",
-                evidence=["verified"],
             ),
         ),
     ]

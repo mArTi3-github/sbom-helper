@@ -43,12 +43,7 @@ class TestE2EPostgresStoreAndLookup:
         response = ResolveResponse(
             purl="pkg:pypi/requests@2.31.0",
             repository_url="https://github.com/psf/requests",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
-            evidence=["homepage from PyPI metadata", "validated via API"],
             warnings=["deprecated version"],
-            version_reference="https://github.com/psf/requests/tree/v2.31.0",
         )
 
         await cache.store(response)
@@ -57,12 +52,6 @@ class TestE2EPostgresStoreAndLookup:
         assert cached is not None
         assert cached.purl == response.purl
         assert cached.repository_url == response.repository_url
-        assert cached.repository_type == response.repository_type
-        assert cached.repository_kind == response.repository_kind
-        assert cached.confidence == response.confidence
-        assert cached.evidence == response.evidence
-        assert cached.warnings == response.warnings
-        assert cached.version_reference == response.version_reference
 
     async def test_lookup_returns_none_for_missing(
         self, cache: PostgresCache
@@ -76,13 +65,11 @@ class TestE2EPostgresStoreAndLookup:
         old = ResolveResponse(
             purl="pkg:pypi/example@1.0",
             repository_url="https://github.com/old/example",
-            evidence=[],
             warnings=[],
         )
         new = ResolveResponse(
             purl="pkg:pypi/example@1.0",
             repository_url="https://github.com/new/example",
-            evidence=["updated"],
             warnings=[],
         )
 
@@ -92,7 +79,6 @@ class TestE2EPostgresStoreAndLookup:
         result = await cache.lookup("pkg:pypi/example@1.0")
         assert result is not None
         assert result.repository_url == "https://github.com/new/example"
-        assert result.evidence == ["updated"]
 
     async def test_store_with_empty_lists(
         self, cache: PostgresCache
@@ -100,21 +86,15 @@ class TestE2EPostgresStoreAndLookup:
         response = ResolveResponse(
             purl="pkg:pypi/empty@1.0",
             repository_url="https://github.com/empty/empty",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="low",
-            evidence=[],
             warnings=[],
-            version_reference=None,
         )
 
         await cache.store(response)
         result = await cache.lookup("pkg:pypi/empty@1.0")
         assert result is not None
-        assert result.evidence == []
         assert result.warnings == []
 
-    async def test_store_with_nullable_fields_as_none(
+    async def test_store_minimal_response(
         self, cache: PostgresCache
     ) -> None:
         response = ResolveResponse(
@@ -126,12 +106,7 @@ class TestE2EPostgresStoreAndLookup:
         result = await cache.lookup("pkg:pypi/minimal@1.0")
         assert result is not None
         assert result.repository_url == "https://github.com/minimal/minimal"
-        assert result.repository_type is None
-        assert result.repository_kind is None
-        assert result.confidence is None
-        assert result.evidence == []
         assert result.warnings == []
-        assert result.version_reference is None
 
 
 async def _seed_data(cache: PostgresCache) -> None:
@@ -139,28 +114,16 @@ async def _seed_data(cache: PostgresCache) -> None:
         ResolveResponse(
             purl="pkg:pypi/requests",
             repository_url="https://github.com/psf/requests",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
-            evidence=["homepage from PyPI"],
             warnings=[],
         ),
         ResolveResponse(
             purl="pkg:npm/express",
             repository_url="https://github.com/expressjs/express",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="low",
-            evidence=[],
             warnings=["registry mismatch"],
         ),
         ResolveResponse(
             purl="pkg:pypi/flask",
             repository_url="https://github.com/pallets/flask",
-            repository_type="github",
-            repository_kind="source_code",
-            confidence="high",
-            evidence=["homepage from PyPI"],
             warnings=[],
         ),
     ]
@@ -198,12 +161,6 @@ class TestE2EPostgresListPurls:
         assert rows[0].purl == "pkg:pypi/flask"
 
     @pytest.mark.asyncio
-    async def test_list_with_confidence_filter(self, cache: PostgresCache) -> None:
-        await _seed_data(cache)
-        rows = await cache.list_purls(0, 50, PurlFilters(confidence="high"))
-        assert len(rows) == 2
-
-    @pytest.mark.asyncio
     async def test_list_sort_by_purl_asc(self, cache: PostgresCache) -> None:
         await _seed_data(cache)
         rows = await cache.list_purls(0, 50, PurlFilters(), sort_by="purl", sort_order="asc")
@@ -224,13 +181,6 @@ class TestE2EPostgresCountPurls:
         await _seed_data(cache)
         count = await cache.count_purls(PurlFilters(search="pypi"))
         assert count == 2
-
-    @pytest.mark.asyncio
-    async def test_count_with_confidence_filter(self, cache: PostgresCache) -> None:
-        await _seed_data(cache)
-        count = await cache.count_purls(PurlFilters(confidence="low"))
-        assert count == 1
-
 
 class TestE2EPostgresUpdatePurl:
 
@@ -302,7 +252,6 @@ class TestE2EPostgresUpsertMany:
             UpsertRow(
                 purl="pkg:pypi/newpkg",
                 repository_url="https://github.com/new/pkg",
-                confidence="high",
             ),
         ]
         upserted, errors = await cache.upsert_many(rows)

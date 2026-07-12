@@ -21,9 +21,6 @@ class TestResolveBatch:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                repository_type="github",
-                repository_kind="source_code",
-                confidence="high",
             )
         )
         purls = [
@@ -73,7 +70,6 @@ class TestResolveBatch:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                confidence="high",
             )
         )
         purls = ["pkg:pypi/requests@2.31.0"]
@@ -88,7 +84,6 @@ class TestResolveBatch:
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",
                 repository_url="https://github.com/psf/requests",
-                confidence="high",
             )
         )
         purls = ["pkg:pypi/requests@2.31.0"]

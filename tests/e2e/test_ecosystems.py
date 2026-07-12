@@ -19,9 +19,6 @@ class TestE2EEcosystemsResolver:
         r = EcosystemsResolver(timeout=15.0)
         result = await r.resolve("pkg:pypi/requests")
         assert result.repository_url == "https://github.com/psf/requests"
-        assert result.confidence == "medium"
-        assert result.repository_kind == "vcs"
-        assert len(result.evidence) > 0
 
     @pytest.mark.asyncio
     async def test_resolve_unknown_package(self) -> None:
