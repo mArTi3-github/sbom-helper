@@ -9,7 +9,7 @@
         <label for="resolver">{{ t('dbAdmin.resolver') }}</label>
         <select id="resolver" v-model="store.resolver">
           <option value="">{{ t('dbAdmin.any') }}</option>
-          <option value="purl2repo">purl2repo</option>
+          <option v-for="r in store.resolvers" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
       <div class="filter-group">
@@ -32,10 +32,12 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDbAdminStore } from '../../stores/useDbAdminStore'
 const { t } = useI18n()
 const store = useDbAdminStore()
+onMounted(() => { store.fetchResolvers() })
 </script>
 
 <style scoped>
