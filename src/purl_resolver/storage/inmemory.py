@@ -82,6 +82,8 @@ class InMemoryCache(Storage):
         updated = ResolveResponse(
             purl=purl,
             repository_url=repository_url,
+            resolver=existing.resolver,
+            resolved_at=existing.resolved_at,
         )
         if old_purl != purl:
             del self._store[old_purl]
@@ -108,6 +110,7 @@ class InMemoryCache(Storage):
             self._store[row.purl] = ResolveResponse(
                 purl=row.purl,
                 repository_url=row.repository_url,
+                resolver=row.resolver,
             )
             upserted += 1
         return (upserted, errors)
