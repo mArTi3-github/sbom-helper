@@ -377,3 +377,25 @@ class TestSbomStoresPreExistingRefs:
         assert "pkg:pypi/requests" in storage._store
         req = storage._store["pkg:pypi/requests"]
         assert req.repository_url == "https://github.com/psf/requests"
+
+
+class TestAdminListResolvers:
+    def test_list_empty(self, admin_client):
+        response = admin_client.get("/api/v1/db/resolvers")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []
+
+    def test_list_with_data(self, storage, admin_client):
+        from purl_resolver.schemas import ResolveResponse
+        entries = [
+            ResolveResponse(purl="pkg:pypi/a", repository_url="https://a.com", resolver="purl2repo"),
+            ResolveResponse(purl="pkg:pypi/b", repository_url="https://b.com", resolver="import-csv"),
+        ]
+        for e in entries:
+            storage._store[e.purl] = e
+        response = admin_client.get("/api/v1/db/resolvers")
+        assert response.status_code == 200
+        data = response.json()
+        assert "purl2repo" in data
+        assert "import-csv" in data
