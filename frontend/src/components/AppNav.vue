@@ -3,8 +3,8 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 const routes = [
   { path: '/sbom-updater', nameKey: 'nav.sbomUpdater' },
-  { path: '/db-admin', nameKey: 'nav.dbAdmin' },
   { path: '/images-list-converter', nameKey: 'nav.imagesListConverter' },
+  { path: '/db-admin', nameKey: 'nav.dbAdmin' },
 ]
 </script>
 
@@ -15,7 +15,7 @@ const routes = [
     </router-link>
     <div class="nav-links">
       <router-link
-        to="/"
+        to="/purl-resolver"
         class="nav-link"
         active-class="nav-link--active"
       >

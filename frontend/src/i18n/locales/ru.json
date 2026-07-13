@@ -15,19 +15,19 @@
     "search": "Поиск",
     "file": "Файл",
     "pageNotFound": "Страница не найдена",
-    "goHome": "На главную (PURL Resolver)",
+    "goHome": "На главную",
     "noData": "Нет данных",
     "githubPrefix": "GitHub: "
   },
   "nav": {
-    "purlResolver": "PURL Resolver",
-    "sbomUpdater": "SBOM Updater",
-    "imagesListConverter": "Images List Converter",
-    "dbAdmin": "Database Admin",
+    "purlResolver": "Найти ссылку для PURL",
+    "sbomUpdater": "Обогатить SBOM",
+    "imagesListConverter": "Генерировать список образов",
+    "dbAdmin": "Управлять БД",
     "settings": "Настройки"
   },
   "purlResolver": {
-    "title": "PURL Resolver",
+    "title": "Найти ссылку для PURL",
     "subtitle": "Определить репозиторий исходного кода по Package URL",
     "placeholder": "pkg:pypi/requests\\@2.31.0",
     "resolve": "Найти",
@@ -41,7 +41,7 @@
     "repoUrl": "URL репозитория"
   },
   "sbomUpdater": {
-    "title": "SBOM Updater",
+    "title": "Обогатить SBOM",
     "subtitle": "Загрузите CycloneDX SBOM (JSON), чтобы обогатить компоненты ссылками на репозитории исходных текстов",
     "removeUnresolved": "Удалять ненайденные компоненты без подкомпонентов",
     "ignorePatterns": "Игнорировать компоненты с перечисленными признаками:",
@@ -76,7 +76,7 @@
     "queued": "Ожидание запуска..."
   },
   "imagesListConverter": {
-    "title": "Images List Converter",
+    "title": "Генерировать список образов",
     "subtitle": "Загрузите CycloneDX SBOM (JSON), чтобы сформировать машиночитаемый список docker-образов продукта",
     "convert": "Конвертировать",
     "processing": "Обработка SBOM...",
@@ -91,7 +91,7 @@
     "downloadList": "Скачать список образов"
   },
   "dbAdmin": {
-    "title": "Database Admin",
+    "title": "Управлять БД",
     "subtitle": "Просмотр, редактирование, фильтрация, импорт и экспорт таблицы resolved_purls",
     "exportCsv": "Export CSV",
     "importCsv": "Import CSV",
@@ -249,6 +249,9 @@
     "removed": "Удалено",
     "ignored": "Игнорировано",
     "skipped": "Пропущено"
+  },
+  "home": {
+    "subtitle": "Инструменты для обогащения SBOM — определяйте репозитории по Package URL, обогащайте CycloneDX SBOM, управляйте базой разрешенных PURL"
   },
   "recentJobs": {
     "title": "Недавние задачи",

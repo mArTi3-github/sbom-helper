@@ -51,7 +51,7 @@ describe('ImagesListConverter.vue', () => {
   it('renders initial empty state with disabled Convert button', async () => {
     const wrapper = mountConverter()
     await flushPromises()
-    expect(wrapper.find('h1').text()).toBe('Images List Converter')
+    expect(wrapper.find('h1').text()).toBe('Generate Images List')
     const button = wrapper.find('.toolbar button')
     expect(button.exists()).toBe(true)
     expect(button.attributes('disabled')).toBeDefined()

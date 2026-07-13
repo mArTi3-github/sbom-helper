@@ -33,7 +33,7 @@ describe('PurlResolver.vue', () => {
   it('renders initial form without loading or result', async () => {
     const wrapper = mountResolver()
     await flushPromises()
-    expect(wrapper.find('h1').text()).toBe('PURL Resolver')
+    expect(wrapper.find('h1').text()).toBe('Resolve PURL')
     expect(wrapper.find('input[type="text"]').exists()).toBe(true)
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
     expect(wrapper.find('.loading').exists()).toBe(false)

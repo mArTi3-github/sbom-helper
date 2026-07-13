@@ -5,6 +5,11 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      name: 'home',
+      component: () => import('../views/HomePage.vue'),
+    },
+    {
+      path: '/purl-resolver',
       name: 'purl-resolver',
       component: () => import('../views/PurlResolver.vue'),
     },

@@ -15,19 +15,19 @@
     "search": "Search",
     "file": "File",
     "pageNotFound": "Page not found",
-    "goHome": "Go to PURL Resolver",
+    "goHome": "Go to Home",
     "noData": "No data",
     "githubPrefix": "GitHub: "
   },
   "nav": {
-    "purlResolver": "PURL Resolver",
-    "sbomUpdater": "SBOM Updater",
-    "imagesListConverter": "Images List Converter",
-    "dbAdmin": "Database Admin",
+    "purlResolver": "Resolve PURL",
+    "sbomUpdater": "Enrich SBOM",
+    "imagesListConverter": "Generate Images List",
+    "dbAdmin": "Manage Database",
     "settings": "Settings"
   },
   "purlResolver": {
-    "title": "PURL Resolver",
+    "title": "Resolve PURL",
     "subtitle": "Resolve a Package URL to its source code repository",
     "placeholder": "pkg:pypi/requests\\@2.31.0",
     "resolve": "Resolve",
@@ -41,7 +41,7 @@
     "repoUrl": "Repository URL"
   },
   "sbomUpdater": {
-    "title": "SBOM Updater",
+    "title": "Enrich SBOM",
     "subtitle": "Upload a CycloneDX SBOM (JSON) to enrich components with source code repository references",
     "removeUnresolved": "Remove unresolved components without subcomponents",
     "ignorePatterns": "Ignore components matching these criteria:",
@@ -76,7 +76,7 @@
     "queued": "Waiting to start..."
   },
   "imagesListConverter": {
-    "title": "Images List Converter",
+    "title": "Generate Images List",
     "subtitle": "Upload a CycloneDX SBOM (JSON) to generate a machine-readable list of container images",
     "convert": "Convert",
     "processing": "Processing SBOM...",
@@ -91,7 +91,7 @@
     "downloadList": "Download image list"
   },
   "dbAdmin": {
-    "title": "Database Admin",
+    "title": "Manage Database",
     "subtitle": "View, edit, filter, import, and export the resolved_purls table",
     "exportCsv": "Export CSV",
     "importCsv": "Import CSV",
@@ -249,6 +249,9 @@
     "removed": "Removed",
     "ignored": "Ignored",
     "skipped": "Skipped"
+  },
+  "home": {
+    "subtitle": "SBOM enrichment toolkit — resolve Package URLs, enrich CycloneDX SBOMs, manage your resolved PURL database."
   },
   "recentJobs": {
     "title": "Recent Jobs",
