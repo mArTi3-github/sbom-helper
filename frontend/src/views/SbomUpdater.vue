@@ -40,6 +40,16 @@
     </div>
 
     <div v-if="activeJobId && activeJob" class="job-details">
+      <!-- Toolbar for terminal statuses (above all content) -->
+      <div v-if="isTerminal(activeJob.status)" class="toolbar">
+        <a v-if="activeJob.status === 'completed'" :href="downloadResultUrl()" class="btn btn-primary" download>
+          {{ t('sbomUpdater.downloadEnriched') }}
+        </a>
+        <button class="btn btn-danger" @click="handleDelete" :disabled="deleting">
+          {{ t('common.delete') }}
+        </button>
+      </div>
+
       <!-- queued / running -->
       <div v-if="activeJob.status === 'queued' || activeJob.status === 'running'" class="loading">
         <span class="spinner"></span>
@@ -126,12 +136,6 @@
             </tbody>
           </table>
         </div>
-
-        <div class="toolbar">
-          <a :href="downloadResultUrl()" class="btn btn-primary" download>
-            {{ t('sbomUpdater.downloadEnriched') }}
-          </a>
-        </div>
       </div>
 
       <!-- failed -->
@@ -142,13 +146,6 @@
       <!-- cancelled -->
       <div v-if="activeJob.status === 'cancelled'" class="info-msg">
         {{ t('sbomUpdater.cancelled') }}
-      </div>
-
-      <!-- Delete button for terminal statuses -->
-      <div v-if="isTerminal(activeJob.status)" class="toolbar">
-        <button class="btn btn-danger" @click="handleDelete" :disabled="deleting">
-          {{ t('common.delete') }}
-        </button>
       </div>
     </div>
   </div>
@@ -646,13 +643,11 @@ th, td {
   padding: 0.75rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--color-row-border);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cell-purl {
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: monospace;
   font-size: 0.85rem;
 }
