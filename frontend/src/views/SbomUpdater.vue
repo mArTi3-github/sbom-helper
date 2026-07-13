@@ -123,14 +123,14 @@
             <tbody>
               <tr v-for="(item, i) in activeJob.results" :key="i">
                 <td class="cell-purl">{{ item.purl }}</td>
-                <td>
+                <td class="cell-nowrap">
                   <span :class="['status-badge', 'status-' + item.status]">{{ t('status.' + item.status) }}</span>
                 </td>
                 <td>
                   <a v-if="item.repository_url" :href="safeUrl(item.repository_url)" target="_blank">{{ item.repository_url }}</a>
                   <span v-else>—</span>
                 </td>
-                <td>{{ item.found_by || '—' }}</td>
+                <td class="cell-nowrap">{{ item.found_by || '—' }}</td>
                 <td>{{ item.resolver || '—' }}</td>
               </tr>
             </tbody>
@@ -354,7 +354,7 @@ onUnmounted(() => {
 
 <style scoped>
 .container {
-  max-width: 960px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem 1rem;
   flex: 1;
@@ -650,6 +650,10 @@ th, td {
 .cell-purl {
   font-family: monospace;
   font-size: 0.85rem;
+}
+
+.cell-nowrap {
+  white-space: nowrap;
 }
 
 .status-badge {
