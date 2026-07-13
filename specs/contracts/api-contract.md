@@ -349,7 +349,7 @@ Asynchronously enrich a CycloneDX SBOM file via a background job. Accepts the sa
 `multipart/form-data` with field `file` containing a CycloneDX JSON file.
 
 - Maximum file size: 200 MB (configurable via `SBOM_MAX_FILE_SIZE`)
-- File must be valid JSON with `bomFormat: "CycloneDX"` and `specVersion: "1.6"`
+- File must be valid JSON with `bomFormat: "CycloneDX"`
 - Optional field `remove_unresolved_no_subcomponents` (boolean, default: `false`)
 - Optional field `ignore_patterns` (JSON string, default: `null`) — JSON array of `{"field": "...", "pattern": "..."}` objects
 

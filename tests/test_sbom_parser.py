@@ -28,13 +28,15 @@ class TestCycloneDXParser:
         with pytest.raises(SbomParseError, match="bomFormat"):
             CycloneDXParser.parse({"bomFormat": "SPDX", "specVersion": "1.6"})
 
-    def test_rejects_missing_spec_version(self) -> None:
-        with pytest.raises(SbomParseError, match="specVersion"):
-            CycloneDXParser.parse({"bomFormat": "CycloneDX"})
+    def test_accepts_any_spec_version(self) -> None:
+        result = CycloneDXParser.parse(
+            {"bomFormat": "CycloneDX", "specVersion": "1.5"}
+        )
+        assert result["specVersion"] == "1.5"
 
-    def test_rejects_unsupported_spec_version(self) -> None:
-        with pytest.raises(SbomParseError, match="specVersion"):
-            CycloneDXParser.parse({"bomFormat": "CycloneDX", "specVersion": "1.5"})
+    def test_accepts_missing_spec_version(self) -> None:
+        result = CycloneDXParser.parse({"bomFormat": "CycloneDX"})
+        assert "specVersion" not in result
 
     def test_allows_extra_fields(self) -> None:
         raw = {
