@@ -86,21 +86,21 @@
               <span class="info-icon" :data-tooltip="t('sbomUpdater.ttNotFound')">i</span>
             </div>
           </div>
-          <div v-if="activeJob.summary.skipped > 0" class="summary-item summary-skipped">
+          <div class="summary-item summary-skipped">
             <div class="summary-value">{{ activeJob.summary.skipped }}</div>
             <div class="summary-label">
               {{ t('sbomUpdater.skipped') }}
               <span class="info-icon" :data-tooltip="t('sbomUpdater.ttSkipped')">i</span>
             </div>
           </div>
-          <div v-if="activeJob.summary.removed > 0" class="summary-item summary-removed">
+          <div class="summary-item summary-removed">
             <div class="summary-value">{{ activeJob.summary.removed }}</div>
             <div class="summary-label">
               {{ t('sbomUpdater.removed') }}
               <span class="info-icon" :data-tooltip="t('sbomUpdater.ttRemoved')">i</span>
             </div>
           </div>
-          <div v-if="activeJob.summary.ignored > 0" class="summary-item summary-ignored">
+          <div class="summary-item summary-ignored">
             <div class="summary-value">{{ activeJob.summary.ignored }}</div>
             <div class="summary-label">
               {{ t('sbomUpdater.ignored') }}
@@ -679,7 +679,8 @@ th, td {
   color: #b45309;
 }
 
-.status-ignored {
+.status-ignored,
+.status-skipped {
   background: var(--color-table-header-bg);
   color: var(--color-muted-light);
 }

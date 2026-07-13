@@ -8,11 +8,13 @@ from .collector import SbomComponent
 def build_report(
     components: list[SbomComponent],
     resolved: dict[str, ResolveResponse],
-    skipped: int = 0,
+    skipped: list[dict] | None = None,
     removed: list[dict] | None = None,
 ) -> dict:
     if removed is None:
         removed = []
+    if skipped is None:
+        skipped = []
     removed_keys = {safe_normalize(r["purl"]) for r in removed}
     seen: set[str] = set()
     results: list[dict] = []
@@ -78,12 +80,23 @@ def build_report(
             "version": r["version"],
         })
 
+    for s in skipped:
+        results.append({
+            "purl": s["purl"],
+            "status": "skipped",
+            "repository_url": None,
+            "found_by": "",
+            "resolver": "",
+            "name": s["name"],
+            "version": s["version"],
+        })
+
     return {
         "summary": {
-            "total_purls": found_count + not_found_count,
+            "total_purls": found_count + not_found_count + ignored_count + len(skipped) + len(removed),
             "found": found_count,
             "not_found": not_found_count,
-            "skipped": skipped,
+            "skipped": len(skipped),
             "removed": len(removed),
             "ignored": ignored_count,
         },

@@ -143,12 +143,12 @@ class SbomEnrichmentPipeline:
 
         seen: set[str] = set()
         unique_purls: list[str] = []
-        skipped = 0
+        skipped_comps: list[dict] = []
         for comp in purls_to_resolve:
             try:
                 n = normalize(validate(comp.purl))
             except Exception:
-                skipped += 1
+                skipped_comps.append({"purl": comp.purl, "name": comp.name, "version": comp.version})
                 continue
             if n not in seen:
                 seen.add(n)
@@ -168,7 +168,7 @@ class SbomEnrichmentPipeline:
         if remove_unresolved_no_subcomponents:
             removed = remove_unresolved_components(sbom_data, components, resolved)
 
-        report = build_report(components, resolved, skipped=skipped, removed=removed)
+        report = build_report(components, resolved, skipped=skipped_comps, removed=removed)
 
         return SbomEnrichmentResult(
             report=report,

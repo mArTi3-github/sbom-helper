@@ -178,6 +178,6 @@ class TestEnrichSbom:
         components = collect_components(sbom)
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://github.com/example/a")}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
-        report = build_report(components, resolved, skipped=0, removed=removed)
+        report = build_report(components, resolved, removed=removed)
         assert report["summary"]["removed"] == 1
         assert any(r["status"] == "removed" for r in report["results"])
