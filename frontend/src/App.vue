@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useTheme } from '../composables/useTheme'
 import AppNav from './components/AppNav.vue'
 const { t, locale } = useI18n()
+const { theme } = useTheme()
 
 watch(locale, (lang) => {
   document.documentElement.lang = lang
+}, { immediate: true })
+
+watch(theme, (val) => {
+  document.documentElement.classList.toggle('light-theme', val === 'light')
+  localStorage.setItem('theme', val)
 }, { immediate: true })
 </script>
 

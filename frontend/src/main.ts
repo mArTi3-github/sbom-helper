@@ -9,6 +9,11 @@ const savedLocale = localStorage.getItem('locale') as 'en' | 'ru' | null
 const browserLocale: 'en' | 'ru' = navigator.language.startsWith('ru') ? 'ru' : 'en'
 i18n.global.locale.value = savedLocale ?? browserLocale
 
+const savedTheme = localStorage.getItem('theme')
+if (savedTheme === 'light') {
+  document.documentElement.classList.add('light-theme')
+}
+
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
