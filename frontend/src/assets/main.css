@@ -37,6 +37,44 @@
   --border-radius-full: 999px;
 }
 
+.light-theme {
+  --color-primary: #5582ff;
+  --color-primary-hover: #4070f0;
+  --color-primary-disabled: #a0b8ff;
+  --color-primary-focus: rgba(85, 130, 255, 0.15);
+  --color-accent: #8b6cf7;
+  --color-danger: #e05050;
+  --color-danger-hover: #c0392b;
+  --color-success: #22a67e;
+  --color-success-bg: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-bg: #fef3cd;
+  --color-error: #dc2626;
+  --color-error-bg: #fee2e2;
+  --color-error-border: #fca5a5;
+  --color-warning-border: #fbbf24;
+  --color-body-bg: #f5f7fa;
+  --color-body-text: #1e293b;
+  --color-card-bg: #ffffff;
+  --color-card-border: #e2e8f0;
+  --color-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --color-muted: #64748b;
+  --color-muted-light: #94a3b8;
+  --color-muted-lighter: #cbd5e1;
+  --color-input-border: #d1d5db;
+  --color-toggle-off: #d1d5db;
+  --color-toggle-on: #5582ff;
+  --color-delete-border: #e05050;
+  --color-delete-bg-hover: #fef2f2;
+  --color-table-header-bg: #f1f5f9;
+  --color-row-border: #e2e8f0;
+  --color-setting-border: #f1f5f9;
+
+  .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
 *,
 *::before,
 *::after {
