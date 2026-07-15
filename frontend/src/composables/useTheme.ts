@@ -12,3 +12,8 @@ watch(theme, (val) => {
 export function useTheme() {
   return { theme }
 }
+
+/** @internal — reset theme state for test isolation */
+export function resetThemeState() {
+  theme.value = 'dark'
+}

@@ -2,6 +2,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
+import { resetThemeState } from '../composables/useTheme'
 import Settings from './Settings.vue'
 import type { SettingsResponse } from '../types/api'
 
@@ -51,6 +52,8 @@ describe('Settings.vue', () => {
     successUpdate.mockResolvedValue(defaultSettings)
     getSettingsMock.mockResolvedValue(defaultSettings)
     localStorage.clear()
+    resetThemeState()
+    document.documentElement.classList.remove('light-theme')
   })
 
   it('renders the loaded settings', async () => {
