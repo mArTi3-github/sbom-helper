@@ -50,6 +50,7 @@ describe('Settings.vue', () => {
     vi.clearAllMocks()
     successUpdate.mockResolvedValue(defaultSettings)
     getSettingsMock.mockResolvedValue(defaultSettings)
+    localStorage.clear()
   })
 
   it('renders the loaded settings', async () => {
@@ -243,5 +244,28 @@ describe('Settings.vue', () => {
     await flushPromises()
 
     expect(checkGithubTokenMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders theme selector and switches theme', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const themeSelect = wrapper.findAll('select').find((s) => {
+      const options = s.findAll('option')
+      return options.length === 2 &&
+        options.some((o) => o.text() === 'Dark') &&
+        options.some((o) => o.text() === 'Light')
+    })
+    expect(themeSelect).toBeDefined()
+
+    await themeSelect!.setValue('light')
+    await flushPromises()
+    expect(document.documentElement.classList.contains('light-theme')).toBe(true)
+    expect(localStorage.getItem('theme')).toBe('light')
+
+    await themeSelect!.setValue('dark')
+    await flushPromises()
+    expect(document.documentElement.classList.contains('light-theme')).toBe(false)
+    expect(localStorage.getItem('theme')).toBe('dark')
   })
 })

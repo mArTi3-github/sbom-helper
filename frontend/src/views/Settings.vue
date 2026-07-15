@@ -25,6 +25,16 @@
             <option value="ru">{{ t('settings.languageRu') }}</option>
           </select>
         </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.theme') }}</div>
+            <div class="setting-desc">{{ t('settings.themeDesc') }}</div>
+          </div>
+          <select :value="theme" @change="setTheme" class="select-input">
+            <option value="dark">{{ t('settings.themeDark') }}</option>
+            <option value="light">{{ t('settings.themeLight') }}</option>
+          </select>
+        </div>
       </div>
 
       <div class="card">
@@ -324,9 +334,11 @@ import { useSettingsStore } from '../stores/useSettingsStore'
 import { clearValidationCache } from '../api/settings'
 import type { SettingsUpdate } from '../types/api'
 import { useI18n } from 'vue-i18n'
+import { useTheme } from '../composables/useTheme'
 
 const store = useSettingsStore()
 const { t, locale } = useI18n()
+const { theme } = useTheme()
 const {
   validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
@@ -438,6 +450,11 @@ function setLanguage(e: Event) {
   const lang = (e.target as HTMLSelectElement).value as 'en' | 'ru'
   locale.value = lang
   localStorage.setItem('locale', lang)
+}
+
+function setTheme(e: Event) {
+  const val = (e.target as HTMLSelectElement).value as 'dark' | 'light'
+  theme.value = val
 }
 
 onMounted(async () => {
