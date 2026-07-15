@@ -144,6 +144,10 @@
     "languageRu": "Russian",
     "browserSection": "Browser",
     "languageDesc": "Interface language",
+    "theme": "Theme",
+    "themeDesc": "Color theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
     "savedToast": "Settings saved",
     "saveFailedToast": "Failed to save: {message}",
     "errorMessages": {

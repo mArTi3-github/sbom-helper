@@ -144,6 +144,10 @@
     "languageRu": "Русский",
     "browserSection": "Браузер",
     "languageDesc": "Язык веб-интерфейса",
+    "theme": "Тема",
+    "themeDesc": "Цветовая тема",
+    "themeDark": "Тёмная",
+    "themeLight": "Светлая",
     "savedToast": "Настройки сохранены",
     "saveFailedToast": "Ошибка сохранения: {message}",
     "errorMessages": {
