@@ -56,8 +56,6 @@ docker compose logs --follow
 ./scripts/update.sh -v      # verbose mode
 ```
 
-The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
-
 ## Architecture
 
 The core functionality of sbom-helper revolves around resolving `PURL → repository URL`. The resolver chain works as follows:
