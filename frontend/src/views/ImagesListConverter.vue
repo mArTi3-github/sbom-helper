@@ -24,7 +24,9 @@
           &#10003; {{ t('imagesListConverter.noTransformation') }}
         </span>
       </div>
-
+      <div class="toolbar">
+        <button class="btn btn-primary" @click="downloadResult">{{ t('imagesListConverter.downloadList') }}</button>
+      </div>
       <div class="table-wrapper">
         <table>
           <thead>
@@ -65,10 +67,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <div class="toolbar">
-        <button class="btn btn-primary" @click="downloadResult">{{ t('imagesListConverter.downloadList') }}</button>
       </div>
     </div>
   </div>
