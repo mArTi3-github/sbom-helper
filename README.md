@@ -1,60 +1,75 @@
 # sbom-helper
 
-Resolve Package URLs (PURLs) to source code repository URLs with resolver attribution and warnings.
+A web application and API service for enriching and validating CycloneDX SBOMs with source code repository references.
+
+## Features
+
+- **PURL → Repository URL resolution** — find the VCS repository URL matching a given Package URL (PURL)
+- **SBOM enrichment** — add missing `externalReferences` (type `vcs`) to all components in a CycloneDX SBOM, and validate existing VCS references
+- **Container image list generation** — extract container components from an SBOM into a dedicated machine-readable format, with deduplication and FSTEC compliance checks
+- **Database administration** — browse, search, edit, delete, import, and export PURL → repository mappings via CSV
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Supported PURL Types](#supported-purl-types)
+- [Settings](#settings)
+- [Web UI Sections](#web-ui-sections)
+- [Tech Stack](#tech-stack)
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Updating](#updating)
+- [API Reference](#api-reference)
+- [Security Notes](#security-notes)
+- [Planned Features](#planned-features)
+- [License](#license)
 
 ## Quick Start
 
+### Requirements
+
+- git
+- Docker + Docker Compose
+
+### Setup
+
 ```bash
+git clone https://github.com/mArTi3-github/sbom-helper.git
+cd sbom-helper
 docker compose up -d
 ```
 
-Open `https://localhost:8443/` in your browser to access the SPA.
+The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
 
-For development with hot-reload (src/ is mounted as a volume, changes apply on save):
-
-```bash
-docker compose up -d
-```
-
-Docker Compose automatically merges `docker-compose.override.yml`, switching the build target to `dev` with `--reload` and source code mounting. No `--build` needed for `src/` changes — uvicorn reloads automatically. Rebuild only when `pyproject.toml` (dependencies) or `frontend/` changes.
-
-**Frontend development** (Vue 3 SPA at `frontend/`):
+### Viewing logs
 
 ```bash
-cd frontend
-npm install
-npm run build -- --watch    # auto-rebuild on changes
+docker compose logs --follow
+# Exit: CTRL-C
 ```
 
-Then `docker compose up -d` (or `docker compose up --build` if the dist directory changed outside the container).
-
-For production, exclude the override file:
+### Updating
 
 ```bash
-docker compose -f docker-compose.yml up -d
+./scripts/update.sh         # pulls latest code, rebuilds, redeploys
+./scripts/update.sh -v      # verbose mode
 ```
 
-## API
+The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
 
-| Endpoint | Description |
-|---|---|
-| `POST /api/v1/resolve` | Resolve a PURL to its repository URL |
-| `POST /api/v1/resolve/sbom` | Enrich a CycloneDX SBOM with VCS references (optional: remove unresolved components, validate existing VCS references) |
-| `POST /api/v1/convert/images-list` | Convert a CycloneDX SBOM to a machine-readable list of Docker container images |
-| `GET /api/v1/db/purls` | List PURLs with pagination and filtering |
-| `GET /api/v1/db/resolvers` | List distinct resolver names for filter dropdown |
-| `PATCH /api/v1/db/purls/{purl}` | Edit a PURL row |
-| `DELETE /api/v1/db/purls` | Bulk delete PURL rows |
-| `POST /api/v1/db/import` | Import PURLs from CSV (comma delimiter) |
-| `POST /api/v1/db/export` | Export selected PURLs to CSV (comma delimiter) |
-| `GET /health` | Health check |
-| `GET /api/v1/settings` | Get application settings |
-| `PATCH /api/v1/settings` | Update application settings |
-| `GET /` | Web UI — PURL resolver |
-| `GET /sbom-updater` | Web UI — SBOM enrichment |
-| `GET /db-admin` | Web UI — Database administration |
-| `GET /settings` | Web UI — Application settings |
-| `GET /images-list-converter` | Web UI — SBOM-to-images-list conversion |
+## Architecture
+
+The core functionality of sbom-helper revolves around resolving `PURL → repository URL`. The resolver chain works as follows:
+
+1. **Validate input** — the PURL is checked against the [Package URL specification](https://github.com/package-url/purl-spec)
+2. **Query sources sequentially** (first match wins):
+   - **Local database** — cache of previously resolved PURL → VCS URL mappings
+   - **[purl2repo](https://github.com/tonylturner/purl2repo)** — open-source resolver for common PURL types
+   - **[ecosyste.ms](https://ecosyste.ms/)** — open package registry API (enabled by default)
+   - **[libraries.io](https://libraries.io/)** — open source package discovery API (optional, requires API key)
+3. **Validate the found URL** — checks if the URL points to a VCS repository using git, svn, hg (Mercurial), and fossil probes
+4. **Cache and return** — on success, the mapping is stored in the local database and the URL is returned
 
 ## Supported PURL Types
 
@@ -82,43 +97,139 @@ docker compose -f docker-compose.yml up -d
 | `swift` | | ✓ | ✓ |
 
 **Notes:**
-- **purl2repo** is the primary resolver (always enabled)
-- **ecosyste.ms** is enabled by default as a fallback and accepts any valid PURL via its lookup API
-- **libraries.io** is an optional fallback (requires API key, configured via Settings)
+- Support for a PURL type does not guarantee a 100 % resolution rate — it means the resolver chain is capable of processing that type
+- **purl2repo** is always enabled as the primary resolver
+- **ecosyste.ms** is enabled by default as a fallback
+- **libraries.io** is optional and requires an API key, configured via Settings
 
-## Stack
+## Settings
 
-**Backend:** FastAPI, Pydantic, purl2repo, ecosyste.ms, libraries.io  
-**UI:** Vue 3 SPA (Vite, TypeScript, Vue Router, vue-i18n) — replaces Jinja2 + vanilla JS  
-**Infrastructure:** Docker, Docker Compose  
-**Python:** 3.11+
+Key settings available in the web UI (`/settings`):
 
-## Status
+| Setting | Recommended | Description |
+|---|---|---|
+| `Validate DB URLs` | Enabled | Validates cached repository URLs before returning them. Invalid URLs are deleted and re-resolved through the chain |
+| `GitHub Personal Access Token` | Active token | Increases GitHub API rate limits from 60 to 5000 requests/hour. [Create a token](https://github.com/settings/tokens) |
+| `Enable libraries.io resolver` + `API key` | Enabled + active key | Enables search across the public libraries.io database. Increases rate limits from 10 to 60 requests/min. [Get a key](https://libraries.io/account) |
+| `Enable ecosyste.ms resolver` + `API key` | Enabled + active key | Enables search across the public ecosyste.ms database. Rate limits are dynamic. [Get a key](https://ecosyste.ms/account/api_key) |
 
-Core features complete: PURL resolution, SBOM enrichment (including storage of pre-existing VCS references and optional removal of unresolved components without subcomponents), database administration (view, edit, filter, import/export via CSV, bulk delete), SBOM-to-images-list conversion (promotes container components from CycloneDX SBOMs into a dedicated images list format with completeness flags), and multilingual UI (English/Russian with language selector in Settings). CSV uses comma delimiter with BOM handling; values containing commas are quoted per RFC 4180.
+Additional settings (URL validation timeout, retry config, batch concurrency, job TTL, log level, connectivity checks) are available in the Settings UI.
 
-**Optional resolvers:** ecosyste.ms is enabled by default as a fallback resolver after purl2repo. libraries.io can be enabled as an additional fallback (requires API key), configured via the Settings page (`/settings`). Supports: Cargo, Composer (Packagist), Conda, CPAN, CRAN, Gem (RubyGems), Generic (GitHub), Go, Hackage, Hex, Maven, NPM, NuGet, Pub, PyPI, Swift (SwiftPM).
+**Browser-only settings:** language (English/Russian) and UI theme (light/dark) are stored locally per user.
 
-**URL validation:** cached repository URLs can be validated via HTTP HEAD + git ls-remote (enabled via `validate_db_urls` setting in Settings). Invalid URLs are deleted from the cache and re-resolved via the resolver chain. Non-http/https URLs are rejected immediately. Validation respects resolver-based cooldown (configurable via `revalidation_cooldown_hours`). The SBOM Updater optionally validates existing VCS references in uploaded SBOMs.
+Server settings are persisted in `data/settings.json`.
 
-See `specs/INDEX.md` for full documentation and `project_plan.md` for upcoming phases.
+## Web UI Sections
 
-## Dev stand deployment
+### PURL Resolver (`/purl-resolver`)
+Accepts a PURL and returns the corresponding source code repository URL. The returned URL points to the project-level repository, not a specific version.
 
-After making changes to `frontend/` or `src/`, redeploy on the current dev stand:
+### SBOM Enricher (`/sbom-updater`)
+Accepts a CycloneDX SBOM and returns an enriched SBOM with VCS repository URLs added to all components (recursively).
+
+Two options are available:
+- **Ignore patterns** — specify component attributes to skip (e.g., exclude proprietary components with known patterns in `purl`, `group`, or `name`)
+- **Remove unresolved leaves** — automatically remove leaf components (those without subcomponents) for which no URL was found. Use with caution.
+
+Processing is asynchronous: each SBOM is handled as a separate job with status tracking, cancellation support, and result download. Job results are stored on the server with a configurable TTL (default: 24 hours).
+
+### Container Images List Converter (`/images-list-converter`)
+Accepts a CycloneDX SBOM and extracts all components with `type: "container"` into a new `components` list, deduplicated by `purl`. The generated list is checked against FSTEC requirements (fields: `name`, `version`, `properties`, sub-`components`).
+
+### Database Admin (`/db-admin`)
+Manage the local PURL → repository URL mapping database:
+- Search and filter records
+- Edit PURL or Repository URL values
+- Delete records
+- Export selected rows as CSV
+- Import data from CSV
+
+## Tech Stack
+
+**Backend:**
+- Language: Python 3.12
+- FastAPI (API framework), Pydantic v2 (data validation), Uvicorn (ASGI server with HTTPS)
+- purl2repo (primary resolver), httpx (HTTP client), asyncpg (PostgreSQL), diskcache (URL validation cache), packageurl-python (PURL parsing)
+- VCS probes: git, subversion, mercurial, fossil
+
+**Frontend:**
+- Language: TypeScript
+- Vue 3 + Vite, vue-i18n (en/ru), Pinia (state management), Vue Router
+
+**Infrastructure:**
+- Docker + Docker Compose
+- Python 3.12-slim (app), postgres:16-alpine (database), node:20-alpine (frontend build)
+
+**Testing:**
+- Backend: pytest
+- Frontend: vitest + @vue/test-utils
+
+## API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/resolve` | Resolve a single PURL to its repository URL |
+| `POST` | `/api/v1/jobs/sbom-enrich` | Submit a CycloneDX SBOM for enrichment (async) |
+| `GET` | `/api/v1/jobs` | List enrichment jobs |
+| `GET` | `/api/v1/jobs/{job_id}` | Get job status |
+| `GET` | `/api/v1/jobs/{job_id}/result` | Download enriched SBOM (when completed) |
+| `POST` | `/api/v1/jobs/{job_id}/cancel` | Cancel a running job |
+| `DELETE` | `/api/v1/jobs/{job_id}` | Delete a job and its result |
+| `POST` | `/api/v1/convert/images-list` | Convert SBOM to container images list |
+| `GET` | `/api/v1/db/purls` | List PURL mappings (paginated, filterable) |
+| `GET` | `/api/v1/db/resolvers` | List distinct resolver names |
+| `PATCH` | `/api/v1/db/purls/{purl}` | Update a PURL mapping |
+| `DELETE` | `/api/v1/db/purls` | Bulk delete PURL mappings |
+| `POST` | `/api/v1/db/import` | Import PURLs from CSV |
+| `POST` | `/api/v1/db/export` | Export selected PURLs to CSV |
+| `GET` | `/api/v1/settings` | Get application settings |
+| `PATCH` | `/api/v1/settings` | Update application settings |
+| `POST` | `/api/v1/settings/clear-validation-cache` | Clear URL validation cache |
+| `POST` | `/api/v1/settings/check-github-token` | Validate the configured GitHub token |
+| `GET` | `/api/v1/sbom/ignore-patterns` | Get SBOM enrichment ignore patterns |
+| `POST` | `/api/v1/sbom/ignore-patterns` | Save SBOM enrichment ignore patterns |
+| `GET` | `/health` | Health check |
+
+An interactive OpenAPI/Swagger UI is available at `/docs` when the server is running.
+
+## Security Notes
+
+sbom-helper does **not** implement authentication or access control. Protect the service at the infrastructure level — do not expose it to the internet or untrusted networks.
+
+## Planned Features
+
+**Major features:**
+- Web UI wrappers for [sbom-checker](https://gitlab.community.ispras.ru/sdl-tools/sbom-checker) CLI tools (ISP RAS)
+- GOST field consistency validation (`GOST:attack_surface`, `GOST:security_function` between parent and child components) with auto-fix suggestions
+- Additional resolvers for `deb`, `apk`, and other package types; LLM-based resolver with internet search
+- Direct source archive download links (`"type": "source-distribution"`) when no VCS repository is available
+
+**Minor improvements:**
+- Batch PURL resolution in the UI
+- Real-time progress reporting during SBOM enrichment
+- Manual record creation in the DB Admin section
+- SBOM-based import of PURL → repository mappings into the local DB
+- Alternative repository URLs storage (fallbacks when the primary URL becomes invalid)
+- Configurable caching of failed resolution/validation attempts
+- Structured debug logging with a dedicated UI section
+- Version information display in the web UI
+
+## Dev Stand Deployment
+
+After making changes to `frontend/` or `src/`:
 
 ```bash
-# 1. Rebuild the frontend (required for any .vue/.ts change)
+# 1. Rebuild the frontend
 cd frontend && npm run build && cd ..
 
 # 2. If pyproject.toml dependencies changed, rebuild the container:
 docker compose build --no-cache
 
-# 3. Restart the container (picks up new frontend dist and/or new image):
+# 3. Restart the container:
 docker compose up -d
 ```
 
-Steps 1 and 3 are sufficient when only frontend code or Python sources changed (the `src/` directory is mounted as a volume in dev mode). Step 2 is needed only when `pyproject.toml` (Python dependencies) or `Dockerfile` changed.
+Steps 1 and 3 are sufficient for frontend-only or Python source changes (the `src/` directory is mounted as a volume in dev mode).
 
 ## Specs
 
