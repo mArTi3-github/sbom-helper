@@ -220,6 +220,16 @@ class TestGitProbe:
             assert args[0] == "git"
             assert args[1] == "ls-remote"
             assert args[2] == "--exit-code"
+            assert args[4] == "HEAD"
+
+    @pytest.mark.asyncio
+    async def test_exit_two_returns_true(self):
+        from purl_resolver.url_validator import _git_probe
+        with patch("asyncio.create_subprocess_exec", return_value=_make_proc(2)) as mock_exec:
+            result = await _git_probe("https://github.com/psf/requests", 5)
+            assert result is True
+            args = mock_exec.call_args[0]
+            assert args[4] == "HEAD"
 
     @pytest.mark.asyncio
     async def test_not_found_stderr_returns_false(self):

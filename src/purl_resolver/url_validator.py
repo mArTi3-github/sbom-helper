@@ -129,7 +129,7 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
         if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")) and url.startswith("https://"):
             git_url = f"https://oauth2:{github_token}@{url[len('https://'):]}"
         proc = await asyncio.create_subprocess_exec(
-            "git", "ls-remote", "--exit-code", git_url,
+            "git", "ls-remote", "--exit-code", git_url, "HEAD",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
@@ -145,7 +145,7 @@ async def _git_probe(url: str, timeout: int, github_token: str | None = None) ->
             await proc.wait()
             logger.warning("git ls-remote timed out for %s", url)
             return None
-        if proc.returncode == 0:
+        if proc.returncode in (0, 2):
             logger.info("git probe confirmed %s as git repository", url)
             return True
         stderr_text = stderr.decode(errors="replace") if stderr else ""
