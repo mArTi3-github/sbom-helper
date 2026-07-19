@@ -87,12 +87,9 @@
 |  |  url_validator.py           |                   |
 |  |                             |                   |
 |  |  validate_url()             |                   |
-|  |  validate_url_with_retry()  |                   |
-|  |  validate_github_token()    |                   |
 |  |  ensure_connectivity()      |                   |
 |  |  HEAD + multi-VCS probe    |                   |
 |  |  Rate limit mitigation      |                   |
-|  |  Token authentication       |                   |
 |  |  Redirect resolution        |                   |
 |  |    follows 3xx, captures    |                   |
 |  |    final URL, returns       |                   |
@@ -256,7 +253,7 @@
 ### Service Layer (`service.py`)
 - `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`, `validation_service: UrlValidationService | None = None`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver chain (iterates resolvers, first success wins) → storage store; uses `resolver.name` property to tag stored records with the actual resolver identifier (e.g. `"purl2repo"`, `"libraries.io"`)
-- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with optional GitHub token authentication; delete invalid URLs and fall through to resolver chain; skip validation if within cooldown window (trusted resolvers respect `revalidation_cooldown_hours`); remove invalid tokens from settings automatically. Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url_with_retry()` directly.
+- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil); delete invalid URLs and fall through to resolver chain; skip validation if within cooldown window (trusted resolvers respect `revalidation_cooldown_hours`). Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url()` directly.
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit from `AppSettings.batch_semaphore_limit` (default: 10); returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `self._storage.store()`
 - Map resolver `Resolution` to canonical `ResolveResponse` format (purl, repository_url, warnings, resolver, found_by, resolved_at); tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
@@ -327,7 +324,7 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, github_token, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
 - `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
@@ -351,18 +348,16 @@
 
 ### URL Validator (`url_validator.py`)
 - Validates repository URLs via HTTP HEAD + multi-VCS probe to verify the URL exists and is reachable
-- `validate_url(url, timeout, github_token=None) → UrlValidationOutput` — performs HEAD (with `follow_redirects=True`), captures the final URL after all 3xx redirects via `str(resp.url)`, then runs `_check_vcs()` against the final URL; returns `UrlValidationOutput(result, final_url)`
-- `validate_url_with_retry(url, timeout, github_token=None, settings_store=None) → UrlValidationOutput` — wraps `validate_url()` with `TOKEN_INVALID` retry: clears the GitHub token from `AppSettings` and re-validates without authentication
-- `validate_github_token(token) → bool` — validates a GitHub token by HEAD on `/rate_limit`
-- `ensure_connectivity(github_token=None, url=None, timeout=None) → bool` — connectivity probe against configurable URL (default `https://github.com`); raises `ConnectionError` on failure
-- `_check_vcs(url, timeout, github_token=None) → bool | None` — unified multi-VCS probe; runs git → svn → hg → fossil sequentially with early-exit on first success; aggregation: `True` if any probe is `True`, else `False` if any is `False`, else `None`; called with the resolved final URL by `validate_url()`
-- `_git_probe(url, timeout, github_token=None) → bool | None` — internal helper: `git ls-remote --exit-code <url>`; rewrites `github.com` URLs with `oauth2:token@` for authenticated calls
+- `validate_url(url, timeout) → UrlValidationOutput` — performs HEAD (with `follow_redirects=True`), captures the final URL after all 3xx redirects via `str(resp.url)`, then runs `_check_vcs()` against the final URL; returns `UrlValidationOutput(result, final_url)`
+- `ensure_connectivity(url=None, timeout=None) → bool` — connectivity probe against configurable URL (default `https://github.com`); raises `ConnectionError` on failure
+- `_check_vcs(url, timeout) → bool | None` — unified multi-VCS probe; runs git → svn → hg → fossil sequentially with early-exit on first success; aggregation: `True` if any probe is `True`, else `False` if any is `False`, else `None`; called with the resolved final URL by `validate_url()`
+- `_git_probe(url, timeout) → bool | None` — internal helper: `git ls-remote --exit-code <url>`
 - `_svn_probe(url, timeout) → bool | None` — internal helper: `svn ls <url>`; exit 0 → True, exit ≠0 → False
 - `_hg_probe(url, timeout) → bool | None` — internal helper: `hg identify <url>`; exit 0 → True, exit ≠0 → False
 - `_fossil_probe(url, timeout) → bool | None` — combined probe: tries the authoritative /xfer protocol probe first (`_fossil_probe_xfer`), falls back to HTML footer regex (`_fossil_probe_footer`) when the xfer probe is uncertain (None)
 - `_fossil_probe_xfer(url, timeout) → bool | None` — internal helper: minimal POST to `<url>/xfer` with `Content-Type: application/x-fossil-debug`; checks response Content-Type for `application/x-fossil` / `application/x-fossil-debug`; 401/403 → None; other → False; transport error → None
 - `_fossil_probe_footer(url, timeout) → bool | None` — internal helper (fallback): HTTP GET with `follow_redirects=True`; status 200 + footer regex match → True; status 200 without footer → False; non-200 → False; transport error → None
-- `UrlValidationResult` enum — `VALID`, `INVALID`, `NETWORK_ERROR`, `RATE_LIMITED`, `TOKEN_INVALID`
+- `UrlValidationResult` enum — `VALID`, `INVALID`, `NETWORK_ERROR`, `RATE_LIMITED`
 - `UrlValidationOutput` dataclass — `result: UrlValidationResult`, `final_url: str | None = None`; `final_url` is `str(resp.url)` after redirects, `None` when HEAD did not execute (scheme error, cooldown, connectivity failure, HEAD exception)
 
 ### Web UI Layer (`frontend/`)

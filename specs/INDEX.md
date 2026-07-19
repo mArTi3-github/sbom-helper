@@ -9,7 +9,7 @@
 | Modify the web UI | `domains/web-ui.md` |
 | Change error handling strategy | `domains/purl-resolution.md`, `contracts/api-contract.md` |
 | Add configuration parameter | `domains/purl-resolution.md` |
-| Change GitHub token validation behavior | `domains/purl-resolution.md`, `contracts/api-contract.md`, `domains/web-ui.md` |
+| Remove GitHub token functionality (deleted feature) | `domains/purl-resolution.md`, `contracts/api-contract.md`, `domains/web-ui.md` (already updated) |
 | Change how purl2repo is called | `architecture/layers.md`, `domains/purl-resolution.md` |
 | Add a new layer or module | `architecture/layers.md`, `META.md` |
 | Make a breaking API change | `contracts/api-contract.md` (Breaking Change Checklist) |

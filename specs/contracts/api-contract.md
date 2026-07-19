@@ -212,7 +212,6 @@ Return current application settings.
   "librariesio_enabled": false,
   "ecosystems_enabled": true,
   "token_set": {
-    "github_token": false,
     "librariesio_api_key": false,
     "ecosystems_api_key": false
   },
@@ -236,7 +235,6 @@ Return current application settings.
 - `connectivity_url`: string — URL used for connectivity probes (default: `"https://github.com"`)
 - `connectivity_timeout`: integer — timeout in seconds for connectivity probes (1–30, default: `2`)
 - `job_ttl_hours`: integer — time-to-live in hours for async job records (1–720, default: `24`)
-- `token_set.github_token`: boolean — whether a GitHub token is configured (token value is never returned)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
 - `language`: string — UI language (`"en"` or `"ru"`; default: `"en"`)
@@ -257,14 +255,6 @@ Partially update application settings.
 }
 ```
 
-```json
-{
-  "validate_db_urls": true,
-  "url_validation_timeout": 10,
-  "github_token": "ghp_..."
-}
-```
-
 All fields optional. Only provided fields are updated.
 
 - `validate_db_urls`: optional bool — enable/disable URL validation for cached repository URLs.
@@ -272,7 +262,6 @@ All fields optional. Only provided fields are updated.
 - `sbom_multiple_vcs_behavior`: optional string — behavior when SBOM component has multiple VCS references (`"keep-first"` or `"keep-all"`).
 - `url_validation_timeout`: optional int — timeout in seconds for HEAD and git ls-remote checks (1–60).
 - `revalidation_cooldown_hours`: optional int — cooldown in hours for trusted resolver entries (0–720, 0 disables cooldown).
-- `github_token`: optional string — GitHub Personal Access Token. Set to `null` to clear the token. Empty string is ignored. Invalid tokens are rejected with `400 invalid_token`.
 - `librariesio_enabled`: optional bool — enable/disable the libraries.io resolver.
 - `librariesio_api_key`: optional string|null — libraries.io API key. Set to `null` to clear the key. Empty string is ignored. Non-empty values are validated via the libraries.io API and rejected with `400 invalid_token` if invalid.
 - `ecosystems_enabled`: optional bool — enable/disable the ecosyste.ms resolver.
@@ -297,32 +286,6 @@ Returns the full updated settings object (same format as `GET /api/v1/settings`)
 ```json
 {
   "error": "invalid_token"
-}
-```
-
----
-
-### `POST /api/v1/settings/check-github-token`
-
-Manually validate the currently stored GitHub token. No request body.
-
-#### Response (200) — token is valid
-
-```json
-{ "status": "valid" }
-```
-
-#### Response (200) — token is invalid
-
-```json
-{ "status": "invalid" }
-```
-
-#### Error Response (400) — token not set
-
-```json
-{
-  "error": "token_not_set"
 }
 ```
 
@@ -635,13 +598,11 @@ Standard FastAPI/Pydantic 422 response.
 | PURL not found on PATCH | 404 | `purl_not_found` |
 | Invalid CSV (missing columns, wrong format) | 400 | `invalid_csv` |
 | CSV too large | 413 | `file_too_large` |
-| Invalid GitHub token on settings save | 400 | `invalid_token` |
 | Invalid libraries.io API key on settings save | 400 | `invalid_token` |
 | Images list conversion: invalid JSON | 400 | `invalid_json` |
 | Images list conversion: invalid SBOM format | 400 | `invalid_sbom` |
 | Images list conversion: file too large | 413 | `file_too_large` |
 | Images list conversion: missing file field | 422 | (Pydantic validation) |
-| GitHub token check with no token stored | 400 | `token_not_set` |
 | Network unavailable (GitHub connectivity check failed) | 503 | `network_unavailable` |
 | Job queue unavailable (no PostgreSQL) | 503 | `job_queue_unavailable` |
 | Job not found | 404 | `job_not_found` |
