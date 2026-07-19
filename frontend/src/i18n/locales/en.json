@@ -163,15 +163,15 @@
     "urlValidation": {
       "title": "URL Validation",
       "validateDbUrls": "Validate URLs from local database",
-      "validateDbUrlsDesc": "When enabled, repository URLs found in the local database are verified (HTTP HEAD + git ls-remote) before being returned. Invalid URLs are deleted and resolution continues through the resolver chain.",
+      "validateDbUrlsDesc": "When enabled, repository URLs found in the local database are verified (HTTP HEAD + VCS check) before being returned. Invalid URLs are deleted and resolution continues through the resolver chain.",
       "validateSbomRefs": "Validate pre-existing URLs from SBOM",
       "validateSbomRefsDesc": "When enabled, existing VCS URLs found in SBOM files are verified before enrichment. Invalid URLs trigger re-resolution of the component.",
       "multipleVcs": "Behavior when multiple valid VCS-links are found",
-      "multipleVcsDesc": "When multiple VCS references are valid, choose whether to keep only the first one or keep all of them in the SBOM.",
+      "multipleVcsDesc": "When multiple valid VCS references are found in the SBOM for a component, choose whether to keep only the first one or all of them in the externalReferences list.",
       "keepFirst": "keep only first",
       "keepAll": "keep all",
       "timeout": "Validation timeout (seconds)",
-      "timeoutDesc": "Timeout for each HTTP HEAD and git ls-remote check (1–60 seconds).",
+      "timeoutDesc": "Timeout for each HTTP-HEAD and VCS-check query (1–60 seconds).",
       "cooldown": "Re-validation cooldown (hours)",
       "cooldownDesc": "This setting controls how long a successfully validated URL remains in the validation cache before being re-checked. All validated URLs are treated equally regardless of origin (resolver, import, or database). Set to 0 to disable the cache and always re-validate.",
       "infoText": "URLs from resolvers are always validated before being returned. Validation results are cached and reused across all contexts (local database, SBOM enrichment) within the configured cooldown period.",
@@ -185,7 +185,7 @@
       "enableDesc": "When enabled, libraries.io is used as a fallback resolver when purl2repo cannot find a repository URL.",
       "apiKey": "API Key",
       "apiKeyDesc": "Optional API key for higher rate limits (60 req/min vs 10 req/min).",
-      "loginHint": "Log in to libraries.io → API Settings",
+      "loginHint": "Log in to libraries.io → Settings → API Key",
       "status": "Status:"
     },
     "ecosystems": {
@@ -194,6 +194,7 @@
       "enableDesc": "Live query to ecosyste.ms API for repository URL lookup. Works without API key. Key is optional for higher rate limits.",
       "apiKey": "API Key (optional)",
       "apiKeyDesc": "Optional API key for higher rate limits.",
+      "loginHint": "Log in to ecosyste.ms → Account → API Key",
       "status": "Status:",
       "maxRps": "Max requests per second",
       "maxRpsDesc": "Rate limit for ecosyste.ms API requests (0.1–100 req/s). Default: 2.0. Lower values reduce timeout risk under concurrent load."

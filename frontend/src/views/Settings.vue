@@ -136,7 +136,7 @@
               {{ t('settings.librariesio.apiKeyDesc') }}
             </div>
             <div class="setting-desc link-desc">
-              <a href="https://libraries.io/login" target="_blank">{{ t('settings.librariesio.loginHint') }}</a>
+              <a href="https://libraries.io/account" target="_blank">{{ t('settings.librariesio.loginHint') }}</a>
             </div>
             <div class="setting-desc status-desc">
               {{ t('settings.librariesio.status') }} <span :class="tokenSet.librariesio_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.librariesio_api_key ? t('settings.set') : t('settings.notSet') }}</span>
@@ -168,6 +168,9 @@
             <div class="setting-label">{{ t('settings.ecosystems.apiKey') }}</div>
             <div class="setting-desc">
               {{ t('settings.ecosystems.apiKeyDesc') }}
+            </div>
+            <div class="setting-desc link-desc">
+              <a href="https://ecosyste.ms/account/api_key" target="_blank">{{ t('settings.ecosystems.loginHint') }}</a>
             </div>
             <div class="setting-desc status-desc">
               {{ t('settings.ecosystems.status') }} <span :class="tokenSet.ecosystems_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.ecosystems_api_key ? t('settings.set') : t('settings.notSet') }}</span>
