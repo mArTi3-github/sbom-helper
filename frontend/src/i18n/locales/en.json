@@ -152,19 +152,12 @@
     "saveFailedToast": "Failed to save: {message}",
     "errorMessages": {
       "loadFailed": "Failed to load settings",
-      "tokenClearFailed": "Failed to clear token",
-      "tokenCheckFailed": "Failed to check token",
       "keyClearFailed": "Failed to clear key",
       "cacheClearFailed": "Failed to clear validation cache"
     },
-    "clearToken": "Clear token",
     "clearKey": "Clear key",
-    "checkValidity": "Check validity",
     "set": "set",
     "notSet": "not set",
-    "valid": "valid",
-    "invalid": "invalid",
-    "tokenCheckComplete": "Token check complete",
     "tokenCleared": "Token cleared",
     "cacheCleared": "Validation cache cleared",
     "urlValidation": {
@@ -185,15 +178,6 @@
       "clearCache": "Clear validation cache",
       "clearCacheDesc": "Remove all cached URL validation results. The next validation for each URL will perform a full check.",
       "clearCacheBtn": "Clear cache"
-    },
-    "githubToken": {
-      "title": "GitHub API Token (optional)",
-      "label": "GitHub Personal Access Token",
-      "desc": "Used for authenticated git ls-remote and HTTP requests. Increases rate limits from 60/hr to 5000/hr for API, and removes limits for git operations.",
-      "genToken": "Generate token",
-      "genTokenHint": "→ Settings → Developer settings → Personal access tokens → Fine-grained or classic",
-      "status": "Status:",
-      "validity": "Validity:"
     },
     "librariesio": {
       "title": "Libraries.io Resolver (optional)",
@@ -276,8 +260,6 @@
     "invalid_json": "Invalid JSON format",
     "invalid_sbom": "Invalid SBOM file",
     "network_unavailable": "Network unavailable",
-    "invalid_token": "GitHub token is invalid or expired",
-    "token_not_set": "GitHub token is not set",
     "invalid_update": "Invalid update request",
     "purl_not_found": "PURL not found",
     "invalid_csv": "Invalid CSV file",

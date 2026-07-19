@@ -152,19 +152,12 @@
     "saveFailedToast": "Ошибка сохранения: {message}",
     "errorMessages": {
       "loadFailed": "Не удалось загрузить настройки",
-      "tokenClearFailed": "Не удалось очистить токен",
-      "tokenCheckFailed": "Не удалось проверить токен",
       "keyClearFailed": "Не удалось очистить ключ",
       "cacheClearFailed": "Не удалось очистить кеш валидации"
     },
-    "clearToken": "Очистить токен",
     "clearKey": "Очистить ключ",
-    "checkValidity": "Проверить",
     "set": "установлен",
     "notSet": "не установлен",
-    "valid": "действителен",
-    "invalid": "недействителен",
-    "tokenCheckComplete": "Проверка токена завершена",
     "tokenCleared": "Токен очищен",
     "cacheCleared": "Кеш валидации очищен",
     "urlValidation": {
@@ -185,15 +178,6 @@
       "clearCache": "Очистить кеш валидации",
       "clearCacheDesc": "Удалить все кешированные результаты валидации URL. Следующая проверка каждого URL будет полной.",
       "clearCacheBtn": "Очистить кеш"
-    },
-    "githubToken": {
-      "title": "GitHub API токен (опционально)",
-      "label": "GitHub Personal Access Token",
-      "desc": "Используется для аутентифицированных git ls-remote и HTTP запросов. Увеличивает лимиты с 60/ч до 5000/ч для API.",
-      "genToken": "Создать токен",
-      "genTokenHint": "→ Settings → Developer settings → Personal access tokens → Fine-grained или classic",
-      "status": "Статус:",
-      "validity": "Действительность:"
     },
     "librariesio": {
       "title": "Libraries.io резолвер (опционально)",
@@ -276,8 +260,6 @@
     "invalid_json": "Неверный формат JSON",
     "invalid_sbom": "Неверный SBOM файл",
     "network_unavailable": "Сеть недоступна",
-    "invalid_token": "GitHub токен недействителен или истёк",
-    "token_not_set": "GitHub токен не установлен",
     "invalid_update": "Неверный запрос на обновление",
     "purl_not_found": "PURL не найден",
     "invalid_csv": "Неверный CSV файл",

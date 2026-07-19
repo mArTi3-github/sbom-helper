@@ -114,35 +114,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">{{ t('settings.githubToken.title') }}</div>
-        <div class="setting-row">
-          <div>
-            <div class="setting-label">{{ t('settings.githubToken.label') }}</div>
-            <div class="setting-desc">
-              {{ t('settings.githubToken.desc') }}
-            </div>
-            <div class="setting-desc link-desc">
-              <a href="https://github.com/settings/tokens" target="_blank">{{ t('settings.githubToken.genToken') }}</a>
-              {{ t('settings.githubToken.genTokenHint') }}
-            </div>
-            <div class="setting-desc status-desc">
-              {{ t('settings.githubToken.status') }} <span :class="tokenSet.github_token ? 'status-set' : 'status-not-set'">{{ tokenSet.github_token ? t('settings.set') : t('settings.notSet') }}</span>
-              <button v-if="tokenSet.github_token" class="btn btn-danger btn-sm" @click="clearToken">{{ t('settings.clearToken') }}</button>
-            </div>
-            <div v-if="tokenSet.github_token" class="setting-desc validity-desc">
-              {{ t('settings.githubToken.validity') }}
-              <span v-if="githubTokenValidity === 'valid'" class="status-valid">{{ t('settings.valid') }}</span>
-              <span v-else-if="githubTokenValidity === 'invalid'" class="status-invalid">{{ t('settings.invalid') }}</span>
-              <span v-else>&mdash;</span>
-              <button class="btn btn-sm btn-secondary" @click="onCheckGithubToken">{{ t('settings.checkValidity') }}</button>
-            </div>
-          </div>
-          <div class="input-right">
-            <input type="password" :value="githubTokenInput" @input="githubTokenInput = ($event.target as HTMLInputElement).value" @blur="onGithubTokenBlur" placeholder="ghp_..." class="pw-input">
-          </div>
-        </div>
-      </div>
 
       <div class="card">
         <div class="card-title">{{ t('settings.librariesio.title') }}</div>
@@ -344,10 +315,9 @@ const {
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout,
-  tokenSet, loading, jsonIndent, githubTokenValidity,
+  tokenSet, loading, jsonIndent,
 } = storeToRefs(store)
 
-const githubTokenInput = ref('')
 const librariesioKeyInput = ref('')
 const ecosystemsKeyInput = ref('')
 
@@ -373,7 +343,6 @@ function autoSave(partial: SettingsUpdate) {
     .then(() => store.load())
     .then(() => {
       showToast(t('settings.savedToast'), false)
-      if ('github_token' in partial) githubTokenInput.value = ''
       if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
       if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
     })
@@ -386,12 +355,6 @@ function autoSave(partial: SettingsUpdate) {
 
 const debouncedAutoSave = debounce(autoSave, 500)
 
-async function onGithubTokenBlur() {
-  const value = githubTokenInput.value.trim()
-  if (!value) return
-  await autoSave({ github_token: value } as SettingsUpdate)
-}
-
 async function onLibrariesIoKeyBlur() {
   const value = librariesioKeyInput.value.trim()
   if (!value) return
@@ -402,23 +365,6 @@ async function onEcosystemsKeyBlur() {
   const value = ecosystemsKeyInput.value.trim()
   if (!value) return
   await autoSave({ ecosystems_api_key: value } as SettingsUpdate)
-}
-
-async function clearToken() {
-  try {
-    await store.clearToken('github_token')
-    showToast(t('settings.tokenCleared'), false)
-    await store.load()
-  } catch { showToast(t('settings.errorMessages.tokenClearFailed'), true) }
-}
-
-async function onCheckGithubToken() {
-  try {
-    await store.checkGithubToken()
-    showToast(t('settings.tokenCheckComplete'), false)
-  } catch {
-    showToast(t('settings.errorMessages.tokenCheckFailed'), true)
-  }
 }
 
 async function clearLibrariesIoKey() {
