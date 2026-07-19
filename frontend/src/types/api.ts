@@ -17,7 +17,6 @@ export interface ErrorResponse {
 }
 
 export interface SettingsTokenSet {
-  github_token: boolean
   librariesio_api_key: boolean
   ecosystems_api_key: boolean
 }
@@ -47,7 +46,6 @@ export interface SettingsUpdate {
   validate_sbom_refs?: boolean
   sbom_multiple_vcs_behavior?: string
   url_validation_timeout?: number
-  github_token?: string | null
   librariesio_enabled?: boolean
   librariesio_api_key?: string | null
   ecosystems_enabled?: boolean

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getSettings, updateSettings, checkGithubToken as checkGithubTokenApi } from '../api/settings'
+import { getSettings, updateSettings } from '../api/settings'
 import type { SettingsUpdate } from '../types/api'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -20,15 +20,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const connectivityUrl = ref('https://github.com')
   const connectivityTimeout = ref(2)
   const jsonIndent = ref(4)
-  const tokenSet = ref({ github_token: false, librariesio_api_key: false, ecosystems_api_key: false })
-  const githubTokenValidity = ref<'valid' | 'invalid' | null>(null)
-  const githubToken = ref('')
+  const tokenSet = ref({ librariesio_api_key: false, ecosystems_api_key: false })
   const librariesioKey = ref('')
   const ecosystemsKey = ref('')
   const loading = ref(true)
 
   const hasAnyToken = computed(() =>
-    tokenSet.value.github_token || tokenSet.value.librariesio_api_key || tokenSet.value.ecosystems_api_key
+    tokenSet.value.librariesio_api_key || tokenSet.value.ecosystems_api_key
   )
 
   async function load() {
@@ -59,22 +57,12 @@ export const useSettingsStore = defineStore('settings', () => {
   async function save(partial: SettingsUpdate) {
     const data = await updateSettings(partial)
     tokenSet.value = data.token_set
-    if ('github_token' in partial) {
-      githubToken.value = ''
-      githubTokenValidity.value = 'valid'
-    }
     if ('librariesio_api_key' in partial) librariesioKey.value = ''
     if ('ecosystems_api_key' in partial) ecosystemsKey.value = ''
   }
 
-  async function clearToken(field: 'github_token' | 'librariesio_api_key' | 'ecosystems_api_key') {
+  async function clearToken(field: 'librariesio_api_key' | 'ecosystems_api_key') {
     await updateSettings({ [field]: null } as SettingsUpdate)
-    if (field === 'github_token') githubTokenValidity.value = null
-  }
-
-  async function checkGithubToken() {
-    const result = await checkGithubTokenApi()
-    githubTokenValidity.value = result.status
   }
 
   return {
@@ -82,8 +70,7 @@ export const useSettingsStore = defineStore('settings', () => {
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
-    tokenSet, githubToken, librariesioKey, ecosystemsKey, loading,
-    githubTokenValidity,
-    hasAnyToken, load, save, clearToken, checkGithubToken,
+    tokenSet, librariesioKey, ecosystemsKey, loading,
+    hasAnyToken, load, save, clearToken,
   }
 })
