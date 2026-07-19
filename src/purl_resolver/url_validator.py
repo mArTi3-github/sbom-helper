@@ -9,13 +9,9 @@ import socket
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import httpx
-
-if TYPE_CHECKING:
-    from .settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +67,6 @@ class UrlValidationResult(Enum):
     INVALID = "invalid"
     NETWORK_ERROR = "network_error"
     RATE_LIMITED = "rate_limited"
-    TOKEN_INVALID = "token_invalid"
 
 
 @dataclass
@@ -81,7 +76,6 @@ class UrlValidationOutput:
 
 
 async def ensure_connectivity(
-    github_token: str | None = None,
     url: str | None = None,
     timeout: int | None = None,
 ) -> bool:
@@ -92,12 +86,8 @@ async def ensure_connectivity(
     if await _is_private_url(probe_url):
         raise ConnectionError(f"Probe URL resolves to a private address: {probe_url}")
     try:
-        headers = {}
-        hostname = urlsplit(probe_url).hostname
-        if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")):
-            headers["Authorization"] = f"Bearer {github_token}"
         async with httpx.AsyncClient(timeout=probe_timeout) as client:
-            resp = await client.head(probe_url, headers=headers)
+            resp = await client.head(probe_url)
             ok = resp.status_code < 500
     except httpx.RequestError:
         logger.warning("Connectivity probe to %s failed", probe_url)
@@ -107,29 +97,21 @@ async def ensure_connectivity(
     return True
 
 
-async def _head_request(url: str, timeout: int, github_token: str | None = None):
+async def _head_request(url: str, timeout: int):
     if await _is_private_url(url):
         raise ConnectionError(f"Refusing HEAD request to private URL: {url}")
-    headers = {}
-    hostname = urlsplit(url).hostname
-    if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")):
-        headers["Authorization"] = f"Bearer {github_token}"
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        resp = await client.head(url, headers=headers)
+        resp = await client.head(url)
     if await _is_private_url(str(resp.url)):
         raise ConnectionError(f"HEAD redirect target is private: {resp.url}")
     return resp
 
 
-async def _git_probe(url: str, timeout: int, github_token: str | None = None) -> bool | None:
+async def _git_probe(url: str, timeout: int) -> bool | None:
     """Probe URL via git ls-remote. Returns True/False/None."""
     try:
-        git_url = url
-        hostname = urlsplit(url).hostname
-        if github_token and hostname and (hostname == "github.com" or hostname.endswith(".github.com")) and url.startswith("https://"):
-            git_url = f"https://oauth2:{github_token}@{url[len('https://'):]}"
         proc = await asyncio.create_subprocess_exec(
-            "git", "ls-remote", "--exit-code", git_url, "HEAD",
+            "git", "ls-remote", "--exit-code", url, "HEAD",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
@@ -298,7 +280,6 @@ async def _fossil_probe(url: str, timeout: int) -> bool | None:
 async def _check_vcs(
     url: str,
     timeout: int,
-    github_token: str | None = None,
 ) -> bool | None:
     """Probe whether URL points to a git/svn/hg/fossil repository.
 
@@ -311,7 +292,7 @@ async def _check_vcs(
                 Caller should treat as network error / preserve cache.
     """
     probes: list[tuple[str, Callable[[], Awaitable[bool | None]]]] = [
-        ("git", lambda: _git_probe(url, timeout, github_token)),
+        ("git", lambda: _git_probe(url, timeout)),
         ("svn", lambda: _svn_probe(url, timeout)),
         ("hg", lambda: _hg_probe(url, timeout)),
         ("fossil", lambda: _fossil_probe(url, timeout)),
@@ -328,23 +309,9 @@ async def _check_vcs(
     return False if saw_false else None
 
 
-async def validate_github_token(token: str) -> bool:
-    """Validate a GitHub token by checking /rate_limit endpoint."""
-    try:
-        result = await _head_request(
-            "https://api.github.com/rate_limit",
-            timeout=5,
-            github_token=token,
-        )
-        return result.status_code == 200
-    except (httpx.RequestError, ConnectionError):
-        return False
-
-
 async def validate_url(
     url: str,
     timeout: int,
-    github_token: str | None = None,
 ) -> UrlValidationOutput:
     hostname = urlsplit(url).hostname
     if not hostname:
@@ -356,18 +323,13 @@ async def validate_url(
     final_url = url
     if url.startswith(("http://", "https://")):
         try:
-            resp = await _head_request(url, timeout, github_token=github_token)
-            if resp.status_code == 401 and github_token:
-                return UrlValidationOutput(
-                    UrlValidationResult.TOKEN_INVALID,
-                    final_url=str(resp.url),
-                )
+            resp = await _head_request(url, timeout)
             final_url = str(resp.url)
         except (httpx.RequestError, ConnectionError):
             pass  # graceful degradation — keep original url
 
     try:
-        git_result = await _check_vcs(final_url, timeout, github_token=github_token)
+        git_result = await _check_vcs(final_url, timeout)
     except Exception:
         logger.warning("VCS check failed unexpectedly for %s", final_url, exc_info=True)
         return UrlValidationOutput(UrlValidationResult.NETWORK_ERROR, final_url=final_url)
@@ -378,28 +340,3 @@ async def validate_url(
 
     return UrlValidationOutput(UrlValidationResult.VALID, final_url=final_url)
 
-
-async def validate_url_with_retry(
-    url: str,
-    timeout: int,
-    github_token: str | None = None,
-    settings_store: SettingsStore | None = None,
-) -> UrlValidationOutput:
-    voutput = await validate_url(
-        url, timeout,
-        github_token=github_token,
-    )
-
-    if voutput.result == UrlValidationResult.TOKEN_INVALID and settings_store is not None:
-        logger.warning("GitHub token invalid, removing from settings")
-        try:
-            app_settings = settings_store.load()
-            settings_store.save(app_settings.model_copy(update={"github_token": None}))
-        except Exception:
-            logger.warning("Failed to persist token removal to settings", exc_info=True)
-        voutput = await validate_url(
-            url, timeout,
-            github_token=None,
-        )
-
-    return voutput

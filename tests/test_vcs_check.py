@@ -260,23 +260,6 @@ class TestGitProbe:
             assert result is None
             mock_exec.return_value.wait.assert_awaited_once()
 
-    @pytest.mark.asyncio
-    async def test_github_token_rewrites_url(self):
-        from purl_resolver.url_validator import _git_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc(0)) as mock_exec:
-            await _git_probe("https://github.com/psf/requests", 5, github_token="ghp_test123")
-            args = mock_exec.call_args[0]
-            assert "https://oauth2:ghp_test123@github.com/psf/requests" in args
-
-    @pytest.mark.asyncio
-    async def test_non_github_url_no_token_injection(self):
-        from purl_resolver.url_validator import _git_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc(0)) as mock_exec:
-            await _git_probe("https://gitlab.com/org/repo", 5, github_token="ghp_test123")
-            args = mock_exec.call_args[0]
-            assert "oauth2" not in str(args)
-
-
 class TestSvnProbe:
     @pytest.mark.asyncio
     async def test_exit_zero_returns_true(self):
