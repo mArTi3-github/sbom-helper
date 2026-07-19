@@ -10,7 +10,6 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from ..settings_store import SettingsStore
-from ..url_validator import validate_github_token
 from ..validation_service import UrlValidationService
 from ..config import settings
 from ..resolver.factory import build_resolvers
@@ -35,7 +34,6 @@ class SettingsUpdate(BaseModel):
     validate_sbom_refs: bool | None = None
     sbom_multiple_vcs_behavior: str | None = Field(None, pattern="^(keep-first|keep-all)$")
     url_validation_timeout: int | None = Field(None, ge=1, le=60)
-    github_token: str | None = None
     librariesio_enabled: bool | None = None
     librariesio_api_key: str | None = None
     ecosystems_enabled: bool | None = None
@@ -86,7 +84,6 @@ async def get_settings(request: Request) -> JSONResponse:
         "json_indent": app_settings.json_indent,
         "job_ttl_hours": app_settings.job_ttl_hours,
         "token_set": {
-            "github_token": app_settings.github_token is not None,
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
             "ecosystems_api_key": app_settings.ecosystems_api_key is not None,
         },
@@ -98,20 +95,6 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
     store: SettingsStore = request.app.state.settings_store
     current = store.load()
     update_data = body.model_dump(exclude_unset=True)
-
-    if "github_token" in update_data:
-        token_value = update_data["github_token"]
-        if token_value is None:
-            pass
-        elif token_value == "":
-            del update_data["github_token"]
-        else:
-            is_valid = await validate_github_token(token_value)
-            if not is_valid:
-                return JSONResponse(
-                    status_code=400,
-                    content={"error": "invalid_token"},
-                )
 
     if "librariesio_api_key" in update_data:
         key_value = update_data["librariesio_api_key"]
@@ -158,7 +141,6 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "json_indent": updated.json_indent,
         "job_ttl_hours": updated.job_ttl_hours,
         "token_set": {
-            "github_token": updated.github_token is not None,
             "librariesio_api_key": updated.librariesio_api_key is not None,
             "ecosystems_api_key": updated.ecosystems_api_key is not None,
         },
@@ -172,15 +154,4 @@ async def clear_validation_cache(request: Request) -> JSONResponse:
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
-@router.post("/api/v1/settings/check-github-token")
-async def check_github_token(request: Request) -> JSONResponse:
-    store: SettingsStore = request.app.state.settings_store
-    app_settings = store.load()
-    token = app_settings.github_token
-    if not token:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "token_not_set"},
-        )
-    is_valid = await validate_github_token(token)
-    return JSONResponse(content={"status": "valid" if is_valid else "invalid"})
+
