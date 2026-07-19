@@ -124,14 +124,51 @@ class TestDownloadResult:
         assert response.status_code == 200
         assert response.json() == {"enriched": True}
 
+    def test_download_content_disposition(self, client, mock_manager, tmp_path):
+        result_file = tmp_path / "result.json"
+        result_file.write_text(json.dumps({"enriched": True}))
+        mock_manager.get_job.return_value = JobRecord(
+            id="job-1", type="sbom_enrich", status="completed",
+            result_path=str(result_file),
+            input_filename="my-sbom.json",
+        )
+        response = client.get("/api/v1/jobs/job-1/result")
+        assert response.status_code == 200
+        cd = response.headers.get("content-disposition")
+        assert cd is not None
+        assert "my-sbom_enriched.json" in cd
+
+    def test_download_input_filename_none(self, client, mock_manager, tmp_path):
+        result_file = tmp_path / "result.json"
+        result_file.write_text(json.dumps({"enriched": True}))
+        mock_manager.get_job.return_value = JobRecord(
+            id="job-1", type="sbom_enrich", status="completed",
+            result_path=str(result_file),
+            input_filename=None,
+        )
+        response = client.get("/api/v1/jobs/job-1/result")
+        assert response.status_code == 200
+        cd = response.headers.get("content-disposition")
+        assert cd is not None
+        assert "unknown_enriched.json" in cd
+
+    def test_download_result_file_not_found(self, client, mock_manager):
+        mock_manager.get_job.return_value = JobRecord(
+            id="job-1", type="sbom_enrich", status="completed",
+            result_path="/nonexistent/path/result.json",
+            input_filename="test.json",
+        )
+        response = client.get("/api/v1/jobs/job-1/result")
+        assert response.status_code == 404
+        assert response.text == "result_file_not_found"
+
     def test_not_completed(self, client, mock_manager):
         mock_manager.get_job.return_value = JobRecord(
             id="job-1", type="sbom_enrich", status="running",
         )
         response = client.get("/api/v1/jobs/job-1/result")
         assert response.status_code == 400
-        data = response.json()
-        assert data["error"] == "result_not_ready"
+        assert response.text == "result_not_ready: running"
 
     def test_job_not_found(self, client, mock_manager):
         mock_manager.get_job.return_value = None
@@ -146,7 +183,7 @@ class TestDownloadResult:
         )
         response = client.get("/api/v1/jobs/job-1/result")
         assert response.status_code == 404
-        assert response.json() == {"error": "result_file_not_found"}
+        assert response.text == "result_file_not_found"
 
 
 class TestCancelJob:

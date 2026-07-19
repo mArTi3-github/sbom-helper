@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, File, Form, Request, UploadFile, status
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from ..config import sbom_settings
 
 if TYPE_CHECKING:
     from ..job_manager import JobManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -100,21 +104,25 @@ async def get_job(request: Request, job_id: str) -> JSONResponse:
 async def download_job_result(request: Request, job_id: str) -> FileResponse:
     manager = _get_manager(request)
     if manager is None:
-        return _UNAVAILABLE
+        return PlainTextResponse("job_queue_unavailable", status_code=503)
     record = await manager.get_job(job_id)
     if not record:
-        return JSONResponse(status_code=404, content={"error": "job_not_found"})
+        return PlainTextResponse("job_not_found", status_code=404)
     if record.status != "completed":
-        return JSONResponse(
-            status_code=400,
-            content={"error": "result_not_ready", "status": record.status},
+        return PlainTextResponse(
+            f"result_not_ready: {record.status}", status_code=400,
         )
     path = Path(record.result_path) if record.result_path else None
     if not path or not path.exists():
-        return JSONResponse(status_code=404, content={"error": "result_file_not_found"})
+        return PlainTextResponse("result_file_not_found", status_code=404)
+    filename = record.input_filename
+    if not filename:
+        logger.warning("Job %s has no input_filename, using fallback", job_id)
+        filename = "unknown"
+    filename = os.path.splitext(filename)[0] + "_enriched.json"
     return FileResponse(
         path=path,
-        filename=record.input_filename.replace(".json", "") + "_enriched.json",
+        filename=filename,
         media_type="application/json",
     )
 
