@@ -164,30 +164,6 @@ Manage the local PURL → repository URL mapping database:
 
 ## API Reference
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/resolve` | Resolve a single PURL to its repository URL |
-| `POST` | `/api/v1/jobs/sbom-enrich` | Submit a CycloneDX SBOM for enrichment (async) |
-| `GET` | `/api/v1/jobs` | List enrichment jobs |
-| `GET` | `/api/v1/jobs/{job_id}` | Get job status |
-| `GET` | `/api/v1/jobs/{job_id}/result` | Download enriched SBOM (when completed) |
-| `POST` | `/api/v1/jobs/{job_id}/cancel` | Cancel a running job |
-| `DELETE` | `/api/v1/jobs/{job_id}` | Delete a job and its result |
-| `POST` | `/api/v1/convert/images-list` | Convert SBOM to container images list |
-| `GET` | `/api/v1/db/purls` | List PURL mappings (paginated, filterable) |
-| `GET` | `/api/v1/db/resolvers` | List distinct resolver names |
-| `PATCH` | `/api/v1/db/purls/{purl}` | Update a PURL mapping |
-| `DELETE` | `/api/v1/db/purls` | Bulk delete PURL mappings |
-| `POST` | `/api/v1/db/import` | Import PURLs from CSV |
-| `POST` | `/api/v1/db/export` | Export selected PURLs to CSV |
-| `GET` | `/api/v1/settings` | Get application settings |
-| `PATCH` | `/api/v1/settings` | Update application settings |
-| `POST` | `/api/v1/settings/clear-validation-cache` | Clear URL validation cache |
-| `POST` | `/api/v1/settings/check-github-token` | Validate the configured GitHub token |
-| `GET` | `/api/v1/sbom/ignore-patterns` | Get SBOM enrichment ignore patterns |
-| `POST` | `/api/v1/sbom/ignore-patterns` | Save SBOM enrichment ignore patterns |
-| `GET` | `/health` | Health check |
-
 An interactive OpenAPI/Swagger UI is available at `/docs` when the server is running.
 
 ## Security Notes
