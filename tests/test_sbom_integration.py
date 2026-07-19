@@ -101,7 +101,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.INVALID),
         ):
@@ -144,7 +144,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.VALID),
         ):
@@ -182,7 +182,7 @@ class TestValidateExistingRefs:
                 settings_store=settings_store_no_validation,
             ),
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url_with_retry", new_callable=AsyncMock) as mock_validate:
+        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock) as mock_validate:
             await pipeline.process(sbom)
         mock_validate.assert_not_called()
 
@@ -216,7 +216,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.NETWORK_ERROR),
         ):
@@ -262,7 +262,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.INVALID),
         ):
@@ -304,7 +304,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.VALID),
         ):
@@ -346,7 +346,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.VALID),
         ):
@@ -388,7 +388,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.INVALID),
         ):
@@ -430,7 +430,7 @@ class TestValidateExistingRefs:
             ),
         )
         with patch(
-            "purl_resolver.sbom_enrichment.validate_url_with_retry",
+            "purl_resolver.sbom_enrichment.validate_url",
             new_callable=AsyncMock,
             return_value=_url_output(UrlValidationResult.VALID, final_url="https://github.com/psf/requests"),
         ):
@@ -477,7 +477,6 @@ class TestValidateExistingRefs:
         mock_validation.validate_url.assert_called_once_with(
             "https://github.com/psf/requests",
             timeout=5,
-            github_token=None,
         )
 
 

@@ -53,7 +53,6 @@ class PurlResolutionService:
         voutput = await self._validation_service.validate_url(
             cached.repository_url,
             app_settings.url_validation_timeout,
-            github_token=app_settings.github_token,
         )
 
         if voutput.result == UrlValidationResult.VALID:
@@ -123,7 +122,6 @@ class PurlResolutionService:
                     voutput = await self._validation_service.validate_url(
                         repo_url,
                         app_settings.url_validation_timeout,
-                        github_token=app_settings.github_token,
                     )
                     if voutput.result == UrlValidationResult.INVALID:
                         logger.warning(

@@ -406,7 +406,6 @@ class TestValidationServiceDelegation:
         mock_validation.validate_url.assert_called_with(
             "https://github.com/psf/requests",
             mock_settings_store.load().url_validation_timeout,
-            github_token=mock_settings_store.load().github_token,
         )
 
     @pytest.mark.asyncio
@@ -431,5 +430,4 @@ class TestValidationServiceDelegation:
         mock_validation.validate_url.assert_called_with(
             "https://github.com/valid/repo",
             mock_settings_store.load().url_validation_timeout,
-            github_token=mock_settings_store.load().github_token,
         )

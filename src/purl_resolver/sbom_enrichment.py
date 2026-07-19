@@ -11,7 +11,7 @@ from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import PurlResolutionService
 from .settings_store import AppSettings
-from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url_with_retry
+from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,6 @@ class SbomEnrichmentPipeline:
         app_settings: AppSettings,
     ) -> None:
         val_timeout = app_settings.url_validation_timeout
-        val_token = app_settings.github_token
         behavior = app_settings.sbom_multiple_vcs_behavior
 
         for comp in components:
@@ -77,10 +76,10 @@ class SbomEnrichmentPipeline:
             for ref in vcs_refs:
                 vs = self._resolution_service.validation_service
                 if vs is not None:
-                    voutput = await vs.validate_url(ref["url"], timeout=val_timeout, github_token=val_token)
+                    voutput = await vs.validate_url(ref["url"], timeout=val_timeout)
                 else:
-                    voutput = await validate_url_with_retry(
-                        ref["url"], timeout=val_timeout, github_token=val_token,
+                    voutput = await validate_url(
+                        ref["url"], timeout=val_timeout,
                     )
                 if voutput.result in (UrlValidationResult.INVALID, UrlValidationResult.NETWORK_ERROR):
                     logger.info("Removed VCS ref %s for %s (reason=%s)", ref["url"], comp.purl, voutput.result.value)
