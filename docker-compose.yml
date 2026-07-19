@@ -7,6 +7,7 @@ services:
       context: .
       target: ${BUILD_TARGET:-prod}
     image: sbom-helper:latest
+    pull_policy: build
     container_name: sbom-helper
     depends_on:
       db:
