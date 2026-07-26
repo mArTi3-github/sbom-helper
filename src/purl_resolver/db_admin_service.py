@@ -11,7 +11,8 @@ from .schemas import (
     PurlListResponse,
     PurlUpdateRequest,
 )
-from .storage.interface import PurlFilters, Storage
+from .purl_utils import PurlValidationError, validate
+from .storage.interface import PurlFilters, Storage, UpsertRow
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,20 @@ class DbAdminService:
         ok = await self._storage.update_purl(purl, new_purl, new_repo)
         if not ok:
             return False, "PURL not found"
+        return True, None
+
+    async def create_purl(self, purl: str, repository_url: str) -> tuple[bool, str | None]:
+        try:
+            validate(purl)
+        except PurlValidationError as e:
+            return False, f"invalid_purl:{e}"
+
+        existing = await self._storage.lookup(purl)
+        if existing is not None:
+            return False, "purl_exists"
+
+        row = UpsertRow(purl=purl, repository_url=repository_url, resolver="import-manual")
+        await self._storage.upsert_many([row])
         return True, None
 
     async def delete_purls(self, purls: list[str]) -> int:

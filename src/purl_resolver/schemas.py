@@ -67,6 +67,11 @@ class PurlUpdateRequest(BaseModel):
     repository_url: str | None = None
 
 
+class PurlCreateRequest(BaseModel):
+    purl: str = Field(..., min_length=1)
+    repository_url: str = Field(..., min_length=1)
+
+
 class PurlDeleteRequest(BaseModel):
     purls: list[str]
 

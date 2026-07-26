@@ -7,6 +7,7 @@ from ..db_admin_service import DbAdminError, DbAdminService
 from ..schemas import (
     ExportRequest,
     ImportStrategy,
+    PurlCreateRequest,
     PurlDeleteRequest,
     PurlListParams,
     PurlUpdateRequest,
@@ -42,6 +43,21 @@ async def update_purl_endpoint(
             content={"error": "purl_not_found" if status == 404 else "invalid_update"},
         )
     return JSONResponse(status_code=200, content={"ok": True})
+
+
+@router.post("/api/v1/db/purls")
+async def create_purl_endpoint(body: PurlCreateRequest, request: Request):
+    service: DbAdminService = request.app.state.db_admin_service
+    ok, error_tag = await service.create_purl(body.purl, body.repository_url)
+
+    if error_tag == "purl_exists":
+        return JSONResponse(status_code=409, content={"error": "purl_exists"})
+
+    if error_tag and error_tag.startswith("invalid_purl:"):
+        detail = error_tag.split(":", 1)[1]
+        return JSONResponse(status_code=400, content={"error": "invalid_purl", "detail": detail})
+
+    return JSONResponse(status_code=201, content={"ok": True})
 
 
 @router.delete("/api/v1/db/purls")

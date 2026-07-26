@@ -379,6 +379,45 @@ class TestSbomStoresPreExistingRefs:
         assert req.repository_url == "https://github.com/psf/requests"
 
 
+class TestAdminCreatePurl:
+    def test_create_success(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/purls",
+            json={"purl": "pkg:pypi/newpkg", "repository_url": "https://github.com/new/pkg"},
+        )
+        assert response.status_code == 201
+        assert response.json() == {"ok": True}
+        cached = populated_storage._store.get("pkg:pypi/newpkg")
+        assert cached is not None
+        assert cached.repository_url == "https://github.com/new/pkg"
+        assert cached.resolver == "import-manual"
+
+    def test_create_duplicate(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/purls",
+            json={"purl": "pkg:pypi/requests", "repository_url": "https://github.com/psf/requests"},
+        )
+        assert response.status_code == 409
+        assert response.json() == {"error": "purl_exists"}
+
+    def test_create_invalid_purl(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/purls",
+            json={"purl": "not-a-purl", "repository_url": "https://github.com/x/y"},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "invalid_purl"
+        assert "detail" in data
+
+    def test_create_missing_repository_url(self, populated_storage, admin_client):
+        response = admin_client.post(
+            "/api/v1/db/purls",
+            json={"purl": "pkg:pypi/newpkg", "repository_url": ""},
+        )
+        assert response.status_code == 422  # Pydantic validation min_length=1
+
+
 class TestAdminListResolvers:
     def test_list_empty(self, admin_client):
         response = admin_client.get("/api/v1/db/resolvers")
