@@ -13,6 +13,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const retryBaseCooldownSeconds = ref(5)
   const logLevel = ref('INFO')
   const librariesioEnabled = ref(false)
+  const apkEnabled = ref(false)
   const ecosystemsEnabled = ref(false)
   const ecosystemsMaxRequestsPerSecond = ref(2)
   const batchSemaphoreLimit = ref(10)
@@ -41,6 +42,7 @@ export const useSettingsStore = defineStore('settings', () => {
       retryBaseCooldownSeconds.value = data.retry_base_cooldown_seconds
       logLevel.value = data.log_level
       librariesioEnabled.value = data.librariesio_enabled
+      apkEnabled.value = data.apk_resolver_enabled
       ecosystemsEnabled.value = data.ecosystems_enabled
       ecosystemsMaxRequestsPerSecond.value = data.ecosystems_max_requests_per_second
       batchSemaphoreLimit.value = data.batch_semaphore_limit
@@ -68,7 +70,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
-    librariesioEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
+    librariesioEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
     tokenSet, librariesioKey, ecosystemsKey, loading,
     hasAnyToken, load, save, clearToken,

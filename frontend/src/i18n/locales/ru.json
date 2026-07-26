@@ -188,6 +188,11 @@
       "loginHint": "Войти в libraries.io → Settings → API Key",
       "status": "Статус:"
     },
+    "apkResolver": {
+      "title": "APK резолвер (Alpine Linux)",
+      "enable": "Включить APK резолвер",
+      "enableDesc": "При включении пакеты Alpine Linux APK (pkg:apk/...) резолвятся в https://github.com/alpinelinux/aports/ как запасной вариант."
+    },
     "ecosystems": {
       "title": "ecosyste.ms резолвер (опционально)",
       "enable": "Включить ecosyste.ms резолвер",
