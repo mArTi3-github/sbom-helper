@@ -14,7 +14,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; creates Purl2RepoResolver, conditionally adds EcosystemsResolver, LibrariesIoResolver, and ApkResolver based on settings
 - `src/purl_resolver/resolver/ecosystems.py` — `EcosystemsResolver`: fallback resolver using ecosyste.ms Packages API, enabled by default (settings-controlled), no API key required (optional for higher rate limits)
 - `src/purl_resolver/resolver/librariesio.py` — `LibrariesIoResolver`: fallback resolver using libraries.io API, optional (settings-controlled), supports: cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift
-- `src/purl_resolver/resolver/apk.py` — `ApkResolver`: last-resort fallback resolver for Alpine Linux APK packages (`pkg:apk/...`), returns constant URL `https://github.com/alpinelinux/aports/`; purely local (no network calls), enabled by default via `apk_resolver_enabled` setting
+- `src/purl_resolver/resolver/apk.py` — `ApkResolver`: last-resort fallback resolver for Alpine Linux APK packages (`pkg:apk/...`), returns constant URL `https://github.com/alpinelinux/aports`; purely local (no network calls), enabled by default via `apk_resolver_enabled` setting
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
 - `src/purl_resolver/sbom/parser.py` — CycloneDX SBOM validation and parsing
@@ -246,7 +246,7 @@ Client                    API Layer (router)         Service Layer             p
 | `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
 | `revalidation_cooldown_hours` | `24` | Re-validation cooldown in hours for trusted resolvers (0 = no cooldown, max 720) |
 | `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
-| `apk_resolver_enabled` | `true` | Enable APK resolver (Alpine Linux) as the last fallback — returns `https://github.com/alpinelinux/aports/` for any `pkg:apk/...` PURL |
+| `apk_resolver_enabled` | `true` | Enable APK resolver (Alpine Linux) as the last fallback — returns `https://github.com/alpinelinux/aports` for any `pkg:apk/...` PURL |
 | `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
 | `ecosystems_max_requests_per_second` | `2.0` | Rate limit for ecosyste.ms API requests (0.1–100) |
 | `retry_max_attempts` | `3` | Maximum HTTP request attempts per resolver (1–10). Applied to ecosyste.ms and libraries.io on timeout, 429, and 5xx errors. |

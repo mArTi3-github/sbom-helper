@@ -196,7 +196,7 @@
     "apkResolver": {
       "title": "APK Resolver (Alpine Linux)",
       "enable": "Enable APK resolver",
-      "enableDesc": "When enabled, Alpine Linux APK packages (pkg:apk/...) resolve to https://github.com/alpinelinux/aports/ as a fallback."
+      "enableDesc": "When enabled, Alpine Linux APK packages (pkg:apk/...) resolve to https://github.com/alpinelinux/aports as a fallback."
     },
     "ecosystems": {
       "title": "ecosyste.ms Resolver (optional)",

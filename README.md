@@ -66,7 +66,7 @@ The core functionality of sbom-helper revolves around resolving `PURL → reposi
    - **[purl2repo](https://github.com/tonylturner/purl2repo)** — open-source resolver for common PURL types
    - **[ecosyste.ms](https://ecosyste.ms/)** — open package registry API (enabled by default)
    - **[libraries.io](https://libraries.io/)** — open source package discovery API (optional, requires API key)
-   - **[APK Resolver (Alpine Linux)](https://github.com/alpinelinux/aports/)** — last-resort fallback for `pkg:apk/...` PURLs, returns the aports repo URL (enabled by default)
+   - **[APK Resolver (Alpine Linux)](https://github.com/alpinelinux/aports)** — last-resort fallback for `pkg:apk/...` PURLs, returns the aports repo URL (enabled by default)
 3. **Validate the found URL** — checks if the URL points to a VCS repository using git, svn, hg (Mercurial), and fossil probes
 4. **Cache and return** — on success, the mapping is stored in the local database and the URL is returned
 
@@ -101,7 +101,7 @@ The core functionality of sbom-helper revolves around resolving `PURL → reposi
 - **purl2repo** is always enabled as the primary resolver
 - **ecosyste.ms** is enabled by default as a fallback
 - **libraries.io** is optional and requires an API key, configured via Settings
-- **APK resolver** is enabled by default as the last fallback — resolves any `pkg:apk/...` PURL to `https://github.com/alpinelinux/aports/` (no API key required)
+- **APK resolver** is enabled by default as the last fallback — resolves any `pkg:apk/...` PURL to `https://github.com/alpinelinux/aports` (no API key required)
 
 ## Settings
 
@@ -111,7 +111,7 @@ Key settings available in the web UI (`/settings`):
 |---|---|---|
 | `Validate DB URLs` | Enabled | Validates cached repository URLs before returning them. Invalid URLs are deleted and re-resolved through the chain |
 | `GitHub Personal Access Token` | Active token | Increases GitHub API rate limits from 60 to 5000 requests/hour. [Create a token](https://github.com/settings/tokens) |
-| `Enable APK resolver (Alpine Linux)` | Enabled | Last-resort fallback for Alpine Linux APK packages (`pkg:apk/...`). Always returns `https://github.com/alpinelinux/aports/`. No API key required. |
+| `Enable APK resolver (Alpine Linux)` | Enabled | Last-resort fallback for Alpine Linux APK packages (`pkg:apk/...`). Always returns `https://github.com/alpinelinux/aports`. No API key required. |
 | `Enable libraries.io resolver` + `API key` | Enabled + active key | Enables search across the public libraries.io database. Increases rate limits from 10 to 60 requests/min. [Get a key](https://libraries.io/account) |
 | `Enable ecosyste.ms resolver` + `API key` | Enabled + active key | Enables search across the public ecosyste.ms database. Rate limits are dynamic. [Get a key](https://ecosyste.ms/account/api_key) |
 

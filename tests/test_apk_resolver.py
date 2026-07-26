@@ -9,7 +9,7 @@ from purl_resolver.resolver.interface import Resolution
 async def test_resolve_apk_purl():
     resolver = ApkResolver()
     result = await resolver.resolve("pkg:apk/alpine/curl@7.83.0-r0")
-    assert result.repository_url == "https://github.com/alpinelinux/aports/"
+    assert result.repository_url == "https://github.com/alpinelinux/aports"
     assert result.purl == "pkg:apk/alpine/curl@7.83.0-r0"
 
 
@@ -17,7 +17,7 @@ async def test_resolve_apk_purl():
 async def test_resolve_apk_with_qualifiers():
     resolver = ApkResolver()
     result = await resolver.resolve("pkg:apk/alpine/apk@2.12.9-r3?arch=x86")
-    assert result.repository_url == "https://github.com/alpinelinux/aports/"
+    assert result.repository_url == "https://github.com/alpinelinux/aports"
 
 
 @pytest.mark.asyncio

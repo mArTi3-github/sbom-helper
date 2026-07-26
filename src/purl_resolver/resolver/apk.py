@@ -28,5 +28,5 @@ class ApkResolver(Resolver):
 
         return Resolution(
             purl=purl,
-            repository_url="https://github.com/alpinelinux/aports/",
+            repository_url="https://github.com/alpinelinux/aports",
         )
