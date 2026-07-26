@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from ..config import Settings
 from ..settings_store import AppSettings
+from .apk import ApkResolver
 from .ecosystems import EcosystemsResolver
 from .interface import Resolver
 from .librariesio import LibrariesIoResolver
-from .apk import ApkResolver
 from .purl2repo import Purl2RepoResolver
 from .retry import RetryConfig
 

@@ -36,8 +36,8 @@ class SettingsUpdate(BaseModel):
     url_validation_timeout: int | None = Field(None, ge=1, le=60)
     librariesio_enabled: bool | None = None
     librariesio_api_key: str | None = None
-    ecosystems_enabled: bool | None = None
     apk_resolver_enabled: bool | None = None
+    ecosystems_enabled: bool | None = None
     ecosystems_api_key: str | None = None
     ecosystems_max_requests_per_second: float | None = Field(None, ge=0.1, le=100)
     revalidation_cooldown_hours: int | None = Field(None, ge=0, le=720)
@@ -77,6 +77,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "retry_base_cooldown_seconds": app_settings.retry_base_cooldown_seconds,
         "log_level": app_settings.log_level,
         "librariesio_enabled": app_settings.librariesio_enabled,
+        "apk_resolver_enabled": app_settings.apk_resolver_enabled,
         "ecosystems_enabled": app_settings.ecosystems_enabled,
         "ecosystems_max_requests_per_second": app_settings.ecosystems_max_requests_per_second,
         "batch_semaphore_limit": app_settings.batch_semaphore_limit,
@@ -84,7 +85,6 @@ async def get_settings(request: Request) -> JSONResponse:
         "connectivity_timeout": app_settings.connectivity_timeout,
         "json_indent": app_settings.json_indent,
         "job_ttl_hours": app_settings.job_ttl_hours,
-        "apk_resolver_enabled": app_settings.apk_resolver_enabled,
         "token_set": {
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
             "ecosystems_api_key": app_settings.ecosystems_api_key is not None,
@@ -135,6 +135,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "retry_base_cooldown_seconds": updated.retry_base_cooldown_seconds,
         "log_level": updated.log_level,
         "librariesio_enabled": updated.librariesio_enabled,
+        "apk_resolver_enabled": updated.apk_resolver_enabled,
         "ecosystems_enabled": updated.ecosystems_enabled,
         "ecosystems_max_requests_per_second": updated.ecosystems_max_requests_per_second,
         "batch_semaphore_limit": updated.batch_semaphore_limit,
@@ -142,7 +143,6 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "connectivity_timeout": updated.connectivity_timeout,
         "json_indent": updated.json_indent,
         "job_ttl_hours": updated.job_ttl_hours,
-        "apk_resolver_enabled": updated.apk_resolver_enabled,
         "token_set": {
             "librariesio_api_key": updated.librariesio_api_key is not None,
             "ecosystems_api_key": updated.ecosystems_api_key is not None,

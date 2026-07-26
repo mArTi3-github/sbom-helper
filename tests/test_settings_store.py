@@ -125,11 +125,11 @@ class TestEcosystemsSettings:
 
 
 class TestApkSettings:
-    def test_default_enabled(self):
+    def test_default_enabled(self) -> None:
         settings = AppSettings()
         assert settings.apk_resolver_enabled is True
 
-    def test_save_and_load(self, tmp_path):
+    def test_save_and_load(self, tmp_path: Path) -> None:
         store = SettingsStore(path=tmp_path / "settings.json")
         app_settings = AppSettings(apk_resolver_enabled=False)
         store.save(app_settings)
