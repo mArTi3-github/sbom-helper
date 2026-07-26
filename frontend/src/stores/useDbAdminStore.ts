@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { listPurls, listResolvers, updatePurl, deletePurls, importCsv, exportSelectedCsv as apiExportCsv } from '../api/db'
+import { listPurls, listResolvers, updatePurl, deletePurls, importCsv, createPurl, exportSelectedCsv as apiExportCsv } from '../api/db'
 import type { PurlListParams } from '../api/db'
 import type { ResolveResponse, ImportResponse } from '../types/api'
 import { ApiError } from '../api/client'
@@ -27,6 +27,10 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
 
   const editingPurl = ref<string | null>(null)
   const editingValues = ref<{ purl?: string; repository_url?: string }>({})
+
+  const addingNewRow = ref(false)
+  const newRowValues = ref<{ purl: string; repository_url: string }>({ purl: '', repository_url: '' })
+  const newRowError = ref<string | null>(null)
 
   const showImportModal = ref(false)
   const importFile = ref<File | null>(null)
@@ -149,6 +153,42 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
     }
   }
 
+  function startNewRow() {
+    addingNewRow.value = true
+    newRowValues.value = { purl: '', repository_url: '' }
+    newRowError.value = null
+  }
+
+  function cancelNewRow() {
+    addingNewRow.value = false
+    newRowValues.value = { purl: '', repository_url: '' }
+    newRowError.value = null
+  }
+
+  async function saveNewRow() {
+    newRowError.value = null
+    try {
+      await createPurl(newRowValues.value.purl, newRowValues.value.repository_url)
+      cancelNewRow()
+      showSuccess('Record created successfully')
+      await fetchData()
+    } catch (e: unknown) {
+      if (e instanceof ApiError) {
+        if (e.error === 'invalid_purl') {
+          newRowError.value = 'Invalid PURL format: ' + ((e.data.detail as string) || '')
+        } else if (e.error === 'purl_exists') {
+          newRowError.value = 'This PURL already exists in the database.'
+        } else {
+          errorMessage.value = 'Failed to create record'
+        }
+      } else if (e instanceof Error) {
+        errorMessage.value = 'Network error: could not reach the server.'
+      } else {
+        errorMessage.value = 'An unexpected error occurred.'
+      }
+    }
+  }
+
   async function deleteRow(purl: string) {
     try {
       await deletePurls([purl])
@@ -250,11 +290,13 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
     page, pageSize, total, totalPages,
     rows, selectedPurls, allSelected, someSelected,
     editingPurl, editingValues,
+    addingNewRow, newRowValues, newRowError,
     showImportModal, importFile, importStrategy, importResults, importLoading, importError,
     loading, errorMessage, successMessage,
     fetchData, applyFilters, resetFilters, setSort,
     fetchResolvers,
     toggleSelectAll, toggleRow, startEdit, cancelEdit, saveEdit,
+    startNewRow, cancelNewRow, saveNewRow,
     deleteRow, deleteSelected, exportCsv,
     handleImportFile, handleImportUpload, closeImportModal,
     goToPage, changePageSize,

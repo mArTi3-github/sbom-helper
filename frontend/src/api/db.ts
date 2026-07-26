@@ -39,6 +39,14 @@ export function updatePurl(purl: string, body: PurlUpdateRequest): Promise<{ ok:
   })
 }
 
+export function createPurl(purl: string, repository_url: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>('/api/v1/db/purls', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ purl, repository_url }),
+  })
+}
+
 export function deletePurls(purls: string[]): Promise<DeleteResponse> {
   return apiFetch<DeleteResponse>('/api/v1/db/purls', {
     method: 'DELETE',
