@@ -186,7 +186,7 @@ Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). 
 
 Serve the settings page (Vue SPA route).
 
-Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `Settings.vue` with URL validation, retry config, log level, GitHub token, ecosyste.ms, and Libraries.io settings cards.
+Response (200): `Content-Type: text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `Settings.vue` with URL validation, retry config, log level, GitHub token, APK resolver, ecosyste.ms, and Libraries.io settings cards.
 
 ---
 
@@ -211,6 +211,7 @@ Return current application settings.
   "revalidation_cooldown_hours": 24,
   "librariesio_enabled": false,
   "ecosystems_enabled": true,
+  "apk_resolver_enabled": true,
   "token_set": {
     "librariesio_api_key": false,
     "ecosystems_api_key": false
@@ -227,6 +228,7 @@ Return current application settings.
 - `revalidation_cooldown_hours`: integer — cooldown in hours for trusted resolver entries (0–720, default: `24`; `0` disables cooldown)
 - `librariesio_enabled`: boolean — whether the libraries.io resolver is active
 - `ecosystems_enabled`: boolean — whether the ecosyste.ms resolver is active (default: `true`)
+- `apk_resolver_enabled`: boolean — whether the APK resolver (Alpine Linux) is active as the last fallback (default: `true`)
 - `ecosystems_max_requests_per_second`: float — rate limit for ecosyste.ms API requests (0.1–100, default: `2.0`)
 - `retry_max_attempts`: integer — maximum HTTP retry attempts for fallback resolvers (1–10, default: `3`)
 - `retry_base_cooldown_seconds`: float — base wait between retries in seconds (0.5–120, default: `5.0`)
@@ -265,6 +267,7 @@ All fields optional. Only provided fields are updated.
 - `librariesio_enabled`: optional bool — enable/disable the libraries.io resolver.
 - `librariesio_api_key`: optional string|null — libraries.io API key. Set to `null` to clear the key. Empty string is ignored. Non-empty values are validated via the libraries.io API and rejected with `400 invalid_token` if invalid.
 - `ecosystems_enabled`: optional bool — enable/disable the ecosyste.ms resolver.
+- `apk_resolver_enabled`: optional bool — enable/disable the APK resolver (Alpine Linux) as the last fallback.
 - `ecosystems_api_key`: optional string|null — ecosyste.ms API key (for higher rate limits). Set to `null` to clear the key. Empty string is ignored.
 - `ecosystems_max_requests_per_second`: optional float — rate limit for ecosyste.ms API requests (0.1–100).
 - `retry_max_attempts`: optional int — maximum HTTP retry attempts for fallback resolvers (1–10).

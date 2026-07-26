@@ -2,7 +2,7 @@
 
 ## Description
 
-Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → ecosyste.ms → libraries.io), storing successful results for future lookups.
+Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → ecosyste.ms → libraries.io → apk), storing successful results for future lookups.
 
 ## Key Files
 
@@ -10,10 +10,11 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `resolve_batch()` for concurrent resolution; `store_preexisting_references()` for SBOM pre-existing refs
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
-- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, ecosyste.ms wrapper, libraries.io wrapper, and factory module
-- `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; creates Purl2RepoResolver, conditionally adds EcosystemsResolver and LibrariesIoResolver based on settings
+- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, ecosyste.ms wrapper, libraries.io wrapper, apk wrapper, and factory module
+- `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; creates Purl2RepoResolver, conditionally adds EcosystemsResolver, LibrariesIoResolver, and ApkResolver based on settings
 - `src/purl_resolver/resolver/ecosystems.py` — `EcosystemsResolver`: fallback resolver using ecosyste.ms Packages API, enabled by default (settings-controlled), no API key required (optional for higher rate limits)
 - `src/purl_resolver/resolver/librariesio.py` — `LibrariesIoResolver`: fallback resolver using libraries.io API, optional (settings-controlled), supports: cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift
+- `src/purl_resolver/resolver/apk.py` — `ApkResolver`: last-resort fallback resolver for Alpine Linux APK packages (`pkg:apk/...`), returns constant URL `https://github.com/alpinelinux/aports/`; purely local (no network calls), enabled by default via `apk_resolver_enabled` setting
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
 - `src/purl_resolver/sbom/parser.py` — CycloneDX SBOM validation and parsing
@@ -196,7 +197,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationOutput`, never raises exceptions
 - **Non-HTTP/HTTPS URLs skip redirect resolution**: URLs are validated by syntax (non-empty hostname) and SSRF guard (non-private IP) before VCS probes. HTTP/HTTPS URLs additionally undergo HEAD redirect resolution. Non-HTTP/HTTPS URLs skip redirect resolution and go directly to VCS probes.
 - **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
-- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
+- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"apk"` when ApkResolver found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
 - **Four-column table**: `resolved_purls` stores only `purl`, `repository_url`, `resolver`, `resolved_at` — all other fields from earlier schema versions have been removed
 - **Warnings are runtime-only**: `warnings` is retained in `Resolution` dataclass, `ResolveResponse` model, and API response but is never persisted to the database, CSV export, or in-memory storage
 - **Index on resolver**: `idx_resolved_purls_resolver` is created on startup in `create_pool()` to accelerate `SELECT DISTINCT resolver` queries for the dynamic resolver filter
@@ -245,6 +246,7 @@ Client                    API Layer (router)         Service Layer             p
 | `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
 | `revalidation_cooldown_hours` | `24` | Re-validation cooldown in hours for trusted resolvers (0 = no cooldown, max 720) |
 | `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
+| `apk_resolver_enabled` | `true` | Enable APK resolver (Alpine Linux) as the last fallback — returns `https://github.com/alpinelinux/aports/` for any `pkg:apk/...` PURL |
 | `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
 | `ecosystems_max_requests_per_second` | `2.0` | Rate limit for ecosyste.ms API requests (0.1–100) |
 | `retry_max_attempts` | `3` | Maximum HTTP request attempts per resolver (1–10). Applied to ecosyste.ms and libraries.io on timeout, 429, and 5xx errors. |

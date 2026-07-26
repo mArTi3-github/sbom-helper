@@ -9,7 +9,7 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/views/PurlResolver.vue` — PURL resolver page: input, resolve button, result card with warnings and resolver metadata
 - `frontend/src/views/SbomUpdater.vue` — SBOM-updater page: file upload, options, ignore patterns editor, results summary and table
 - `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete
-- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, ecosyste.ms, Libraries.io cards
+- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, ecosyste.ms, Libraries.io cards
 - `frontend/src/views/ImagesListConverter.vue` — Images List Converter page: file upload, conversion status card, images table, download
 - `frontend/src/views/NotFound.vue` — 404 catch-all page
 - `frontend/src/router/index.ts` — Vue Router configuration (5 routes + catch-all)
@@ -168,6 +168,7 @@ User                   Browser (Vue SPA)             API Layer
 - URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds), number input controls `revalidation_cooldown_hours` (0–720, default 24; 0 disables cooldown)
 - Retry Configuration card: number input controls `retry_max_attempts` (1–10), number input controls `retry_base_cooldown_seconds` (0.5–120)
 - Log Level card: dropdown controls `log_level` (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- APK Resolver card: enable toggle (controls `apk_resolver_enabled`), no API key, Alpine Linux APK packages resolve to `https://github.com/alpinelinux/aports/` as last fallback
 - ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits), rate limit input (`ecosystems_max_requests_per_second`, 0.1–100), status badge (set/not set), clear button
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
 - Settings are loaded from `GET /api/v1/settings` on page mount

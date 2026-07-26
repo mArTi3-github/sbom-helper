@@ -68,10 +68,11 @@
 |  |  Resolver (ABC)             |                   |
 |  |  Resolution dataclass       |                   |
 |  |  build_resolvers() factory  |                   |
-|  |  Purl2RepoResolver          |                   |
-|  |  EcosystemsResolver         |                   |
-|  |  LibrariesIoResolver        |                   |
-|  |  (future: LLM, purl2src)   |                   |
+ |  |  Purl2RepoResolver          |                   |
+ |  |  EcosystemsResolver         |                   |
+ |  |  LibrariesIoResolver        |                   |
+ |  |  ApkResolver                |                   |
+ |  |  (future: LLM, purl2src)   |                   |
 |  +----+------------------------+                   |
 |       |                                            |
 |       | Python call                                |
@@ -225,7 +226,7 @@
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
-- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation.
+- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages.
 - **Resolver Layer** imports purl2repo, httpx, and `purl_utils`; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
@@ -324,7 +325,7 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, apk_resolver_enabled, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
 - `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
@@ -382,10 +383,11 @@
 
 ### Resolver Layer (`resolver/`)
 - **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"libraries.io"`) and `async resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `warnings`
-- **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; creates `Purl2RepoResolver` from `Settings`, conditionally adds `EcosystemsResolver` (if `ecosystems_enabled`) and `LibrariesIoResolver` (if `librariesio_enabled` and API key present); used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
+- **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; creates `Purl2RepoResolver` from `Settings`, conditionally adds `EcosystemsResolver` (if `ecosystems_enabled`), `LibrariesIoResolver` (if `librariesio_enabled` and API key present), and `ApkResolver` (if `apk_resolver_enabled`); ApkResolver is always added last; used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
 - **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; async implementation uses `asyncio.to_thread()` to offload synchronous purl2repo calls to a thread pool; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`
 - **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; async implementation uses `httpx.AsyncClient` and `asyncio.sleep()` for rate limiting; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms; rate-limited (1 req/sec via `asyncio.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; async implementation uses `httpx.AsyncClient`; enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); configurable rate limiting via `ecosystems_max_requests_per_second` app setting; URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
+- **apk.py** — `ApkResolver(Resolver)` for Alpine Linux APK packages; `name` returns `"apk"`; purely local — checks `validate().type == "apk"` and returns constant URL `https://github.com/alpinelinux/aports/`; no network calls, no API key; enabled by default via `apk_resolver_enabled` setting; always placed last in the resolver chain
 - **retry.py** — `RetryConfig` dataclass, `RetryableErrorPolicy` (retryable error classification), `RetryHelper` (async retry loop with linear backoff)
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 
