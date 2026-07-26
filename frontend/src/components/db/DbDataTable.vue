@@ -1,6 +1,7 @@
 <template>
   <div>
     <div class="toolbar">
+      <button class="btn btn-primary" :disabled="store.addingNewRow" @click="store.startNewRow()">{{ t('dbAdmin.addRow') }}</button>
       <button class="btn btn-secondary" :disabled="store.selectedPurls.size === 0" @click="handleExport">{{ t('dbAdmin.exportCsv') }} ({{ store.selectedPurls.size }})</button>
       <button class="btn btn-secondary" @click="store.showImportModal = true">{{ t('dbAdmin.importCsv') }}</button>
       <button class="btn btn-danger" :disabled="store.selectedPurls.size === 0" @click="handleDeleteSelected">{{ t('dbAdmin.deleteSelected') }} ({{ store.selectedPurls.size }})</button>
@@ -25,6 +26,24 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="store.addingNewRow" class="new-row">
+            <td class="col-check"></td>
+            <td>
+              <input v-model="store.newRowValues.purl" class="inline-edit" placeholder="pkg:type/name" @keydown="handleNewRowKeydown">
+            </td>
+            <td>
+              <input v-model="store.newRowValues.repository_url" class="inline-edit" placeholder="https://github.com/..." @keydown="handleNewRowKeydown">
+            </td>
+            <td><span class="auto-field">import-manual</span></td>
+            <td class="cell-nowrap"><span class="auto-field">{{ currentTimestamp }}</span></td>
+            <td class="col-actions">
+              <button class="btn btn-sm btn-primary" :disabled="!store.newRowValues.purl || !store.newRowValues.repository_url" @click="store.saveNewRow()">{{ t('dbAdmin.saveNewRow') }}</button>
+              <button class="btn btn-sm btn-secondary" @click="store.cancelNewRow()">{{ t('dbAdmin.cancelNewRow') }}</button>
+            </td>
+          </tr>
+          <tr v-if="store.addingNewRow && store.newRowError" class="new-row-error">
+            <td colspan="7"><span class="error-text">{{ store.newRowError }}</span></td>
+          </tr>
           <tr v-for="row in store.rows" :key="row.purl">
             <td class="col-check"><input type="checkbox" :checked="store.selectedPurls.has(row.purl)" @change="store.toggleRow(row.purl)"></td>
             <td @dblclick="handleDblclick(row, 'purl', $event)">
@@ -116,6 +135,20 @@ function handleDblclick(row: ResolveResponse, field: 'purl' | 'repository_url', 
     input?.focus()
     input?.select()
   })
+}
+
+const currentTimestamp = computed(() => {
+  const d = new Date()
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+})
+
+function handleNewRowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && store.newRowValues.purl && store.newRowValues.repository_url) {
+    store.saveNewRow()
+  } else if (event.key === 'Escape') {
+    store.cancelNewRow()
+  }
 }
 
 function handleKeydown(event: KeyboardEvent, row: ResolveResponse) {
@@ -336,5 +369,29 @@ tr:hover {
   border: 1px solid var(--color-input-border);
   border-radius: var(--border-radius);
   font-size: 0.85rem;
+}
+
+.new-row {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.new-row td {
+  border-top: 2px solid var(--color-primary);
+}
+
+.new-row-error td {
+  padding-top: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: none;
+}
+
+.error-text {
+  color: var(--color-error);
+  font-size: 0.82rem;
+}
+
+.auto-field {
+  color: var(--color-muted);
+  font-style: italic;
 }
 </style>

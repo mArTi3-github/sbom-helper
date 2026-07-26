@@ -134,7 +134,10 @@
     "importing": "Importing...",
     "imported": "Imported:",
     "skipped": "Skipped:",
-    "errors": "Errors:"
+    "errors": "Errors:",
+    "addRow": "Add Row",
+    "saveNewRow": "Save",
+    "cancelNewRow": "Cancel"
   },
   "settings": {
     "title": "Settings",

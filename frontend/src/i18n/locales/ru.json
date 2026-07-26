@@ -134,7 +134,10 @@
     "importing": "Импорт...",
     "imported": "Импортировано:",
     "skipped": "Пропущено:",
-    "errors": "Ошибок:"
+    "errors": "Ошибок:",
+    "addRow": "Добавить строку",
+    "saveNewRow": "Сохранить",
+    "cancelNewRow": "Отмена"
   },
   "settings": {
     "title": "Настройки",
