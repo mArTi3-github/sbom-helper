@@ -28,6 +28,7 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
   const editingPurl = ref<string | null>(null)
   const editingValues = ref<{ purl?: string; repository_url?: string }>({})
 
+  const currentTimestamp = ref('')
   const addingNewRow = ref(false)
   const newRowValues = ref<{ purl: string; repository_url: string }>({ purl: '', repository_url: '' })
   const newRowError = ref<string | null>(null)
@@ -157,6 +158,9 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
     addingNewRow.value = true
     newRowValues.value = { purl: '', repository_url: '' }
     newRowError.value = null
+    const d = new Date()
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    currentTimestamp.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
   }
 
   function cancelNewRow() {
@@ -290,7 +294,7 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
     page, pageSize, total, totalPages,
     rows, selectedPurls, allSelected, someSelected,
     editingPurl, editingValues,
-    addingNewRow, newRowValues, newRowError,
+    currentTimestamp, addingNewRow, newRowValues, newRowError,
     showImportModal, importFile, importStrategy, importResults, importLoading, importError,
     loading, errorMessage, successMessage,
     fetchData, applyFilters, resetFilters, setSort,

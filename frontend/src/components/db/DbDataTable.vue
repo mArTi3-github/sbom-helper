@@ -35,14 +35,14 @@
               <input v-model="store.newRowValues.repository_url" class="inline-edit" placeholder="https://github.com/..." @keydown="handleNewRowKeydown">
             </td>
             <td><span class="auto-field">import-manual</span></td>
-            <td class="cell-nowrap"><span class="auto-field">{{ currentTimestamp }}</span></td>
+            <td class="cell-nowrap"><span class="auto-field">{{ store.currentTimestamp }}</span></td>
             <td class="col-actions">
               <button class="btn btn-sm btn-primary" :disabled="!store.newRowValues.purl || !store.newRowValues.repository_url" @click="store.saveNewRow()">{{ t('dbAdmin.saveNewRow') }}</button>
               <button class="btn btn-sm btn-secondary" @click="store.cancelNewRow()">{{ t('dbAdmin.cancelNewRow') }}</button>
             </td>
           </tr>
           <tr v-if="store.addingNewRow && store.newRowError" class="new-row-error">
-            <td colspan="7"><span class="error-text">{{ store.newRowError }}</span></td>
+            <td colspan="6"><span class="error-text">{{ store.newRowError }}</span></td>
           </tr>
           <tr v-for="row in store.rows" :key="row.purl">
             <td class="col-check"><input type="checkbox" :checked="store.selectedPurls.has(row.purl)" @change="store.toggleRow(row.purl)"></td>
@@ -66,7 +66,7 @@
               <button class="btn btn-sm btn-danger" @click="handleDeleteRow(row.purl)">{{ t('dbAdmin.del') }}</button>
             </td>
           </tr>
-          <tr v-if="store.rows.length === 0"><td colspan="7" class="empty-row">{{ t('dbAdmin.noRecords') }}</td></tr>
+          <tr v-if="store.rows.length === 0"><td colspan="6" class="empty-row">{{ t('dbAdmin.noRecords') }}</td></tr>
         </tbody>
       </table>
     </div>
@@ -136,12 +136,6 @@ function handleDblclick(row: ResolveResponse, field: 'purl' | 'repository_url', 
     input?.select()
   })
 }
-
-const currentTimestamp = computed(() => {
-  const d = new Date()
-  const pad = (n: number) => n.toString().padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-})
 
 function handleNewRowKeydown(event: KeyboardEvent) {
   if (event.key === 'Enter' && store.newRowValues.purl && store.newRowValues.repository_url) {
