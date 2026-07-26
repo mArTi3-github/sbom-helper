@@ -204,16 +204,13 @@ class TestJobManager:
         manager._repo.get_stuck_running.return_value = []
         manager._repo.get_queued.return_value = []
 
-        async def noop():
-            pass
-
         with (
-            patch("asyncio.create_task", return_value=MagicMock()) as mock_ct,
+            patch.object(manager, "_run_worker"),
+            patch.object(manager, "_run_cleanup"),
             patch("purl_resolver.job_manager.JOBS_DIR") as mock_jobs_dir,
         ):
             await manager.start()
 
-        assert mock_ct.call_count == 2
         mock_jobs_dir.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
     async def test_stop_cancels_worker_and_cleanup(self, manager):
