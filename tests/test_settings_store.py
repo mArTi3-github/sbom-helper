@@ -124,6 +124,19 @@ class TestEcosystemsSettings:
         assert loaded.ecosystems_max_requests_per_second == 5.0
 
 
+class TestApkSettings:
+    def test_default_enabled(self):
+        settings = AppSettings()
+        assert settings.apk_resolver_enabled is True
+
+    def test_save_and_load(self, tmp_path):
+        store = SettingsStore(path=tmp_path / "settings.json")
+        app_settings = AppSettings(apk_resolver_enabled=False)
+        store.save(app_settings)
+        loaded = store.load()
+        assert loaded.apk_resolver_enabled is False
+
+
 class TestSettingsStoreCache:
 
     def test_load_returns_cached_value_after_first_read(self, store: SettingsStore, tmp_settings_file: Path):

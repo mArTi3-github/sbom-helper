@@ -38,3 +38,17 @@ async def test_resolve_invalid_purl():
 def test_resolver_name():
     resolver = ApkResolver()
     assert resolver.name == "apk"
+
+
+async def test_apk_resolver_is_last_in_chain(monkeypatch):
+    from purl_resolver.settings_store import AppSettings
+    from purl_resolver.config import Settings
+    from purl_resolver.resolver.factory import build_resolvers
+
+    app_settings = AppSettings(
+        ecosystems_enabled=False,
+        librariesio_enabled=False,
+        apk_resolver_enabled=True,
+    )
+    resolvers = build_resolvers(Settings(), app_settings)
+    assert resolvers[-1].name == "apk"

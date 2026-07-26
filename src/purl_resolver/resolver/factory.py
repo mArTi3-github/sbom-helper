@@ -5,6 +5,7 @@ from ..settings_store import AppSettings
 from .ecosystems import EcosystemsResolver
 from .interface import Resolver
 from .librariesio import LibrariesIoResolver
+from .apk import ApkResolver
 from .purl2repo import Purl2RepoResolver
 from .retry import RetryConfig
 
@@ -38,4 +39,6 @@ def build_resolvers(
         resolvers.append(
             LibrariesIoResolver(api_key=app_settings.librariesio_api_key, retry_config=retry_config)
         )
+    if app_settings.apk_resolver_enabled:
+        resolvers.append(ApkResolver())
     return resolvers
