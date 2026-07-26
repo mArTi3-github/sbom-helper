@@ -137,7 +137,9 @@
     "errors": "Ошибок:",
     "addRow": "Добавить строку",
     "saveNewRow": "Сохранить",
-    "cancelNewRow": "Отмена"
+    "cancelNewRow": "Отмена",
+    "invalidPurl": "Неверный формат PURL: {detail}",
+    "purlExists": "Этот PURL уже существует в базе данных."
   },
   "settings": {
     "title": "Настройки",

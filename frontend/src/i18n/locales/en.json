@@ -137,7 +137,9 @@
     "errors": "Errors:",
     "addRow": "Add Row",
     "saveNewRow": "Save",
-    "cancelNewRow": "Cancel"
+    "cancelNewRow": "Cancel",
+    "invalidPurl": "Invalid PURL format: {detail}",
+    "purlExists": "This PURL already exists in the database."
   },
   "settings": {
     "title": "Settings",

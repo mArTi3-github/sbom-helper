@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { listPurls, listResolvers, updatePurl, deletePurls, importCsv, createPurl, exportSelectedCsv as apiExportCsv } from '../api/db'
 import type { PurlListParams } from '../api/db'
 import type { ResolveResponse, ImportResponse } from '../types/api'
 import { ApiError } from '../api/client'
 
 export const useDbAdminStore = defineStore('dbAdmin', () => {
+  const { t } = useI18n()
   const search = ref('')
   const resolver = ref('')
   const resolvers = ref<string[]>([])
@@ -179,9 +181,9 @@ export const useDbAdminStore = defineStore('dbAdmin', () => {
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         if (e.error === 'invalid_purl') {
-          newRowError.value = 'Invalid PURL format: ' + ((e.data.detail as string) || '')
+          newRowError.value = t('dbAdmin.invalidPurl', { detail: (e.data.detail as string) || '' })
         } else if (e.error === 'purl_exists') {
-          newRowError.value = 'This PURL already exists in the database.'
+          newRowError.value = t('dbAdmin.purlExists')
         } else {
           errorMessage.value = 'Failed to create record'
         }
