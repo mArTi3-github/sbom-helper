@@ -114,7 +114,49 @@
         </div>
       </div>
 
-
+      <div class="card">
+        <div class="card-title">{{ t('settings.ecosystems.title') }}</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.ecosystems.enable') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.ecosystems.enableDesc') }}
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" v-model="ecosystemsEnabled" @change="debouncedAutoSave({ ecosystems_enabled: ecosystemsEnabled })">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.ecosystems.apiKey') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.ecosystems.apiKeyDesc') }}
+            </div>
+            <div class="setting-desc link-desc">
+              <a href="https://ecosyste.ms/account/api_key" target="_blank">{{ t('settings.ecosystems.loginHint') }}</a>
+            </div>
+            <div class="setting-desc status-desc">
+              {{ t('settings.ecosystems.status') }} <span :class="tokenSet.ecosystems_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.ecosystems_api_key ? t('settings.set') : t('settings.notSet') }}</span>
+              <button v-if="tokenSet.ecosystems_api_key" class="btn btn-danger btn-sm" @click="clearEcosystemsKey">{{ t('settings.clearKey') }}</button>
+            </div>
+          </div>
+          <div class="input-right">
+            <input type="password" :value="ecosystemsKeyInput" @input="ecosystemsKeyInput = ($event.target as HTMLInputElement).value" @blur="onEcosystemsKeyBlur" placeholder="ecosyste.ms API key (optional)" class="pw-input">
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.ecosystems.maxRps') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.ecosystems.maxRpsDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="ecosystemsMaxRequestsPerSecond" min="0.1" max="100" step="0.1" @change="debouncedAutoSave({ ecosystems_max_requests_per_second: ecosystemsMaxRequestsPerSecond })" class="num-input">
+        </div>
+      </div>
+      
       <div class="card">
         <div class="card-title">{{ t('settings.librariesio.title') }}</div>
         <div class="setting-row">
@@ -160,49 +202,6 @@
             <input type="checkbox" v-model="apkEnabled" @change="debouncedAutoSave({ apk_resolver_enabled: apkEnabled })">
             <span class="toggle-slider"></span>
           </label>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">{{ t('settings.ecosystems.title') }}</div>
-        <div class="setting-row">
-          <div>
-            <div class="setting-label">{{ t('settings.ecosystems.enable') }}</div>
-            <div class="setting-desc">
-              {{ t('settings.ecosystems.enableDesc') }}
-            </div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" v-model="ecosystemsEnabled" @change="debouncedAutoSave({ ecosystems_enabled: ecosystemsEnabled })">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="setting-label">{{ t('settings.ecosystems.apiKey') }}</div>
-            <div class="setting-desc">
-              {{ t('settings.ecosystems.apiKeyDesc') }}
-            </div>
-            <div class="setting-desc link-desc">
-              <a href="https://ecosyste.ms/account/api_key" target="_blank">{{ t('settings.ecosystems.loginHint') }}</a>
-            </div>
-            <div class="setting-desc status-desc">
-              {{ t('settings.ecosystems.status') }} <span :class="tokenSet.ecosystems_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.ecosystems_api_key ? t('settings.set') : t('settings.notSet') }}</span>
-              <button v-if="tokenSet.ecosystems_api_key" class="btn btn-danger btn-sm" @click="clearEcosystemsKey">{{ t('settings.clearKey') }}</button>
-            </div>
-          </div>
-          <div class="input-right">
-            <input type="password" :value="ecosystemsKeyInput" @input="ecosystemsKeyInput = ($event.target as HTMLInputElement).value" @blur="onEcosystemsKeyBlur" placeholder="ecosyste.ms API key (optional)" class="pw-input">
-          </div>
-        </div>
-        <div class="setting-row">
-          <div>
-            <div class="setting-label">{{ t('settings.ecosystems.maxRps') }}</div>
-            <div class="setting-desc">
-              {{ t('settings.ecosystems.maxRpsDesc') }}
-            </div>
-          </div>
-          <input type="number" v-model.number="ecosystemsMaxRequestsPerSecond" min="0.1" max="100" step="0.1" @change="debouncedAutoSave({ ecosystems_max_requests_per_second: ecosystemsMaxRequestsPerSecond })" class="num-input">
         </div>
       </div>
 
