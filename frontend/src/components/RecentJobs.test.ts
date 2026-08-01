@@ -5,8 +5,8 @@ import RecentJobs from './RecentJobs.vue'
 import type { JobRecord } from '../types/api'
 
 const mockJobs: JobRecord[] = [
-  { job_id: '1', type: 'sbom_enrich', status: 'completed', progress_current: 0, progress_total: 0, input_filename: 'bom.json', summary: null, results: null, error_message: null, created_at: '2026-07-10T12:00:00', started_at: null, finished_at: null },
-  { job_id: '2', type: 'sbom_enrich', status: 'running', progress_current: 5, progress_total: 10, input_filename: 'app.json', summary: null, results: null, error_message: null, created_at: '2026-07-10T12:05:00', started_at: null, finished_at: null },
+  { job_id: '1', type: 'sbom_enrich', status: 'completed', progress_current: 0, progress_total: 0, progress_phase: null, input_filename: 'bom.json', summary: null, results: null, error_message: null, created_at: '2026-07-10T12:00:00', started_at: null, finished_at: null },
+  { job_id: '2', type: 'sbom_enrich', status: 'running', progress_current: 5, progress_total: 10, progress_phase: null, input_filename: 'app.json', summary: null, results: null, error_message: null, created_at: '2026-07-10T12:05:00', started_at: null, finished_at: null },
 ]
 
 function mountRecentJobs(props: { jobs: JobRecord[]; activeId: string | null }) {

@@ -73,7 +73,14 @@
     "ttIgnored": "Уникальных PURL, исключённых из обработки по правилам игнорирования",
     "cancelled": "Задача отменена",
     "failed": "Ошибка выполнения",
-    "queued": "Ожидание запуска..."
+    "queued": "Ожидание запуска...",
+    "phase": {
+      "parsing": "Разбор SBOM",
+      "validating_refs": "Проверка ссылок",
+      "resolving": "Резолвинг PURL",
+      "enriching": "Обогащение SBOM"
+    },
+    "progressCounter": "{current} / {total} · {percent}%"
   },
   "imagesListConverter": {
     "title": "Генерировать список образов",

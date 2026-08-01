@@ -73,7 +73,14 @@
     "ttIgnored": "Unique PURLs excluded from processing by ignore rules",
     "cancelled": "Job was cancelled",
     "failed": "Job failed",
-    "queued": "Waiting to start..."
+    "queued": "Waiting to start...",
+    "phase": {
+      "parsing": "Parsing SBOM",
+      "validating_refs": "Validating references",
+      "resolving": "Resolving PURLs",
+      "enriching": "Enriching SBOM"
+    },
+    "progressCounter": "{current} / {total} · {percent}%"
   },
   "imagesListConverter": {
     "title": "Generate Images List",

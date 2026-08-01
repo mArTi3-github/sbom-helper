@@ -88,6 +88,7 @@ export interface JobRecord {
   status: JobStatus
   progress_current: number
   progress_total: number
+  progress_phase: string | null
   input_filename: string | null
   summary: SbomSummary | null
   results: SbomResultItem[] | null

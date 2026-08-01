@@ -14,6 +14,7 @@ const runningJob: JobRecord = {
   status: 'running',
   progress_current: 5,
   progress_total: 10,
+  progress_phase: null,
   input_filename: 'bom.json',
   summary: null,
   results: null,
@@ -29,6 +30,7 @@ const completedJob: JobRecord = {
   status: 'completed',
   progress_current: 10,
   progress_total: 10,
+  progress_phase: null,
   input_filename: 'bom.json',
   summary: {
     total_purls: 10,
@@ -54,6 +56,7 @@ const failedJob: JobRecord = {
   status: 'failed',
   progress_current: 3,
   progress_total: 10,
+  progress_phase: null,
   input_filename: 'bom.json',
   summary: null,
   results: null,
