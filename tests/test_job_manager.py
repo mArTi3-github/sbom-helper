@@ -6,8 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from purl_resolver.job_manager import JobManager, JOBS_DIR
+from purl_resolver.job_manager import JobManager, _JobProgressReporter
 from purl_resolver.job_repository import JobRecord
+from purl_resolver.resolver.interface import Resolution
+from purl_resolver.service import PurlResolutionService
+from purl_resolver.storage.inmemory import InMemoryCache
+from tests.helpers import FakeResolver
 
 
 @pytest.fixture
@@ -228,3 +232,110 @@ class TestJobManager:
 
         assert worker_task.cancelled()
         assert cleanup_task.cancelled()
+
+
+class FakeClock:
+    def __init__(self, values: list[float]) -> None:
+        self._values = list(values)
+
+    def __call__(self) -> float:
+        return self._values.pop(0)
+
+
+class TestJobProgressReporter:
+
+    @pytest.mark.asyncio
+    async def test_throttles_intermediate_writes(self, mock_repo) -> None:
+        # Clock values consumed in this order:
+        #   initial write, 2 skipped checks, throttle-expired write, final write
+        clock = FakeClock([0.0, 0.0, 0.1, 3.0, 9.0, 9.0])
+        reporter = _JobProgressReporter(mock_repo, "j1", monotonic=clock)
+
+        await reporter.on_resolved(0, 10)    # initial -> write (0, 10)
+        await reporter.on_resolved(1, 10)    # 0.0 - 0.0 < 2 -> skip
+        await reporter.on_resolved(2, 10)    # 0.1 - 0.0 < 2 -> skip
+        await reporter.on_resolved(5, 10)    # 3.0 - 0.1 >= 2 -> write (5, 10)
+        await reporter.on_resolved(10, 10)   # current == total -> forced write
+
+        writes = [
+            c.kwargs for c in mock_repo.update_status.call_args_list
+            if "progress_current" in c.kwargs
+        ]
+        assert writes == [
+            {"progress_current": 0, "progress_total": 10},
+            {"progress_current": 5, "progress_total": 10},
+            {"progress_current": 10, "progress_total": 10},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_phase_writes_unconditionally(self, mock_repo) -> None:
+        reporter = _JobProgressReporter(mock_repo, "j1", monotonic=lambda: 1.0)
+
+        await reporter.on_phase("parsing")
+        await reporter.on_phase("resolving")
+
+        assert mock_repo.update_status.call_count == 2
+        mock_repo.update_status.assert_any_call("j1", "running", progress_phase="parsing")
+        mock_repo.update_status.assert_any_call("j1", "running", progress_phase="resolving")
+
+    @pytest.mark.asyncio
+    async def test_db_error_is_swallowed(self, mock_repo) -> None:
+        mock_repo.update_status.side_effect = RuntimeError("db down")
+        reporter = _JobProgressReporter(mock_repo, "j1")
+
+        await reporter.on_phase("resolving")
+        await reporter.on_resolved(0, 10)
+
+
+class TestProcessJobProgress:
+
+    @pytest.mark.asyncio
+    async def test_process_job_reports_progress(self, manager, mock_repo, tmp_path) -> None:
+        record = JobRecord(
+            id="j1", type="sbom_enrich", status="queued",
+            params_json=json.dumps({"remove_unresolved_no_subcomponents": False}),
+        )
+        mock_repo.get.return_value = record
+        resolver = FakeResolver(
+            resolution=Resolution(
+                purl="pkg:pypi/requests@2.31.0",
+                repository_url="https://github.com/psf/requests",
+            ),
+        )
+        manager._resolution_service = PurlResolutionService(InMemoryCache(), [resolver])
+
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library", "name": "requests", "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                },
+                {
+                    "type": "library", "name": "flask", "version": "3.0.0",
+                    "purl": "pkg:pypi/flask@3.0.0",
+                },
+            ],
+        }
+        with patch("purl_resolver.job_manager.JOBS_DIR", tmp_path):
+            (tmp_path / "j1").mkdir(parents=True)
+            (tmp_path / "j1" / "input.json").write_text(json.dumps(sbom))
+            await manager._process_job("j1")
+
+        progress_calls = [
+            c.kwargs for c in mock_repo.update_status.call_args_list
+            if "progress_" in " | ".join(c.kwargs)
+        ]
+        phases = [k["progress_phase"] for k in progress_calls if "progress_phase" in k]
+        totals = [k["progress_total"] for k in progress_calls if "progress_total" in k]
+        last_progress = [k for k in progress_calls if "progress_current" in k][-1]
+
+        assert phases == ["parsing", "resolving", "enriching"]
+        assert totals and totals[0] == 2
+        assert last_progress["progress_current"] == 2
+        assert last_progress["progress_total"] == 2
+
+        statuses = [c.args[1] for c in mock_repo.update_status.call_args_list]
+        assert statuses[-1] == "completed"

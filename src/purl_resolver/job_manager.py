@@ -5,7 +5,10 @@ import json
 import logging
 import os
 import shutil
+import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import asyncpg
 
@@ -17,6 +20,48 @@ from .service import PurlResolutionService
 logger = logging.getLogger(__name__)
 
 JOBS_DIR = Path(os.environ.get("JOBS_DIR", "data/jobs"))
+
+_PROGRESS_THROTTLE_SECONDS = 2.0
+
+
+class _JobProgressReporter:
+    """Writes pipeline progress into the jobs table, throttling DB writes.
+
+    Forced writes happen on phase changes and on the initial (0, total) and
+    final (total, total) progress events; intermediate writes are throttled
+    to ``throttle_seconds`` (default 2.0, matching the frontend poll interval).
+    DB errors are logged and swallowed — progress reporting never fails a job.
+    """
+
+    def __init__(
+        self,
+        repo: JobRepository,
+        job_id: str,
+        throttle_seconds: float = _PROGRESS_THROTTLE_SECONDS,
+        monotonic: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._repo = repo
+        self._job_id = job_id
+        self._throttle_seconds = throttle_seconds
+        self._monotonic = monotonic
+        self._last_write = 0.0
+
+    async def on_phase(self, phase: str) -> None:
+        await self._write(progress_phase=phase)
+
+    async def on_resolved(self, current: int, total: int) -> None:
+        if current == 0 or current == total:
+            await self._write(progress_current=current, progress_total=total)
+            return
+        if self._monotonic() - self._last_write >= self._throttle_seconds:
+            await self._write(progress_current=current, progress_total=total)
+
+    async def _write(self, **fields: Any) -> None:
+        try:
+            await self._repo.update_status(self._job_id, "running", **fields)
+            self._last_write = self._monotonic()
+        except Exception:
+            logger.warning("Failed to update progress for job %s", self._job_id, exc_info=True)
 
 
 class JobManager:
@@ -184,11 +229,13 @@ class JobManager:
             ignore_patterns = params.get("ignore_patterns")
 
             pipeline = SbomEnrichmentPipeline(self._resolution_service)
+            reporter = _JobProgressReporter(self._repo, job_id)
 
             result = await pipeline.process(
                 sbom_data,
                 remove_unresolved_no_subcomponents=remove_unresolved,
                 ignore_patterns=ignore_patterns,
+                progress_reporter=reporter,
             )
 
             record = await self._repo.get(job_id)
