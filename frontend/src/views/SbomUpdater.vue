@@ -167,7 +167,7 @@ import { ApiError } from '../api/client'
 import { safeUrl } from '../composables/useDownload'
 import type { IgnorePatternItem, JobRecord, JobStatus } from '../types/api'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const selectedFile = ref<File | null>(null)
 const removeUnresolved = ref(false)
@@ -193,7 +193,9 @@ const progressPercent = computed(() => {
 
 const phaseLabel = computed(() => {
   const phase = activeJob.value?.progress_phase
-  return phase ? t('sbomUpdater.phase.' + phase) : t('sbomUpdater.processing')
+  if (!phase) return t('sbomUpdater.processing')
+  const key = 'sbomUpdater.phase.' + phase
+  return te(key) ? t(key) : t('sbomUpdater.processing')
 })
 
 const progressCounter = computed(() => {

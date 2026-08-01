@@ -346,4 +346,17 @@ describe('SbomUpdater.vue', () => {
 
     expect(wrapper.find('.phase-label').text()).toBe('Processing SBOM...')
   })
+
+  it('falls back to processing label for unknown phase', async () => {
+    const unknownPhaseJob: JobRecord = { ...runningJob, progress_phase: 'unknown_phase' }
+    listJobsMock.mockResolvedValue({ jobs: [unknownPhaseJob] })
+    getJobMock.mockResolvedValue(unknownPhaseJob)
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    await wrapper.find('.job-row').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.phase-label').text()).toBe('Processing SBOM...')
+  })
 })
