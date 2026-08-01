@@ -16,6 +16,7 @@ class JobRecord:
     status: str
     progress_current: int = 0
     progress_total: int = 0
+    progress_phase: str | None = None
     params_json: str | None = None
     input_filename: str | None = None
     result_path: str | None = None
@@ -51,6 +52,7 @@ _COLUMNS = (
     "status",
     "progress_current",
     "progress_total",
+    "progress_phase",
     "params_json",
     "input_filename",
     "result_path",

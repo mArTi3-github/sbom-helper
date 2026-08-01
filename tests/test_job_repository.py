@@ -34,7 +34,7 @@ class TestJobRepository:
         record = JobRecord(id=job_id, type="sbom_enrich", status="queued")
         repo._pool.acquire.return_value.__aenter__.return_value.fetchrow.return_value = MockRecord(
             id=job_id, type="sbom_enrich", status="queued",
-            progress_current=0, progress_total=0,
+            progress_current=0, progress_total=0, progress_phase=None,
             params_json=None, input_filename=None,
             result_path=None, summary_json=None, results_json=None,
             error_message=None, cancel_requested=0,
@@ -47,6 +47,30 @@ class TestJobRepository:
         assert fetched is not None
         assert fetched.id == job_id
         assert fetched.status == "queued"
+
+    @pytest.mark.asyncio
+    async def test_create_and_get_with_progress_phase(self, repo):
+        job_id = _new_id()
+        record = JobRecord(
+            id=job_id, type="sbom_enrich", status="running",
+            progress_current=3, progress_total=10, progress_phase="resolving",
+        )
+        repo._pool.acquire.return_value.__aenter__.return_value.fetchrow.return_value = MockRecord(
+            id=job_id, type="sbom_enrich", status="running",
+            progress_current=3, progress_total=10, progress_phase="resolving",
+            params_json=None, input_filename=None,
+            result_path=None, summary_json=None, results_json=None,
+            error_message=None, cancel_requested=0,
+            created_at="2026-07-10T12:00:00", started_at=None, finished_at=None,
+        )
+
+        await repo.create(record)
+        fetched = await repo.get(job_id)
+
+        assert fetched is not None
+        assert fetched.progress_phase == "resolving"
+        assert fetched.progress_current == 3
+        assert fetched.progress_total == 10
 
     @pytest.mark.asyncio
     async def test_get_not_found(self, repo):
