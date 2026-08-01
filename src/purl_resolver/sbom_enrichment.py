@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Protocol
 
 from .purl_utils import normalize, validate
 from .sbom.collector import SbomComponent, collect_components
@@ -12,6 +13,13 @@ from .sbom.reporter import build_report
 from .service import PurlResolutionService
 from .settings_store import AppSettings
 from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url
+
+
+class ProgressReporter(Protocol):
+    async def on_phase(self, phase: str) -> None: ...
+
+    async def on_resolved(self, current: int, total: int) -> None: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +111,11 @@ class SbomEnrichmentPipeline:
         sbom_data: dict,
         remove_unresolved_no_subcomponents: bool = False,
         ignore_patterns: list[dict[str, str]] | None = None,
+        progress_reporter: ProgressReporter | None = None,
     ) -> SbomEnrichmentResult:
         """Parse, collect, deduplicate, resolve, enrich, and report."""
+        if progress_reporter is not None:
+            await progress_reporter.on_phase("parsing")
         CycloneDXParser.parse(sbom_data)
 
         components = collect_components(sbom_data)
@@ -120,6 +131,8 @@ class SbomEnrichmentPipeline:
         if settings:
             app_settings = settings.load()
             if app_settings.validate_sbom_refs:
+                if progress_reporter is not None:
+                    await progress_reporter.on_phase("validating_refs")
                 await self._validate_external_references(components, app_settings)
                 # Sync filtered existing_references back to SBOM data
                 # Components that go through validation but keep valid VCS refs
@@ -153,15 +166,26 @@ class SbomEnrichmentPipeline:
                 seen.add(n)
                 unique_purls.append(comp.purl)
 
+        if progress_reporter is not None:
+            await progress_reporter.on_phase("resolving")
+            await progress_reporter.on_resolved(0, len(unique_purls))
+
+        async def _report_resolved(current: int, total: int) -> None:
+            if progress_reporter is not None:
+                await progress_reporter.on_resolved(current, total)
+
         resolved = await self._resolution_service.resolve_batch(
             unique_purls,
             resolver="import-sbom",
+            on_progress=_report_resolved,
         )
         await self._resolution_service.store_preexisting_references(
             components, resolver="import-sbom"
         )
 
         removed: list[dict] = []
+        if progress_reporter is not None:
+            await progress_reporter.on_phase("enriching")
         enrich_sbom(sbom_data, components, resolved)
 
         if remove_unresolved_no_subcomponents:
