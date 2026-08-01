@@ -58,8 +58,8 @@ class _JobProgressReporter:
 
     async def _write(self, **fields: Any) -> None:
         try:
-            await self._repo.update_status(self._job_id, "running", **fields)
             self._last_write = self._monotonic()
+            await self._repo.update_progress(self._job_id, **fields)
         except Exception:
             logger.warning("Failed to update progress for job %s", self._job_id, exc_info=True)
 

@@ -117,6 +117,26 @@ class JobRepository:
         async with self._pool.acquire() as conn:
             await conn.execute(f"UPDATE jobs SET {', '.join(set_parts)} WHERE id = ${i}", *values)
 
+    async def update_progress(
+        self,
+        job_id: str,
+        **fields: Any,
+    ) -> None:
+        set_parts = []
+        values: list[Any] = []
+        i = 1
+        for key, val in fields.items():
+            set_parts.append(f"{key} = ${i}")
+            values.append(val)
+            i += 1
+        values.append(job_id)
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                f"UPDATE jobs SET {', '.join(set_parts)} "
+                f"WHERE id = ${i} AND status = 'running' AND cancel_requested = 0",
+                *values,
+            )
+
     async def delete(self, job_id: str) -> bool:
         async with self._pool.acquire() as conn:
             result = await conn.execute("DELETE FROM jobs WHERE id = $1", job_id)

@@ -21,6 +21,7 @@ def mock_repo():
     mgr.get = AsyncMock()
     mgr.list = AsyncMock()
     mgr.update_status = AsyncMock()
+    mgr.update_progress = AsyncMock()
     mgr.delete = AsyncMock()
     mgr.get_queued = AsyncMock()
     mgr.get_stuck_running = AsyncMock()
@@ -258,7 +259,7 @@ class TestJobProgressReporter:
         await reporter.on_resolved(10, 10)   # current == total -> forced write
 
         writes = [
-            c.kwargs for c in mock_repo.update_status.call_args_list
+            c.kwargs for c in mock_repo.update_progress.call_args_list
             if "progress_current" in c.kwargs
         ]
         assert writes == [
@@ -274,13 +275,13 @@ class TestJobProgressReporter:
         await reporter.on_phase("parsing")
         await reporter.on_phase("resolving")
 
-        assert mock_repo.update_status.call_count == 2
-        mock_repo.update_status.assert_any_call("j1", "running", progress_phase="parsing")
-        mock_repo.update_status.assert_any_call("j1", "running", progress_phase="resolving")
+        assert mock_repo.update_progress.call_count == 2
+        mock_repo.update_progress.assert_any_call("j1", progress_phase="parsing")
+        mock_repo.update_progress.assert_any_call("j1", progress_phase="resolving")
 
     @pytest.mark.asyncio
     async def test_db_error_is_swallowed(self, mock_repo) -> None:
-        mock_repo.update_status.side_effect = RuntimeError("db down")
+        mock_repo.update_progress.side_effect = RuntimeError("db down")
         reporter = _JobProgressReporter(mock_repo, "j1")
 
         await reporter.on_phase("resolving")
@@ -325,7 +326,7 @@ class TestProcessJobProgress:
             await manager._process_job("j1")
 
         progress_calls = [
-            c.kwargs for c in mock_repo.update_status.call_args_list
+            c.kwargs for c in mock_repo.update_progress.call_args_list
             if "progress_" in " | ".join(c.kwargs)
         ]
         phases = [k["progress_phase"] for k in progress_calls if "progress_phase" in k]

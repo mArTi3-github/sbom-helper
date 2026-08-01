@@ -88,6 +88,22 @@ class TestJobRepository:
         )
 
     @pytest.mark.asyncio
+    async def test_update_progress_guards_against_cancelled_or_non_running(self, repo):
+        conn = repo._pool.acquire.return_value.__aenter__.return_value
+        await repo.update_progress(
+            "job-1",
+            progress_current=5,
+            progress_total=10,
+            progress_phase="resolving",
+        )
+        conn.execute.assert_called_once_with(
+            "UPDATE jobs SET progress_current = $1, progress_total = $2, "
+            "progress_phase = $3 WHERE id = $4 AND status = 'running' "
+            "AND cancel_requested = 0",
+            5, 10, "resolving", "job-1",
+        )
+
+    @pytest.mark.asyncio
     async def test_list_all(self, repo):
         conn = repo._pool.acquire.return_value.__aenter__.return_value
         conn.fetch.return_value = []
