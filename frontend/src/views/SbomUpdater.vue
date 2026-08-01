@@ -53,10 +53,15 @@
       <!-- queued / running -->
       <div v-if="activeJob.status === 'queued' || activeJob.status === 'running'" class="loading">
         <span class="spinner"></span>
-        <span>{{ t('sbomUpdater.processing') }}</span>
-        <span v-if="activeJob.progress_total > 0" class="progress-text">
-          ({{ activeJob.progress_current }} / {{ activeJob.progress_total }})
-        </span>
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="phase-label">{{ phaseLabel }}</span>
+            <span v-if="activeJob.progress_total > 0" class="progress-text">{{ progressCounter }}</span>
+          </div>
+          <div v-if="activeJob.progress_total > 0" class="progress-track">
+            <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+          </div>
+        </div>
         <button class="btn-cancel" @click="handleCancel" :disabled="cancelling">
           {{ t('common.cancel') }}
         </button>
@@ -178,6 +183,28 @@ const patternsSaved = ref(false)
 const jobs = ref<JobRecord[]>([])
 const activeJobId = ref<string | null>(null)
 const activeJob = computed(() => jobs.value.find(j => j.job_id === activeJobId.value) || null)
+
+const progressPercent = computed(() => {
+  const total = activeJob.value?.progress_total ?? 0
+  const current = activeJob.value?.progress_current ?? 0
+  if (total <= 0) return 0
+  return Math.min(100, Math.round((current / total) * 100))
+})
+
+const phaseLabel = computed(() => {
+  const phase = activeJob.value?.progress_phase
+  return phase ? t('sbomUpdater.phase.' + phase) : t('sbomUpdater.processing')
+})
+
+const progressCounter = computed(() => {
+  const job = activeJob.value
+  if (!job || job.progress_total <= 0) return ''
+  return t('sbomUpdater.progressCounter', {
+    current: job.progress_current,
+    total: job.progress_total,
+    percent: progressPercent.value,
+  })
+})
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -472,9 +499,39 @@ h1 {
   color: var(--color-muted);
 }
 
+.progress-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.phase-label {
+  font-size: 0.9rem;
+}
+
 .progress-text {
   font-size: 0.85rem;
   color: var(--color-muted-light);
+}
+
+.progress-track {
+  margin-top: 0.35rem;
+  height: 0.5rem;
+  border-radius: var(--border-radius-full);
+  background: var(--color-table-header-bg);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: var(--border-radius-full);
+  background: var(--color-primary);
+  transition: width 0.4s ease;
 }
 
 .btn-cancel {

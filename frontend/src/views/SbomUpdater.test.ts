@@ -298,4 +298,52 @@ describe('SbomUpdater.vue', () => {
     expect(errorMsg.exists()).toBe(true)
     expect(errorMsg.text()).toBe('Something went wrong')
   })
+
+  it('renders progress bar and phase for a running job', async () => {
+    const resolvingJob: JobRecord = { ...runningJob, progress_phase: 'resolving' }
+    listJobsMock.mockResolvedValue({ jobs: [resolvingJob] })
+    getJobMock.mockResolvedValue(resolvingJob)
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    await wrapper.find('.job-row').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.progress-track').exists()).toBe(true)
+    expect(wrapper.find('.progress-fill').attributes('style')).toContain('width: 50%')
+    expect(wrapper.find('.phase-label').text()).toBe('Resolving PURLs')
+    expect(wrapper.find('.progress-text').text()).toBe('5 / 10 · 50%')
+  })
+
+  it('hides progress bar when total is zero', async () => {
+    const zeroJob: JobRecord = {
+      ...runningJob,
+      progress_current: 0,
+      progress_total: 0,
+      progress_phase: 'resolving',
+    }
+    listJobsMock.mockResolvedValue({ jobs: [zeroJob] })
+    getJobMock.mockResolvedValue(zeroJob)
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    await wrapper.find('.job-row').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.progress-track').exists()).toBe(false)
+    expect(wrapper.find('.phase-label').text()).toBe('Resolving PURLs')
+  })
+
+  it('falls back to processing label when phase is null', async () => {
+    const noPhaseJob: JobRecord = { ...runningJob, progress_phase: null }
+    listJobsMock.mockResolvedValue({ jobs: [noPhaseJob] })
+    getJobMock.mockResolvedValue(noPhaseJob)
+    const wrapper = mountUpdater()
+    await flushPromises()
+
+    await wrapper.find('.job-row').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.phase-label').text()).toBe('Processing SBOM...')
+  })
 })
