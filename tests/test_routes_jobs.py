@@ -85,7 +85,7 @@ class TestGetJob:
     def test_existing(self, client, mock_manager):
         record = JobRecord(
             id="job-1", type="sbom_enrich", status="completed",
-            progress_current=5, progress_total=10,
+            progress_current=5, progress_total=10, progress_phase="resolving",
             params_json='{"remove_unresolved_no_subcomponents": false}',
             input_filename="test.json",
             summary_json=json.dumps({"total": 1}),
@@ -103,6 +103,19 @@ class TestGetJob:
         assert data["status"] == "completed"
         assert data["summary"] == {"total": 1}
         assert data["results"] == [{"purl": "pkg:pypi/requests"}]
+        assert data["progress_phase"] == "resolving"
+
+    def test_queued_has_null_progress_phase(self, client, mock_manager):
+        record = JobRecord(
+            id="job-1", type="sbom_enrich", status="queued",
+            params_json='{"remove_unresolved_no_subcomponents": false}',
+            input_filename="test.json",
+        )
+        mock_manager.get_job.return_value = record
+        response = client.get("/api/v1/jobs/job-1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["progress_phase"] is None
 
     def test_not_found(self, client, mock_manager):
         mock_manager.get_job.return_value = None
@@ -235,7 +248,7 @@ class TestListJobs:
         mock_manager.list_jobs.return_value = [
             JobRecord(
                 id="job-1", type="sbom_enrich", status="completed",
-                progress_current=10, progress_total=10,
+                progress_current=10, progress_total=10, progress_phase="resolving",
                 input_filename="test.json",
                 summary_json=json.dumps({"total": 5}),
                 error_message=None,
@@ -249,4 +262,5 @@ class TestListJobs:
         data = response.json()
         assert len(data["jobs"]) == 1
         assert data["jobs"][0]["job_id"] == "job-1"
+        assert data["jobs"][0]["progress_phase"] == "resolving"
         mock_manager.list_jobs.assert_called_once_with(limit=10, offset=5)
