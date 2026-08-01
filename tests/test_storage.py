@@ -271,3 +271,13 @@ class TestResolvePurl:
         assert result.error_status is None
         assert result.response is not None
         assert result.response.repository_url == "https://github.com/second/pkg"
+
+
+class TestSchema:
+
+    def test_schema_has_progress_phase_column(self) -> None:
+        from purl_resolver.storage import postgres
+        postgres.CREATE_TABLE_SQL = None
+        schema = postgres._load_schema()
+        assert "progress_phase" in schema
+        assert "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS progress_phase TEXT" in schema

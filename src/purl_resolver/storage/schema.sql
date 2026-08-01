@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     status           TEXT NOT NULL,
     progress_current INTEGER DEFAULT 0,
     progress_total   INTEGER DEFAULT 0,
+    progress_phase   TEXT,
     params_json      TEXT,
     input_filename   TEXT,
     result_path      TEXT,
@@ -18,6 +19,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     started_at       TEXT,
     finished_at      TEXT
 );
+
+-- Idempotent migration for existing databases: CREATE TABLE IF NOT EXISTS
+-- does not alter tables, so new columns are added explicitly.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS progress_phase TEXT;
 
 -- Table for persisting successful PURL→repository_url resolution results.
 -- Auto-created on application startup via CREATE TABLE IF NOT EXISTS.
