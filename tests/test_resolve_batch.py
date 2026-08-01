@@ -92,3 +92,43 @@ class TestResolveBatch:
         resp = result["pkg:pypi/requests"]
         assert resp.found_by == "resolver"
         assert resp.resolver == "fake"
+
+    @pytest.mark.asyncio
+    async def test_on_progress_called_after_each_purl(self, storage: InMemoryCache) -> None:
+        resolver = FakeResolver(
+            resolution=Resolution(
+                purl="pkg:pypi/requests@2.31.0",
+                repository_url="https://github.com/psf/requests",
+            )
+        )
+        purls = [
+            "pkg:pypi/requests@2.31.0",
+            "pkg:npm/express@4.17.1",
+            "pkg:pypi/flask@3.0.0",
+        ]
+        calls: list[tuple[int, int]] = []
+
+        async def on_progress(current: int, total: int) -> None:
+            calls.append((current, total))
+
+        await PurlResolutionService(storage, [resolver]).resolve_batch(
+            purls, on_progress=on_progress
+        )
+
+        assert calls == [(1, 3), (2, 3), (3, 3)]
+
+    @pytest.mark.asyncio
+    async def test_on_progress_counts_unresolved_purls(self, storage: InMemoryCache) -> None:
+        resolver = FakeResolver(
+            resolution=Resolution(purl="pkg:pypi/requests@2.31.0", repository_url=None)
+        )
+        calls: list[tuple[int, int]] = []
+
+        async def on_progress(current: int, total: int) -> None:
+            calls.append((current, total))
+
+        await PurlResolutionService(storage, [resolver]).resolve_batch(
+            ["pkg:pypi/requests@2.31.0"], on_progress=on_progress
+        )
+
+        assert calls == [(1, 1)]

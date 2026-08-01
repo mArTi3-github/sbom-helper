@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from .purl_utils import normalize, safe_normalize, validate
@@ -163,14 +165,19 @@ class PurlResolutionService:
         self,
         purls: list[str],
         resolver: str = "",
+        on_progress: Callable[[int, int], Awaitable[None]] | None = None,
     ) -> dict[str, ResolveResponse]:
         batch_limit = self._settings_store.load().batch_semaphore_limit if self._settings_store else _BATCH_SEMAPHORE_LIMIT
         semaphore = asyncio.Semaphore(batch_limit)
+        total = len(purls)
+        counter = itertools.count(1)
 
         async def _resolve_one(original: str) -> tuple[str, ResolveResponse | None]:
             async with semaphore:
                 result = await self.resolve_purl(original, resolver=resolver)
                 key = safe_normalize(original)
+                if on_progress is not None:
+                    await on_progress(next(counter), total)
                 if result.response and result.response.repository_url:
                     return (key, result.response)
                 return (key, None)
