@@ -5,6 +5,7 @@ import logging
 from ..config import Settings
 from ..settings_store import AppSettings
 from .apk import ApkResolver
+from .depsdev import DepsdevResolver
 from .ecosystems import EcosystemsResolver
 from .interface import Resolver
 from .librariesio import LibrariesIoResolver
@@ -32,6 +33,13 @@ def build_resolvers(
         max_attempts=app_settings.retry_max_attempts,
         base_cooldown_seconds=app_settings.retry_base_cooldown_seconds,
     )
+    if app_settings.depsdev_enabled:
+        resolvers.append(
+            DepsdevResolver(
+                timeout=settings.timeout,
+                retry_config=retry_config,
+            )
+        )
     if app_settings.ecosystems_enabled:
         resolvers.append(
             EcosystemsResolver(

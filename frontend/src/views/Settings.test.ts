@@ -16,6 +16,7 @@ const defaultSettings: SettingsResponse = {
   retry_base_cooldown_seconds: 5,
   log_level: 'INFO',
   librariesio_enabled: false,
+  depsdev_enabled: true,
   apk_resolver_enabled: false,
   ecosystems_enabled: false,
   ecosystems_max_requests_per_second: 2,

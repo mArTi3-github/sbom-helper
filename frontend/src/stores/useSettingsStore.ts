@@ -13,6 +13,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const retryBaseCooldownSeconds = ref(5)
   const logLevel = ref('INFO')
   const librariesioEnabled = ref(false)
+  const depsdevEnabled = ref(false)
   const apkEnabled = ref(false)
   const ecosystemsEnabled = ref(false)
   const ecosystemsMaxRequestsPerSecond = ref(2)
@@ -48,6 +49,7 @@ export const useSettingsStore = defineStore('settings', () => {
       retryBaseCooldownSeconds.value = data.retry_base_cooldown_seconds
       logLevel.value = data.log_level
       librariesioEnabled.value = data.librariesio_enabled
+      depsdevEnabled.value = data.depsdev_enabled
       apkEnabled.value = data.apk_resolver_enabled
       ecosystemsEnabled.value = data.ecosystems_enabled
       ecosystemsMaxRequestsPerSecond.value = data.ecosystems_max_requests_per_second
@@ -82,7 +84,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
-    librariesioEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
+    librariesioEnabled, depsdevEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
     llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
     tokenSet, librariesioKey, ecosystemsKey, llmApiKey, loading,

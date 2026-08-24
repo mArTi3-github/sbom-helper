@@ -263,6 +263,11 @@
       "indentSize": "Размер отступа JSON",
       "indentSizeDesc": "Количество пробелов для отступа JSON в скачиваемых файлах (SBOM, Images List).",
       "spaces": "{count} пробел | {count} пробела | {count} пробелов"
+    },
+    "depsdevResolver": {
+      "title": "Резолвер deps.dev",
+      "enable": "Включить резолвер deps.dev",
+      "enableDesc": "При включении пакеты, поддерживаемые deps.dev (Maven, npm, Go, PyPI, NuGet, Cargo, RubyGems), резолвятся через API deps.dev вторым шагом цепочки резолверов."
     }
   },
   "status": {

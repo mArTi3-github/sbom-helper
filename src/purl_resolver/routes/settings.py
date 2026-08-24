@@ -36,6 +36,7 @@ class SettingsUpdate(BaseModel):
     url_validation_timeout: int | None = Field(None, ge=1, le=60)
     librariesio_enabled: bool | None = None
     librariesio_api_key: str | None = None
+    depsdev_enabled: bool | None = None
     apk_resolver_enabled: bool | None = None
     ecosystems_enabled: bool | None = None
     ecosystems_api_key: str | None = None
@@ -87,6 +88,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "retry_base_cooldown_seconds": app_settings.retry_base_cooldown_seconds,
         "log_level": app_settings.log_level,
         "librariesio_enabled": app_settings.librariesio_enabled,
+        "depsdev_enabled": app_settings.depsdev_enabled,
         "apk_resolver_enabled": app_settings.apk_resolver_enabled,
         "ecosystems_enabled": app_settings.ecosystems_enabled,
         "ecosystems_max_requests_per_second": app_settings.ecosystems_max_requests_per_second,
@@ -151,6 +153,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "retry_base_cooldown_seconds": updated.retry_base_cooldown_seconds,
         "log_level": updated.log_level,
         "librariesio_enabled": updated.librariesio_enabled,
+        "depsdev_enabled": updated.depsdev_enabled,
         "apk_resolver_enabled": updated.apk_resolver_enabled,
         "ecosystems_enabled": updated.ecosystems_enabled,
         "ecosystems_max_requests_per_second": updated.ecosystems_max_requests_per_second,

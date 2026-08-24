@@ -115,6 +115,20 @@
       </div>
 
       <div class="card">
+        <div class="card-title">{{ t('settings.depsdevResolver.title') }}</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.depsdevResolver.enable') }}</div>
+            <div class="setting-desc">{{ t('settings.depsdevResolver.enableDesc') }}</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" v-model="depsdevEnabled" @change="debouncedAutoSave({ depsdev_enabled: depsdevEnabled })">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">{{ t('settings.ecosystems.title') }}</div>
         <div class="setting-row">
           <div>
@@ -396,7 +410,7 @@ const { theme } = useTheme()
 const {
   validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
-  librariesioEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
+  librariesioEnabled, depsdevEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout,
   tokenSet, loading, jsonIndent,
   llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,

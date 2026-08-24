@@ -32,6 +32,7 @@ export interface SettingsResponse {
   retry_base_cooldown_seconds: number
   log_level: string
   librariesio_enabled: boolean
+  depsdev_enabled: boolean
   apk_resolver_enabled: boolean
   ecosystems_enabled: boolean
   ecosystems_max_requests_per_second: number
@@ -55,6 +56,7 @@ export interface SettingsUpdate {
   url_validation_timeout?: number
   librariesio_enabled?: boolean
   librariesio_api_key?: string | null
+  depsdev_enabled?: boolean
   apk_resolver_enabled?: boolean
   ecosystems_enabled?: boolean
   ecosystems_api_key?: string | null

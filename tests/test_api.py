@@ -248,11 +248,18 @@ class TestResolverChainRebuild:
 
         with (
             patch("purl_resolver.resolver.factory.Purl2RepoResolver") as purl2repo_cls,
+            patch("purl_resolver.resolver.factory.DepsdevResolver") as depsdev_cls,
             patch("purl_resolver.resolver.factory.LlmResolver") as llm_cls,
         ):
             fake_purl2repo = purl2repo_cls.return_value
             fake_purl2repo.name = "purl2repo"
             fake_purl2repo.resolve = AsyncMock(
+                return_value=Resolution(purl="pkg:pypi/requests@2.31.0")
+            )
+
+            fake_depsdev = depsdev_cls.return_value
+            fake_depsdev.name = "depsdev"
+            fake_depsdev.resolve = AsyncMock(
                 return_value=Resolution(purl="pkg:pypi/requests@2.31.0")
             )
 

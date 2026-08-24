@@ -263,6 +263,11 @@
       "indentSize": "JSON indent size",
       "indentSizeDesc": "Number of spaces used when indenting JSON in downloaded files (SBOM, Images List).",
       "spaces": "{count} space | {count} spaces"
+    },
+    "depsdevResolver": {
+      "title": "deps.dev Resolver",
+      "enable": "Enable deps.dev resolver",
+      "enableDesc": "When enabled, packages supported by deps.dev (Maven, npm, Go, PyPI, NuGet, Cargo, RubyGems) are resolved through the deps.dev API as the second step of the resolver chain."
     }
   },
   "status": {

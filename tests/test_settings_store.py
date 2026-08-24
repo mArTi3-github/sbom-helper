@@ -137,6 +137,19 @@ class TestApkSettings:
         assert loaded.apk_resolver_enabled is False
 
 
+class TestDepsdevSettings:
+    def test_default_enabled(self) -> None:
+        settings = AppSettings()
+        assert settings.depsdev_enabled is True
+
+    def test_save_and_load(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        app_settings = AppSettings(depsdev_enabled=False)
+        store.save(app_settings)
+        loaded = store.load()
+        assert loaded.depsdev_enabled is False
+
+
 class TestLlmResolverSettings:
     def test_defaults(self) -> None:
         settings = AppSettings()

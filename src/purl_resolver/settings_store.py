@@ -31,6 +31,7 @@ class AppSettings(BaseModel):
     connectivity_url: str = Field(default="https://github.com")
     connectivity_timeout: int = Field(default=2, ge=1, le=30)
     json_indent: Literal[1, 2, 4] = Field(default=4)
+    depsdev_enabled: bool = True
     apk_resolver_enabled: bool = True
     llm_resolver_enabled: bool = False
     llm_resolver_base_url: str | None = Field(default=None, pattern=r"^https?://.+")
