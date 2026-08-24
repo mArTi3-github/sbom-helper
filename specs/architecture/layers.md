@@ -65,23 +65,26 @@
 |  |   Resolver Layer            |                   |
 |  |  resolver/                  |                   |
 |  |                             |                   |
-|  |  Resolver (ABC)             |                   |
-|  |  Resolution dataclass       |                   |
-|  |  build_resolvers() factory  |                   |
- |  |  Purl2RepoResolver          |                   |
- |  |  EcosystemsResolver         |                   |
- |  |  LibrariesIoResolver        |                   |
- |  |  ApkResolver                |                   |
- |  |  (future: LLM, purl2src)   |                   |
-|  +----+------------------------+                   |
-|       |                                            |
-|       | Python call                                |
-|       v                                            |
-|  +-----------------------------+                   |
-|  |     Domain Layer            |                   |
-|  |  (purl2repo, future LLM)    |                   |
-|  |  resolve(original_purl)     |                   |
-|  +-----------------------------+                   |
+  |  |  Resolver (ABC)             |                   |
+  |  |  Resolution dataclass       |                   |
+  |  |  build_resolvers() factory  |                   |
+  |  |  Purl2RepoResolver          |                   |
+  |  |  DepsdevResolver            |                   |
+  |  |  EcosystemsResolver         |                   |
+  |  |  LibrariesIoResolver        |                   |
+  |  |  ApkResolver                |                   |
+  |  |  LlmResolver (last)         |                   |
+  |  +----+------------------------+                   |
+  |       |                                            |
+  |       | Python call                                |
+  |       v                                            |
+  |  +-----------------------------+                   |
+  |  |     Domain Layer            |                   |
+  |  |  (external: purl2repo,      |                   |
+  |  |   deps.dev, ecosyste.ms,    |                   |
+  |  |   libraries.io, LLM API)    |                   |
+  |  |  resolve(original_purl)     |                   |
+  |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
 |  |     URL Validator           |                   |
@@ -226,7 +229,7 @@
 - **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
-- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages.
+- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `DepsdevResolver` wraps the deps.dev v3 API (maven, npm, golang, pypi, nuget, cargo, gem; no API key). `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages. `LlmResolver` wraps an OpenAI-compatible chat API and is always added last.
 - **Resolver Layer** imports purl2repo, httpx, and `purl_utils`; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
 - **Config Layer** is a standalone module with no internal project imports
@@ -254,7 +257,7 @@
 ### Service Layer (`service.py`)
 - `PurlResolutionService` class with constructor injection (`storage: Storage`, `resolvers: list[Resolver]`, `settings_store: SettingsStore | None = None`, `validation_service: UrlValidationService | None = None`)
 - Orchestrate single resolution flow (`resolve_purl`): validate PURL → normalize cache key → storage lookup → URL validation (if enabled) → resolver chain (iterates resolvers, first success wins) → storage store; uses `resolver.name` property to tag stored records with the actual resolver identifier (e.g. `"purl2repo"`, `"libraries.io"`)
-- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil); delete invalid URLs and fall through to resolver chain; skip validation if within cooldown window (trusted resolvers respect `revalidation_cooldown_hours`). Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url()` directly.
+- URL validation: when `validate_db_urls` is enabled, verify cached URLs via HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil); delete invalid URLs and fall through to resolver chain; skip validation if within the cooldown window (`revalidation_cooldown_hours`, enforced per URL by the URL validation cache). Cache entries are updated with the resolved final URL when `_validate_cached_url()` receives a `UrlValidationOutput` whose `final_url` differs from the stored URL on `VALID` result. Fresh resolver results use `final_url` for any non-INVALID validation result. URL validation delegates to `UrlValidationService` when provided, otherwise calls `validate_url()` directly.
 - Batch resolution (`resolve_batch`): resolve multiple PURLs concurrently via `asyncio.gather()` with semaphore limit from `AppSettings.batch_semaphore_limit` (default: 10); returns `dict[str, str]` of normalized PURL → repository URL for successful resolutions; uses `self._settings_store` for URL validation (no longer accepts it per-call)
 - Store pre-existing references (`store_preexisting_references`): for SBOM components with `needs_enrichment=False`, extract VCS repository URL from `externalReferences` and store in database via `self._storage.store()`
 - Map resolver `Resolution` to canonical `ResolveResponse` format (purl, repository_url, warnings, resolver, found_by, resolved_at); tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
@@ -325,7 +328,7 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, librariesio_enabled, librariesio_api_key, ecosystems_enabled, ecosystems_api_key, apk_resolver_enabled, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, resolver toggles and API keys: librariesio/ecosyste.ms/depsdev/apk/llm, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, batch_max_items, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
 - `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
@@ -363,14 +366,14 @@
 
 ### Web UI Layer (`frontend/`)
 - Vue 3 SPA built with Vite + TypeScript, source in `frontend/src/`
-- **Views** (`src/views/`): `PurlResolver.vue`, `SbomUpdater.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
+- **Views** (`src/views/`): `HomePage.vue`, `PurlResolver.vue`, `SbomUpdater.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
 - **Components** (`src/components/`): `AppNav.vue` (navigation bar), `FileUploadZone.vue` (drag-and-drop upload), `ModalDialog.vue` (reusable modal)
 - **Composables** (`src/composables/`): `useDownload.ts` (file download helper)
 - **Stores** (`src/stores/`): `useSettingsStore.ts` (Pinia store for settings), `useDbAdminStore.ts` (Pinia store for database admin state — includes pagination logic via `goToPage`, `changePageSize`, `totalPages`)
 - **i18n** (`src/i18n/`): `index.ts` (vue-i18n configuration with `legacy: false`), `locales/en.json` (English), `locales/ru.json` (Russian); `@intlify/unplugin-vue-i18n` Vite plugin for compile-time message compilation
 - **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts`, `db.ts`, `settings.ts`, `images.ts`
 - **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`
-- **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 5 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`
+- **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 6 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`
 - FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass) mounted at `/` in `main.py`; `SPAStaticFiles` falls back to `index.html` for unmatched paths, enabling client-side routing
 - Each `.vue` component uses `<style scoped>` for CSS isolation; global CSS variables in `src/assets/main.css`
 - No CSS framework — design system uses CSS custom properties
@@ -382,12 +385,14 @@
 - Our code does not import or modify purl2repo directly
 
 ### Resolver Layer (`resolver/`)
-- **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"libraries.io"`) and `async resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `warnings`
-- **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; creates `Purl2RepoResolver` from `Settings`, conditionally adds `EcosystemsResolver` (if `ecosystems_enabled`), `LibrariesIoResolver` (if `librariesio_enabled` and API key present), and `ApkResolver` (if `apk_resolver_enabled`); ApkResolver is always added last; used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
+- **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"depsdev"`, `"libraries.io"`, `"llm"`) and `async resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `warnings`
+- **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; always creates `Purl2RepoResolver` from `Settings`; then conditionally adds `DepsdevResolver` (if `depsdev_enabled`), `EcosystemsResolver` (if `ecosystems_enabled`), `LibrariesIoResolver` (if `librariesio_enabled` and API key present), `ApkResolver` (if `apk_resolver_enabled`), and `LlmResolver` (if `llm_resolver_enabled` and base URL/api key/model are all set — always last; skipped with a warning if configuration is incomplete); used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
 - **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; async implementation uses `asyncio.to_thread()` to offload synchronous purl2repo calls to a thread pool; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`
+- **depsdev.py** — `DepsdevResolver(Resolver)` using the deps.dev v3 API; `name` returns `"depsdev"`; supports maven, npm, golang, pypi, nuget, cargo, gem; no API key required; enabled by default via `depsdev_enabled`; ~1 req/s rate limiting and shared `RetryConfig`; unversioned PURLs resolve against the default (or latest published) version; the SOURCE_REPO link is normalized to an HTTPS URL (strips `scm:` prefixes, converts `git://`/`ssh://`/`git@`, drops `/tree/` segments and trailing `.git`); graceful degradation on errors
 - **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; async implementation uses `httpx.AsyncClient` and `asyncio.sleep()` for rate limiting; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms; rate-limited (1 req/sec via `asyncio.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; async implementation uses `httpx.AsyncClient`; enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); configurable rate limiting via `ecosystems_max_requests_per_second` app setting; URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
-- **apk.py** — `ApkResolver(Resolver)` for Alpine Linux APK packages; `name` returns `"apk"`; purely local — checks `validate().type == "apk"` and returns constant URL `https://github.com/alpinelinux/aports`; no network calls, no API key; enabled by default via `apk_resolver_enabled` setting; always placed last in the resolver chain
+- **apk.py** — `ApkResolver(Resolver)` for Alpine Linux APK packages; `name` returns `"apk"`; purely local — checks `validate().type == "apk"` and returns constant URL `https://github.com/alpinelinux/aports`; no network calls, no API key; enabled by default via `apk_resolver_enabled` setting
+- **llm.py** — `LlmResolver(Resolver)` using an OpenAI-compatible chat API (`AsyncOpenAI`); `name` returns `"llm"`; optional, settings-controlled (`llm_resolver_enabled` + `llm_resolver_base_url` + `llm_resolver_api_key` + `llm_resolver_model`); always placed last; asks the model for a JSON object (`purl`, `status`, `repository_url`), validates the schema, and verifies the URL with an HTTP HEAD request before accepting; failed attempts (`attempts_count` total) are fed back into the prompt
 - **retry.py** — `RetryConfig` dataclass, `RetryableErrorPolicy` (retryable error classification), `RetryHelper` (async retry loop with linear backoff)
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 

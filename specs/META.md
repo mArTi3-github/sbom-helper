@@ -23,7 +23,9 @@ specs/
     ├── 0003-purl-validation-and-normalization.md # Application-level PURL validation
     ├── 0004-librariesio-as-fallback-resolver.md  # libraries.io as fallback resolver
     ├── 0005-ecosyste-ms-as-fallback-resolver.md  # ecosyste.ms as fallback resolver
-    └── 0006-async-first-resolver-architecture.md # Async-first resolver architecture
+    ├── 0006-async-first-resolver-architecture.md # Async-first resolver architecture
+    ├── 0007-depsdev-as-fallback-resolver.md      # deps.dev as fallback resolver
+    └── 0008-llm-as-last-resort-resolver.md       # LLM as last-resort resolver
 ```
 
 ## How to Use

@@ -60,48 +60,54 @@ docker compose logs --follow
 
 The core functionality of sbom-helper revolves around resolving `PURL → repository URL`. The resolver chain works as follows:
 
-1. **Validate input** — the PURL is checked against the [Package URL specification](https://github.com/package-url/purl-spec)
+1. **Validate input** — each PURL is checked against the [Package URL specification](https://github.com/package-url/purl-spec)
 2. **Query sources sequentially** (first match wins):
    - **Local database** — cache of previously resolved PURL → VCS URL mappings
    - **[purl2repo](https://github.com/tonylturner/purl2repo)** — open-source resolver for common PURL types
+   - **[deps.dev](https://deps.dev/)** — Google package metadata API, no API key required (enabled by default) — Maven, npm, Go, PyPI, NuGet, Cargo, RubyGems
    - **[ecosyste.ms](https://ecosyste.ms/)** — open package registry API (enabled by default)
    - **[libraries.io](https://libraries.io/)** — open source package discovery API (optional, requires API key)
-   - **[APK Resolver (Alpine Linux)](https://github.com/alpinelinux/aports)** — last-resort fallback for `pkg:apk/...` PURLs, returns the aports repo URL (enabled by default)
+   - **[APK Resolver (Alpine Linux)](https://github.com/alpinelinux/aports)** — fallback for `pkg:apk/...` PURLs, returns the aports repo URL (enabled by default)
+   - **[LLM Resolver]** — optional last-resort resolver: an OpenAI-compatible LLM with web search finds the repository URL (disabled by default)
 3. **Validate the found URL** — checks if the URL points to a VCS repository using git, svn, hg (Mercurial), and fossil probes
 4. **Cache and return** — on success, the mapping is stored in the local database and the URL is returned
 
+Each resolver after purl2repo can be enabled or disabled independently in Settings. The LLM resolver, when enabled, is always tried last.
+
 ## Supported PURL Types
 
-| PURL Type | purl2repo | ecosyste.ms | libraries.io | apk |
-|---|:---:|:---:|:---:|:---:|
-| `apk` | | | | ✓ |
-| `bitbucket` | ✓ | | |
-| `cargo` | ✓ | ✓ | ✓ |
-| `composer` | | ✓ | ✓ |
-| `conda` | | ✓ | ✓ |
-| `cpan` | | ✓ | ✓ |
-| `cran` | | ✓ | ✓ |
-| `gem` | | ✓ | ✓ |
-| `generic` | ✓ | | ✓ |
-| `github` | ✓ | | |
-| `golang` | ✓ | ✓ | ✓ |
-| `hackage` | | ✓ | ✓ |
-| `hex` | | ✓ | ✓ |
-| `huggingface` | ✓ | | |
-| `maven` | ✓ | ✓ | ✓ |
-| `mlflow` | ✓ | | |
-| `npm` | ✓ | ✓ | ✓ |
-| `nuget` | ✓ | ✓ | ✓ |
-| `pub` | | ✓ | ✓ |
-| `pypi` | ✓ | ✓ | ✓ |
-| `swift` | | ✓ | ✓ |
+| PURL Type | purl2repo | deps.dev | ecosyste.ms | libraries.io | apk |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `apk` | | | | | ✓ |
+| `bitbucket` | ✓ | | | |
+| `cargo` | ✓ | ✓ | ✓ | ✓ |
+| `composer` | | | ✓ | ✓ |
+| `conda` | | | ✓ | ✓ |
+| `cpan` | | | ✓ | ✓ |
+| `cran` | | | ✓ | ✓ |
+| `gem` | | ✓ | ✓ | ✓ |
+| `generic` | ✓ | | | ✓ |
+| `github` | ✓ | | | |
+| `golang` | ✓ | ✓ | ✓ | ✓ |
+| `hackage` | | | ✓ | ✓ |
+| `hex` | | | ✓ | ✓ |
+| `huggingface` | ✓ | | | |
+| `maven` | ✓ | ✓ | ✓ | ✓ |
+| `mlflow` | ✓ | | | |
+| `npm` | ✓ | ✓ | ✓ | ✓ |
+| `nuget` | ✓ | ✓ | ✓ | ✓ |
+| `pub` | | | ✓ | ✓ |
+| `pypi` | ✓ | ✓ | ✓ | ✓ |
+| `swift` | | | ✓ | ✓ |
 
 **Notes:**
 - Support for a PURL type does not guarantee a 100 % resolution rate — it means the resolver chain is capable of processing that type
 - **purl2repo** is always enabled as the primary resolver
+- **deps.dev** is enabled by default, no API key required
 - **ecosyste.ms** is enabled by default as a fallback
 - **libraries.io** is optional and requires an API key, configured via Settings
-- **APK resolver** is enabled by default as the last fallback — resolves any `pkg:apk/...` PURL to `https://github.com/alpinelinux/aports` (no API key required)
+- **APK resolver** is enabled by default — resolves any `pkg:apk/...` PURL to `https://github.com/alpinelinux/aports` (no API key required)
+- **LLM resolver** is optional and disabled by default; when enabled it is always tried last
 
 ## Settings
 
@@ -111,11 +117,13 @@ Key settings available in the web UI (`/settings`):
 |---|---|---|
 | `Validate DB URLs` | Enabled | Validates cached repository URLs before returning them. Invalid URLs are deleted and re-resolved through the chain |
 | `GitHub Personal Access Token` | Active token | Increases GitHub API rate limits from 60 to 5000 requests/hour. [Create a token](https://github.com/settings/tokens) |
-| `Enable APK resolver (Alpine Linux)` | Enabled | Last-resort fallback for Alpine Linux APK packages (`pkg:apk/...`). Always returns `https://github.com/alpinelinux/aports`. No API key required. |
-| `Enable libraries.io resolver` + `API key` | Enabled + active key | Enables search across the public libraries.io database. Increases rate limits from 10 to 60 requests/min. [Get a key](https://libraries.io/account) |
-| `Enable ecosyste.ms resolver` + `API key` | Enabled + active key | Enables search across the public ecosyste.ms database. Rate limits are dynamic. [Get a key](https://ecosyste.ms/account/api_key) |
+| `Enable deps.dev resolver` | Enabled | Searches the deps.dev package metadata API for Maven, npm, Go, PyPI, NuGet, Cargo, and RubyGems packages. No API key required. |
+| `Enable APK resolver (Alpine Linux)` | Enabled | Fallback for Alpine Linux APK packages (`pkg:apk/...`). Always returns `https://github.com/alpinelinux/aports`. No API key required. |
+| `Enable libraries.io resolver` + `API key` | Enabled + active key | Enables search across the public libraries.io database. [Get a key](https://libraries.io/account) |
+| `Enable ecosyste.ms resolver` + `API key` | Enabled + active key | Enables search across the public ecosyste.ms database. [Get a key](https://ecosyste.ms/account/api_key) |
+| `Enable LLM resolver` + `Base URL` + `API key` + `Model` | Disabled | Optional last-resort resolver: an OpenAI-compatible LLM with web search finds the repository URL. Requires a compatible endpoint and API key. |
 
-Additional settings (URL validation timeout, retry config, batch concurrency, job TTL, log level, connectivity checks) are available in the Settings UI.
+Additional settings (URL validation timeout, retry config, batch concurrency, batch size limit, job TTL, log level, connectivity checks) are available in the Settings UI.
 
 **Browser-only settings:** language (English/Russian) and UI theme (light/dark) are stored locally per user.
 
@@ -124,7 +132,7 @@ Server settings are persisted in `data/settings.json`.
 ## Web UI Sections
 ### PURL Resolver (`/purl-resolver`)
 
-Accepts one or more PURLs (one per line) and returns the corresponding source code repository URLs in a results table. The returned URL points to the project-level repository, not a specific version.
+Accepts one or more PURLs (one per line) in a text area and returns the corresponding source code repository URLs in a results table — one row per input PURL, in input order. The returned URL points to the project-level repository, not a specific version.
 
 ### SBOM Enricher (`/sbom-updater`)
 Accepts a CycloneDX SBOM and returns an enriched SBOM with VCS repository URLs added to all components (recursively).
@@ -151,7 +159,7 @@ Manage the local PURL → repository URL mapping database:
 **Backend:**
 - Language: Python 3.12
 - FastAPI (API framework), Pydantic v2 (data validation), Uvicorn (ASGI server with HTTPS)
-- purl2repo (primary resolver), httpx (HTTP client), asyncpg (PostgreSQL), diskcache (URL validation cache), packageurl-python (PURL parsing)
+- purl2repo (primary resolver), httpx (HTTP client), openai (LLM resolver client), asyncpg (PostgreSQL), diskcache (URL validation cache), packageurl-python (PURL parsing)
 - VCS probes: git, subversion, mercurial, fossil
 
 **Frontend:**
@@ -179,11 +187,10 @@ sbom-helper does **not** implement authentication or access control. Protect the
 **Major features:**
 - Web UI wrappers for [sbom-checker](https://gitlab.community.ispras.ru/sdl-tools/sbom-checker) CLI tools (ISP RAS)
 - GOST field consistency validation (`GOST:attack_surface`, `GOST:security_function` between parent and child components) with auto-fix suggestions
-- Additional resolvers for `deb` and other package types; LLM-based resolver with internet search
+- Additional resolvers for `deb` and other package types
 - Direct source archive download links (`"type": "source-distribution"`) when no VCS repository is available
 
 **Minor improvements:**
-- Batch PURL resolution in the UI
 - Real-time progress reporting during SBOM enrichment
 - Manual record creation in the DB Admin section
 - SBOM-based import of PURL → repository mappings into the local DB

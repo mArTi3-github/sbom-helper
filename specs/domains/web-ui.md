@@ -2,17 +2,18 @@
 
 ## Description
 
-Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for enriching CycloneDX SBOM files, a database administration page for managing the `resolved_purls` table, a settings page for application configuration, and an Images List Converter page for transforming CycloneDX SBOM files into machine-readable lists of Docker container images.
+A Vue 3 SPA with a landing page and five tool pages: a PURL resolver page accepting one or more PURLs per request, an SBOM-updater page for enriching CycloneDX SBOM files, a database administration page for managing the `resolved_purls` table, a settings page for application configuration, and an Images List Converter page for transforming CycloneDX SBOM files into machine-readable lists of Docker container images.
 
 ## Key Files
 
-- `frontend/src/views/PurlResolver.vue` — PURL resolver page: input, resolve button, result card with warnings and resolver metadata
+- `frontend/src/views/HomePage.vue` — landing page: hero section and tiles linking to the five tool pages
+- `frontend/src/views/PurlResolver.vue` — PURL resolver page: textarea input (one PURL per line, batch supported), resolve button, results table with per-PURL status, warnings, and resolver metadata
 - `frontend/src/views/SbomUpdater.vue` — SBOM-updater page: file upload, options, ignore patterns editor, results summary and table
 - `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete
-- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, ecosyste.ms, Libraries.io cards
+- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, deps.dev, ecosyste.ms, Libraries.io, and LLM resolver cards
 - `frontend/src/views/ImagesListConverter.vue` — Images List Converter page: file upload, conversion status card, images table, download
 - `frontend/src/views/NotFound.vue` — 404 catch-all page
-- `frontend/src/router/index.ts` — Vue Router configuration (5 routes + catch-all)
+- `frontend/src/router/index.ts` — Vue Router configuration (6 page routes + catch-all)
 - `frontend/src/App.vue` — Root component: layout shell with `AppNav` + `<router-view>`
 - `frontend/src/components/AppNav.vue` — Navigation bar shared across all pages
 - `frontend/src/components/FileUploadZone.vue` — Reusable drag-and-drop file upload zone
@@ -27,7 +28,7 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 - `frontend/src/api/db.ts` — Database admin API client (list, update, delete, import, export)
 - `frontend/src/api/settings.ts` — Settings API client
 - `frontend/src/i18n/index.ts` — vue-i18n configuration (Composition API mode, `legacy: false`)
-- `frontend/src/i18n/locales/en.json` — English UI strings (241 keys, grouped by domain)
+- `frontend/src/i18n/locales/en.json` — English UI strings (grouped by domain)
 - `frontend/src/i18n/locales/ru.json` — Russian UI strings (identical key structure)
 - `frontend/src/tests/i18n.ts` — `mountWithI18n` helper for test mounting with vue-i18n plugin
 - `frontend/src/api/jobs.ts` — Background job API client (create, poll, download, cancel, list)
@@ -41,24 +42,25 @@ Five browser interfaces: a single-page PURL resolver, an SBOM-updater page for e
 
 ## Flows
 
-### Single PURL Resolution
+### PURL Resolution (single or batch)
 
 ```
 User                   Browser (Vue SPA)             API Layer
   |                       |                           |
-  | Navigate to /         |                           |
+  | Navigate to           |                           |
+  | /purl-resolver        |                           |
   |---------------------->|                           |
-  |                       | GET / → index.html        |
-  |                       | (SPAStaticFiles)          |
+  |                       | GET /purl-resolver        |
+  |                       | (SPA fallback, index.html)|
   |                       |-------------------------->|
   |                       | 200 index.html            |
   |                       |<--------------------------|
   |                       | Vue Router mounts         |
   |                       | PurlResolver.vue          |
   |                       |                           |
-  | Enters one or more      |                           |
-  | PURLs (one per line),   |                           |
-  | clicks "Resolve"        |                           |
+  | Enters one or more     |                           |
+  | PURLs (one per line),  |                           |
+  | clicks "Resolve"       |                           |
   |---------------------->|                           |
   |                       | POST /api/v1/resolve/batch |
   |                       | {"purls": [...]}          |
@@ -66,6 +68,7 @@ User                   Browser (Vue SPA)             API Layer
   |                       | 200 {results: [...]}      |
   |                       |<--------------------------|
   | Sees results table    |                           |
+  | (one row per PURL)    |                           |
   |<----------------------|                           |
 ```
 
@@ -129,10 +132,11 @@ User                   Browser (Vue SPA)             API Layer
 ### PURL Resolver Page
 
 - The page never reloads during resolution (Vue reactivity, no full-page navigation)
+- Input is a textarea: one PURL per line; empty lines are ignored; multiple lines are sent as a batch to `POST /api/v1/resolve/batch`
+- Results are rendered as a table with one row per input PURL (status, repository URL, warnings, resolver, found_by)
 - Submit button is disabled while a request is in flight
 - All states (loading, success, unresolved, error, network failure) have distinct visual representations
-
-- Warnings within the resolved result card are shown in red; the unresolved fallback message is shown in yellow; errors in red
+- Warnings within a resolved row are shown in red; the unresolved fallback message is shown in yellow; errors in red
 - `found_by` and `resolver` fields are displayed in the details section when present
 
 ### SBOM-updater Page
@@ -170,9 +174,11 @@ User                   Browser (Vue SPA)             API Layer
 - URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds), number input controls `revalidation_cooldown_hours` (0–720, default 24; 0 disables cooldown)
 - Retry Configuration card: number input controls `retry_max_attempts` (1–10), number input controls `retry_base_cooldown_seconds` (0.5–120)
 - Log Level card: dropdown controls `log_level` (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- APK Resolver card: enable toggle (controls `apk_resolver_enabled`), no API key, Alpine Linux APK packages resolve to `https://github.com/alpinelinux/aports` as last fallback
+- APK Resolver card: enable toggle (controls `apk_resolver_enabled`), no API key, Alpine Linux APK packages resolve to `https://github.com/alpinelinux/aports` as a fallback
+- Deps.dev Resolver card: enable toggle (controls `depsdev_enabled`), no API key required
 - ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits), rate limit input (`ecosystems_max_requests_per_second`, 0.1–100), status badge (set/not set), clear button
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
+- LLM Resolver card: enable toggle, OpenAI-compatible base URL, API key (status badge, clear button), model name, attempts count (1–10), timeout (1–600 s); card controls are disabled while the resolver is off
 - Settings are loaded from `GET /api/v1/settings` on page mount
 - Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
 - Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error); toast messages are translated via i18n keys
@@ -195,7 +201,7 @@ User                   Browser (Vue SPA)             API Layer
 
 ### Global
 
-- All five pages share a consistent navigation bar via `AppNav` component (Vue Router `<router-link>`)
+- All pages share a consistent navigation bar via `AppNav` component (Vue Router `<router-link>`): logo (home), PURL Resolver, SBOM Updater, Images List Converter, DB Admin, Settings
 - Vue Router uses `createWebHistory()` (HTML5 history mode, no hash)
 - Catch-all route (`/:pathMatch(.*)*`) renders `NotFound.vue` for unknown paths
 - SPA is served by FastAPI via `SPAStaticFiles` (custom `StaticFiles` subclass with fallback to `index.html` for client-side routing)

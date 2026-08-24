@@ -2,7 +2,7 @@
 
 ## Description
 
-Core capability of the system. Accepts a single Package URL (PURL) string and returns the corresponding source code repository URL with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → ecosyste.ms → libraries.io → apk), storing successful results for future lookups.
+Core capability of the system. Accepts one or more Package URL (PURL) strings and returns the corresponding source code repository URLs with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → deps.dev → ecosyste.ms → libraries.io → apk → llm), storing successful results for future lookups. Resolver composition is settings-driven — each resolver after purl2repo can be toggled; the LLM resolver, when enabled, is always last.
 
 ## Key Files
 
@@ -10,11 +10,13 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `_resolve_concurrent()` core (semaphore + dedup by normalized key) shared by `resolve_many()` (batch endpoint, one row per input PURL) and `resolve_batch()` (SBOM flow, successful results only); `store_preexisting_references()` for SBOM pre-existing refs
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
-- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, ecosyste.ms wrapper, libraries.io wrapper, apk wrapper, and factory module
-- `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; creates Purl2RepoResolver, conditionally adds EcosystemsResolver, LibrariesIoResolver, and ApkResolver based on settings
+- `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, deps.dev wrapper, ecosyste.ms wrapper, libraries.io wrapper, apk wrapper, LLM wrapper, and factory module
+- `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; always creates Purl2RepoResolver, then conditionally adds DepsdevResolver, EcosystemsResolver, LibrariesIoResolver, ApkResolver, and LlmResolver (always last) based on settings
+- `src/purl_resolver/resolver/depsdev.py` — `DepsdevResolver`: fallback resolver using the deps.dev v3 API; enabled by default (settings-controlled), no API key required; supports: maven, npm, golang, pypi, nuget, cargo, gem; returns the package's SOURCE_REPO link normalized to an HTTPS URL
 - `src/purl_resolver/resolver/ecosystems.py` — `EcosystemsResolver`: fallback resolver using ecosyste.ms Packages API, enabled by default (settings-controlled), no API key required (optional for higher rate limits)
 - `src/purl_resolver/resolver/librariesio.py` — `LibrariesIoResolver`: fallback resolver using libraries.io API, optional (settings-controlled), supports: cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift
-- `src/purl_resolver/resolver/apk.py` — `ApkResolver`: last-resort fallback resolver for Alpine Linux APK packages (`pkg:apk/...`), returns constant URL `https://github.com/alpinelinux/aports`; purely local (no network calls), enabled by default via `apk_resolver_enabled` setting
+- `src/purl_resolver/resolver/apk.py` — `ApkResolver`: fallback resolver for Alpine Linux APK packages (`pkg:apk/...`), returns constant URL `https://github.com/alpinelinux/aports`; purely local (no network calls), enabled by default via `apk_resolver_enabled` setting
+- `src/purl_resolver/resolver/llm.py` — `LlmResolver`: last resolver in the chain; asks an OpenAI-compatible LLM (with web search) for the repository URL, validates the JSON response schema and verifies the URL via HTTP HEAD (failed checks are fed back for the next attempt); optional (settings-controlled), always placed last
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
 - `src/purl_resolver/sbom/parser.py` — CycloneDX SBOM validation and parsing
@@ -201,20 +203,20 @@ Client                    API Layer (router)         Service Layer             p
 - Empty purl strings are rejected at the Pydantic validation level (HTTP 422)
 - **Normalized cache keys**: storage uses `scheme:type/namespace/name` form — version/qualifiers/subpath are stripped
 - **Resolver receives original PURL**: the full string (with version, qualifiers, subpath) is passed unmodified to resolvers
-- **DB cache hit**: if a result is found in PostgreSQL, the resolver is NOT called (unless URL validation is enabled and the entry is outside the cooldown window — for trusted resolvers, cooldown is `revalidation_cooldown_hours`; for untrusted resolvers, cooldown is always bypassed)
+- **DB cache hit**: if a result is found in PostgreSQL, the resolver is NOT called; when `validate_db_urls` is enabled, the cached URL is re-validated unless it is still within the validation cooldown window (`revalidation_cooldown_hours`)
 - **Only successful results are stored**: `repository_url = null` results are never persisted
 - **Graceful degradation**: if PostgreSQL is unavailable, the resolver still works (without caching)
 - **Store is best-effort**: a failure to store does not break the response to the client
-- **URL validation is optional**: controlled by `validate_db_urls` setting (default: off). When enabled, validation applies to both cached entries and freshly resolved URLs. For cached entries, uses resolver-based cooldown; for fresh entries, validation runs synchronously before storing/returning.
+- **URL validation is optional**: controlled by `validate_db_urls` setting (default: off). When enabled, validation applies to both cached entries and freshly resolved URLs. For cached entries, cooldown (`revalidation_cooldown_hours`) skips re-validation; for fresh entries, validation runs synchronously before storing/returning.
 - **Fresh URL validation skips invalid results**: when `validate_db_urls=true`, a freshly resolved URL returning `INVALID` via `validate_url()` causes the resolver chain to continue to the next resolver. The invalid result is neither stored nor returned. `NETWORK_ERROR` and `RATE_LIMITED` results keep the current resolver's result (store + return) to avoid discarding potentially valid URLs due to transient errors.
-- **Resolver-based cooldown**: Trusted resolvers (`purl2repo`, `ecosyste.ms`, `libraries.io`) respect `revalidation_cooldown_hours` setting; entries from other resolvers (e.g. `import-sbom`, `import-csv`) always trigger validation regardless of cooldown
+- **Validation cooldown applies uniformly**: the `revalidation_cooldown_hours` window is enforced per URL via the URL validation cache (diskcache) for all cached entries, regardless of the resolver that produced them
 - **Cooldown disabled at zero**: Setting `revalidation_cooldown_hours=0` disables cooldown entirely — every cached entry triggers validation when `validate_db_urls=true`
 - **SBOM existing-ref validation**: Optional checkbox `validate_existing_refs` in SBOM Updater validates existing VCS references via HEAD + multi-VCS probe (`_check_vcs`); `INVALID` results mark the component for re-resolution (`needs_enrichment=True`)
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationOutput`, never raises exceptions
 - **Non-HTTP/HTTPS URLs skip redirect resolution**: URLs are validated by syntax (non-empty hostname) and SSRF guard (non-private IP) before VCS probes. HTTP/HTTPS URLs additionally undergo HEAD redirect resolution. Non-HTTP/HTTPS URLs skip redirect resolution and go directly to VCS probes.
 - **revalidation_cooldown_hours bounds**: validated server-side with `ge=0, le=720` in both `AppSettings` and `SettingsUpdate`
-- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"` when purl2repo found the result, `"ecosyste.ms"` when ecosyste.ms found the result, `"libraries.io"` when libraries.io found the result, `"apk"` when ApkResolver found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import
+- **Resolver field tracks origin**: every stored record has a `resolver` field indicating how it was added — `"purl2repo"`, `"depsdev"`, `"ecosyste.ms"`, `"libraries.io"`, `"apk"`, or `"llm"` when the corresponding resolver found the result, `"import-sbom"` for SBOM enrichment, `"import-csv"` for CSV import, `"import-manual"` for manual DB admin creation
 - **Four-column table**: `resolved_purls` stores only `purl`, `repository_url`, `resolver`, `resolved_at` — all other fields from earlier schema versions have been removed
 - **Warnings are runtime-only**: `warnings` is retained in `Resolution` dataclass, `ResolveResponse` model, and API response but is never persisted to the database, CSV export, or in-memory storage
 - **Index on resolver**: `idx_resolved_purls_resolver` is created on startup in `create_pool()` to accelerate `SELECT DISTINCT resolver` queries for the dynamic resolver filter
@@ -261,20 +263,28 @@ Client                    API Layer (router)         Service Layer             p
 | `url_validation_timeout` | `5` | Timeout in seconds for HEAD and multi-VCS probe checks (1–60) |
 | `librariesio_enabled` | `false` | Enable libraries.io as a fallback resolver after purl2repo |
 | `librariesio_api_key` | `null` | Libraries.io API key for higher rate limits (60 req/min vs 10 req/min) |
-| `revalidation_cooldown_hours` | `24` | Re-validation cooldown in hours for trusted resolvers (0 = no cooldown, max 720) |
-| `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver after purl2repo |
-| `apk_resolver_enabled` | `true` | Enable APK resolver (Alpine Linux) as the last fallback — returns `https://github.com/alpinelinux/aports` for any `pkg:apk/...` PURL |
+| `depsdev_enabled` | `true` | Enable deps.dev as a fallback resolver after purl2repo (no API key required) |
+| `revalidation_cooldown_hours` | `24` | Re-validation cooldown in hours (0 = no cooldown, max 720) |
+| `ecosystems_enabled` | `true` | Enable ecosyste.ms as a fallback resolver |
+| `apk_resolver_enabled` | `true` | Enable APK resolver (Alpine Linux) fallback — returns `https://github.com/alpinelinux/aports` for any `pkg:apk/...` PURL |
 | `ecosystems_api_key` | `null` | Optional API key for ecosyste.ms (higher rate limits) |
 | `ecosystems_max_requests_per_second` | `2.0` | Rate limit for ecosyste.ms API requests (0.1–100) |
 | `retry_max_attempts` | `3` | Maximum HTTP request attempts per resolver (1–10). Applied to ecosyste.ms and libraries.io on timeout, 429, and 5xx errors. |
 | `retry_base_cooldown_seconds` | `5.0` | Base wait time between retries; actual wait = cooldown × (attempt − 1). Range: 0.5–120. |
 | `batch_semaphore_limit` | `10` | Maximum concurrent resolution requests in batch mode (1–100) |
+| `batch_max_items` | `100` | Maximum PURLs per batch request (1–1000) |
 | `job_ttl_hours` | `24` | Time-to-live in hours for async job records (1–720) |
 | `connectivity_url` | `"https://github.com"` | URL used for connectivity probes |
 | `connectivity_timeout` | `2` | Timeout in seconds for connectivity probes (1–30) |
 | `log_level` | `"INFO"` | Application log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
 | `language` | `"en"` | UI language (`"en"` or `"ru"`) |
 | `json_indent` | `4` | Number of spaces for JSON indentation in downloaded files (1, 2, or 4) |
+| `llm_resolver_enabled` | `false` | Enable the LLM resolver as the last resolver in the chain |
+| `llm_resolver_base_url` | `null` | OpenAI-compatible API base URL (`^https?://`) |
+| `llm_resolver_api_key` | `null` | LLM API key |
+| `llm_resolver_model` | `null` | LLM model name |
+| `llm_resolver_attempts_count` | `2` | Total LLM attempts per PURL (1–10) |
+| `llm_resolver_timeout` | `60` | LLM request timeout in seconds (1–600) |
 
 ## Database Schema
 

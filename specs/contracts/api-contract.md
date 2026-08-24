@@ -93,11 +93,11 @@ Simple health check for monitoring and container orchestration.
 
 ### `GET /`
 
-Serve the Vue 3 SPA (PURL resolver page).
+Serve the Vue 3 SPA (home page).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns `index.html` from the built SPA (`frontend/dist/`). Vue Router handles client-side routing — all SPA routes (`/`, `/sbom-updater`, `/db-admin`, `/settings`, `/images-list-converter`) return the same `index.html`; the router mounts the corresponding view component. API routes are registered before the SPA mount and take priority.
+Content-Type: `text/html`. Returns `index.html` from the built SPA (`frontend/dist/`). Vue Router handles client-side routing — all SPA routes (`/`, `/purl-resolver`, `/sbom-updater`, `/db-admin`, `/settings`, `/images-list-converter`) return the same `index.html`; the router mounts the corresponding view component. API routes are registered before the SPA mount and take priority.
 
 ---
 
@@ -216,17 +216,34 @@ Return current application settings.
 ```json
 {
   "validate_db_urls": false,
+  "validate_sbom_refs": false,
+  "sbom_multiple_vcs_behavior": "keep-first",
   "url_validation_timeout": 5,
   "revalidation_cooldown_hours": 24,
+  "retry_max_attempts": 3,
+  "retry_base_cooldown_seconds": 5.0,
+  "log_level": "INFO",
   "librariesio_enabled": false,
-  "ecosystems_enabled": true,
+  "depsdev_enabled": true,
   "apk_resolver_enabled": true,
+  "ecosystems_enabled": true,
+  "ecosystems_max_requests_per_second": 2.0,
+  "batch_semaphore_limit": 10,
+  "batch_max_items": 100,
+  "connectivity_url": "https://github.com",
+  "connectivity_timeout": 2,
+  "json_indent": 4,
+  "job_ttl_hours": 24,
+  "llm_resolver_enabled": false,
+  "llm_resolver_base_url": null,
+  "llm_resolver_model": null,
+  "llm_resolver_attempts_count": 2,
+  "llm_resolver_timeout": 60.0,
   "token_set": {
     "librariesio_api_key": false,
-    "ecosystems_api_key": false
-  },
-  "language": "en",
-  "json_indent": 4
+    "ecosystems_api_key": false,
+    "llm_resolver_api_key": false
+  }
 }
 ```
 
@@ -234,21 +251,28 @@ Return current application settings.
 - `validate_sbom_refs`: boolean — enable URL validation for existing VCS references in SBOM files (default: `false`)
 - `sbom_multiple_vcs_behavior`: string — behavior when SBOM component has multiple VCS references (`"keep-first"` or `"keep-all"`; default: `"keep-first"`)
 - `url_validation_timeout`: integer — timeout in seconds for HEAD and git ls-remote checks (1–60, default: `5`)
-- `revalidation_cooldown_hours`: integer — cooldown in hours for trusted resolver entries (0–720, default: `24`; `0` disables cooldown)
+- `revalidation_cooldown_hours`: integer — cooldown in hours before cached entries are re-validated (0–720, default: `24`; `0` disables cooldown)
 - `librariesio_enabled`: boolean — whether the libraries.io resolver is active
+- `depsdev_enabled`: boolean — whether the deps.dev resolver is active (default: `true`)
+- `apk_resolver_enabled`: boolean — whether the APK resolver (Alpine Linux) is active as a fallback (default: `true`)
 - `ecosystems_enabled`: boolean — whether the ecosyste.ms resolver is active (default: `true`)
-- `apk_resolver_enabled`: boolean — whether the APK resolver (Alpine Linux) is active as the last fallback (default: `true`)
 - `ecosystems_max_requests_per_second`: float — rate limit for ecosyste.ms API requests (0.1–100, default: `2.0`)
 - `retry_max_attempts`: integer — maximum HTTP retry attempts for fallback resolvers (1–10, default: `3`)
 - `retry_base_cooldown_seconds`: float — base wait between retries in seconds (0.5–120, default: `5.0`)
 - `log_level`: string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default: `"INFO"`)
 - `batch_semaphore_limit`: integer — maximum number of concurrent resolution requests in batch mode (1–100, default: `10`)
+- `batch_max_items`: integer — maximum PURLs per batch request (1–1000, default: `100`)
 - `connectivity_url`: string — URL used for connectivity probes (default: `"https://github.com"`)
 - `connectivity_timeout`: integer — timeout in seconds for connectivity probes (1–30, default: `2`)
 - `job_ttl_hours`: integer — time-to-live in hours for async job records (1–720, default: `24`)
+- `llm_resolver_enabled`: boolean — whether the LLM resolver is active (default: `false`)
+- `llm_resolver_base_url`: string|null — OpenAI-compatible API base URL
+- `llm_resolver_model`: string|null — LLM model name
+- `llm_resolver_attempts_count`: integer — attempts per PURL (1–10, default: `2`)
+- `llm_resolver_timeout`: number — request timeout in seconds (1–600, default: `60`)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
-- `language`: string — UI language (`"en"` or `"ru"`; default: `"en"`)
+- `token_set.llm_resolver_api_key`: boolean — whether an LLM API key is configured
 - `json_indent`: integer — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`; default: `4`)
 
 ---
@@ -272,22 +296,29 @@ All fields optional. Only provided fields are updated.
 - `validate_sbom_refs`: optional bool — enable/disable URL validation for existing VCS references in SBOM files.
 - `sbom_multiple_vcs_behavior`: optional string — behavior when SBOM component has multiple VCS references (`"keep-first"` or `"keep-all"`).
 - `url_validation_timeout`: optional int — timeout in seconds for HEAD and git ls-remote checks (1–60).
-- `revalidation_cooldown_hours`: optional int — cooldown in hours for trusted resolver entries (0–720, 0 disables cooldown).
+- `revalidation_cooldown_hours`: optional int — cooldown in hours before cached entries are re-validated (0–720, 0 disables cooldown).
 - `librariesio_enabled`: optional bool — enable/disable the libraries.io resolver.
 - `librariesio_api_key`: optional string|null — libraries.io API key. Set to `null` to clear the key. Empty string is ignored. Non-empty values are validated via the libraries.io API and rejected with `400 invalid_token` if invalid.
+- `depsdev_enabled`: optional bool — enable/disable the deps.dev resolver.
 - `ecosystems_enabled`: optional bool — enable/disable the ecosyste.ms resolver.
-- `apk_resolver_enabled`: optional bool — enable/disable the APK resolver (Alpine Linux) as the last fallback.
+- `apk_resolver_enabled`: optional bool — enable/disable the APK resolver (Alpine Linux) as a fallback.
 - `ecosystems_api_key`: optional string|null — ecosyste.ms API key (for higher rate limits). Set to `null` to clear the key. Empty string is ignored.
 - `ecosystems_max_requests_per_second`: optional float — rate limit for ecosyste.ms API requests (0.1–100).
 - `retry_max_attempts`: optional int — maximum HTTP retry attempts for fallback resolvers (1–10).
 - `retry_base_cooldown_seconds`: optional float — base wait between retries in seconds (0.5–120).
 - `log_level`: optional string — application log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
 - `batch_semaphore_limit`: optional int — maximum concurrent resolution requests in batch mode (1–100).
+- `batch_max_items`: optional int — maximum PURLs per batch request (1–1000).
 - `job_ttl_hours`: optional int — time-to-live for async job records in hours (1–720).
 - `connectivity_url`: optional string — URL for connectivity probes.
 - `connectivity_timeout`: optional int — timeout in seconds for connectivity probes (1–30).
-- `language`: optional string — UI language (`"en"` or `"ru"`).
 - `json_indent`: optional int — number of spaces for JSON indentation in downloaded files (`1`, `2`, or `4`).
+- `llm_resolver_enabled`: optional bool — enable/disable the LLM resolver (always last in the chain).
+- `llm_resolver_base_url`: optional string — OpenAI-compatible API base URL (`^https?://`).
+- `llm_resolver_api_key`: optional string|null — LLM API key. Set to `null` to clear the key.
+- `llm_resolver_model`: optional string — LLM model name.
+- `llm_resolver_attempts_count`: optional int — attempts per PURL (1–10).
+- `llm_resolver_timeout`: optional float — LLM request timeout in seconds (1–600).
 
 #### Response (200)
 

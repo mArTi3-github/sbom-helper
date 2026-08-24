@@ -58,6 +58,8 @@ decisions/0003-purl-validation-and-normalization.md
 decisions/0004-librariesio-as-fallback-resolver.md
 decisions/0005-ecosyste-ms-as-fallback-resolver.md
 decisions/0006-async-first-resolver-architecture.md
+decisions/0007-depsdev-as-fallback-resolver.md
+decisions/0008-llm-as-last-resort-resolver.md
 ```
 
 The API contract depends on the purl-resolution domain definition. The web UI depends on the API contract. Architecture layers provide the structural constraints for all domains. Decisions document the rationale behind architectural choices.
@@ -73,7 +75,7 @@ specs/
 │   └── layers.md                    — Layer hierarchy, import rules, DbAdminService, JobManager, UrlValidationCache
 ├── domains/
 │   ├── purl-resolution.md           — Core resolution capability (sync + async batch)
-│   └── web-ui.md                    — Browser interface (five pages, Vue SPA, Pinia stores)
+│   └── web-ui.md                    — Browser interface (home + five tool pages, Vue SPA, Pinia stores)
 ├── contracts/
 │   └── api-contract.md              — HTTP API contract (including db-admin, settings, and jobs endpoints)
 └── decisions/
@@ -83,5 +85,7 @@ specs/
     ├── 0003-purl-validation-and-normalization.md — Application-level PURL validation
     ├── 0004-librariesio-as-fallback-resolver.md  — libraries.io as fallback resolver
     ├── 0005-ecosyste-ms-as-fallback-resolver.md  — ecosyste.ms as fallback resolver
-    └── 0006-async-first-resolver-architecture.md — Async-first resolver architecture
+    ├── 0006-async-first-resolver-architecture.md — Async-first resolver architecture
+    ├── 0007-depsdev-as-fallback-resolver.md      — deps.dev as fallback resolver
+    └── 0008-llm-as-last-resort-resolver.md       — LLM as last-resort resolver
 ```
