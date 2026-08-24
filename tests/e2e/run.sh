@@ -40,16 +40,18 @@ for i in $(seq 1 30); do
 done
 
 echo "=== Test 1: Resolve a known PURL ==="
-FIRST=$(curl -sf -X POST http://localhost:8000/api/v1/resolve \
+FIRST=$(curl -sf -X POST http://localhost:8000/api/v1/resolve/batch \
     -H "Content-Type: application/json" \
-    -d '{"purl":"pkg:pypi/django@1.11.1"}')
+    -d '{"purls":["pkg:pypi/django@1.11.1"]}')
 echo "$FIRST" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
-assert d['repository_url'] == 'https://github.com/django/django', f'Wrong repo: {d}'
-assert isinstance(d['evidence'], list), 'evidence is not a list'
-assert isinstance(d['warnings'], list), 'warnings is not a list'
-print(f\"  OK: {d['repository_url']} (evidence: {len(d['evidence'])} items)\")
+assert len(d['results']) == 1, f'Expected one result: {d}'
+item = d['results'][0]
+assert item['repository_url'] == 'https://github.com/django/django', f'Wrong repo: {d}'
+assert item['error'] is None, f'Unexpected error: {d}'
+assert isinstance(item['warnings'], list), 'warnings is not a list'
+print(f\"  OK: {item['repository_url']}\")
 "
 PASS=$((PASS + 1))
 
@@ -75,11 +77,11 @@ else
 fi
 
 echo "=== Test 4: Repeat request for same PURL (cache) ==="
-SECOND=$(curl -sf -X POST http://localhost:8000/api/v1/resolve \
+SECOND=$(curl -sf -X POST http://localhost:8000/api/v1/resolve/batch \
     -H "Content-Type: application/json" \
-    -d '{"purl":"pkg:pypi/django@1.11.1"}')
-FIRST_REPO=$(echo "$FIRST" | python3 -c "import sys,json; print(json.load(sys.stdin)['repository_url'])")
-SECOND_REPO=$(echo "$SECOND" | python3 -c "import sys,json; print(json.load(sys.stdin)['repository_url'])")
+    -d '{"purls":["pkg:pypi/django@1.11.1"]}')
+FIRST_REPO=$(echo "$FIRST" | python3 -c "import sys,json; print(json.load(sys.stdin)['results'][0]['repository_url'])")
+SECOND_REPO=$(echo "$SECOND" | python3 -c "import sys,json; print(json.load(sys.stdin)['results'][0]['repository_url'])")
 if [ "$FIRST_REPO" = "$SECOND_REPO" ]; then
     echo "  OK: Repeat request returned same result"
     PASS=$((PASS + 1))

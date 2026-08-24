@@ -3,21 +3,26 @@ import { flushPromises } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
 import PurlResolver from './PurlResolver.vue'
 import { ApiError } from '../api/client'
-import type { ResolveResponse } from '../types/api'
+import type { BatchResolveResponse } from '../types/api'
 
-const successResponse: ResolveResponse = {
-  purl: 'pkg:pypi/requests@2.31.0',
-  repository_url: 'https://github.com/psf/requests',
-  warnings: [],
-  resolver: 'purl2repo',
-  found_by: 'purl2repo',
-  resolved_at: '2026-06-25T10:00:00',
+const successResponse: BatchResolveResponse = {
+  results: [
+    {
+      purl: 'pkg:pypi/requests@2.31.0',
+      repository_url: 'https://github.com/psf/requests',
+      warnings: [],
+      resolver: 'purl2repo',
+      found_by: 'purl2repo',
+      resolved_at: '2026-06-25T10:00:00',
+      error: null,
+    },
+  ],
 }
 
-const resolvePurlMock = vi.fn()
+const resolvePurlsMock = vi.fn()
 
 vi.mock('../api/purl', () => ({
-  resolvePurl: (body: { purl: string }) => resolvePurlMock(body),
+  resolvePurls: (body: { purls: string[] }) => resolvePurlsMock(body),
 }))
 
 function mountResolver() {
@@ -27,98 +32,145 @@ function mountResolver() {
 describe('PurlResolver.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    resolvePurlMock.mockResolvedValue(successResponse)
+    resolvePurlsMock.mockResolvedValue(successResponse)
   })
 
-  it('renders initial form without loading or result', async () => {
+  it('renders initial form without loading or results', async () => {
     const wrapper = mountResolver()
     await flushPromises()
     expect(wrapper.find('h1').text()).toBe('Resolve PURL')
-    expect(wrapper.find('input[type="text"]').exists()).toBe(true)
+    expect(wrapper.find('textarea').exists()).toBe(true)
     expect(wrapper.find('button[type="submit"]').exists()).toBe(true)
     expect(wrapper.find('.loading').exists()).toBe(false)
-    expect(wrapper.find('.result').exists()).toBe(false)
+    expect(wrapper.find('.result-table').exists()).toBe(false)
     expect(wrapper.find('.error-msg').exists()).toBe(false)
   })
 
-  it('calls resolvePurl with the trimmed PURL on submit', async () => {
+  it('calls resolvePurls with one PURL per line, trimmed and empty lines filtered', async () => {
     const wrapper = mountResolver()
     await flushPromises()
-    await wrapper.find('input[type="text"]').setValue('  pkg:pypi/requests@2.31.0  ')
+    await wrapper.find('textarea').setValue('  pkg:pypi/requests@2.31.0  \n\npkg:pypi/flask@3.0.0\n  ')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
-    expect(resolvePurlMock).toHaveBeenCalledTimes(1)
-    expect(resolvePurlMock).toHaveBeenCalledWith({ purl: 'pkg:pypi/requests@2.31.0' })
+    expect(resolvePurlsMock).toHaveBeenCalledTimes(1)
+    expect(resolvePurlsMock).toHaveBeenCalledWith({
+      purls: ['pkg:pypi/requests@2.31.0', 'pkg:pypi/flask@3.0.0'],
+    })
   })
 
-  it('renders result card with repository URL on success', async () => {
+  it('does not call the API when input contains only empty lines', async () => {
     const wrapper = mountResolver()
     await flushPromises()
-    await wrapper.find('input[type="text"]').setValue('pkg:pypi/requests@2.31.0')
+    await wrapper.find('textarea').setValue(' \n\n ')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
-    const repoLink = wrapper.find('.repo-url a')
-    expect(repoLink.exists()).toBe(true)
-    expect(repoLink.attributes('href')).toBe('https://github.com/psf/requests')
-    expect(repoLink.text()).toBe('https://github.com/psf/requests')
+    expect(resolvePurlsMock).not.toHaveBeenCalled()
   })
 
-  it('toggles details section when Show details is clicked', async () => {
+  it('renders a table with resolved rows', async () => {
     const wrapper = mountResolver()
     await flushPromises()
-    await wrapper.find('input[type="text"]').setValue('pkg:pypi/requests@2.31.0')
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const toggle = wrapper.find('.details-toggle')
-    expect(toggle.exists()).toBe(true)
-    expect(wrapper.find('.details').exists()).toBe(false)
-
-    await toggle.trigger('click')
-    expect(wrapper.find('.details').exists()).toBe(true)
-    const detailsText = wrapper.find('.details').text()
-    expect(detailsText).toContain('Found by')
-    expect(detailsText).toContain('purl2repo')
-    expect(detailsText).toContain('Resolver')
-    expect(detailsText).toContain('purl2repo')
-
-    await toggle.trigger('click')
-    expect(wrapper.find('.details').exists()).toBe(false)
+    const table = wrapper.find('.result-table')
+    expect(table.exists()).toBe(true)
+    const cells = table.findAll('tbody td')
+    const rowText = table.find('tbody tr').text()
+    expect(rowText).toContain('pkg:pypi/requests@2.31.0')
+    expect(rowText).toContain('https://github.com/psf/requests')
+    expect(rowText).toContain('purl2repo')
+    expect(rowText).toContain('Resolved')
+    expect(cells.length).toBe(6)
   })
 
-  it('shows API error message when resolvePurl rejects with ApiError', async () => {
-    resolvePurlMock.mockRejectedValueOnce(new ApiError(404, 'purl_not_found'))
+  it('renders one row per result with status Not found', async () => {
+    resolvePurlsMock.mockResolvedValueOnce({
+      results: [
+        successResponse.results[0],
+        {
+          purl: 'pkg:pypi/unknown@1.0.0',
+          repository_url: null,
+          warnings: ['No resolver found a repository URL'],
+          resolver: '',
+          found_by: '',
+          resolved_at: '',
+          error: null,
+        },
+      ],
+    })
     const wrapper = mountResolver()
     await flushPromises()
-    await wrapper.find('input[type="text"]').setValue('pkg:pypi/missing@1.0.0')
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0\npkg:pypi/unknown@1.0.0')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows.length).toBe(2)
+    expect(rows[1].text()).toContain('Not found')
+  })
+
+  it('renders error status for rows with an error', async () => {
+    resolvePurlsMock.mockResolvedValueOnce({
+      results: [
+        {
+          purl: 'not-a-purl',
+          repository_url: null,
+          warnings: [],
+          resolver: '',
+          found_by: '',
+          resolved_at: '',
+          error: 'invalid_purl',
+        },
+      ],
+    })
+    const wrapper = mountResolver()
+    await flushPromises()
+    await wrapper.find('textarea').setValue('not-a-purl')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const rowText = wrapper.find('tbody tr').text()
+    expect(rowText).toContain('Invalid PURL')
+    expect(wrapper.find('.status-error').exists()).toBe(true)
+  })
+
+  it('shows API error message when resolvePurls rejects with ApiError', async () => {
+    resolvePurlsMock.mockRejectedValueOnce(new ApiError(400, 'batch_too_large'))
+    const wrapper = mountResolver()
+    await flushPromises()
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
-    expect(wrapper.find('.error-msg').text()).toBe('PURL not found')
-    expect(wrapper.find('.result').exists()).toBe(false)
+    expect(wrapper.find('.error-msg').text()).toBe('Too many PURLs in one request')
+    expect(wrapper.find('.result-table').exists()).toBe(false)
   })
 
-  it('shows network error message when resolvePurl rejects with generic Error', async () => {
-    resolvePurlMock.mockRejectedValueOnce(new Error('network down'))
+  it('shows network error message when resolvePurls rejects with generic Error', async () => {
+    resolvePurlsMock.mockRejectedValueOnce(new Error('network down'))
     const wrapper = mountResolver()
     await flushPromises()
-    await wrapper.find('input[type="text"]').setValue('pkg:pypi/requests@2.31.0')
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('.error-msg').exists()).toBe(true)
     expect(wrapper.find('.error-msg').text()).toContain('Network error')
   })
 
-  it('shows fallback "No repository URL found" when response has null repository_url', async () => {
-    resolvePurlMock.mockResolvedValueOnce({
-      ...successResponse,
-      repository_url: null,
-    })
+  it('clears previous results when a new request starts', async () => {
     const wrapper = mountResolver()
     await flushPromises()
-    await wrapper.find('input[type="text"]').setValue('pkg:pypi/missing@1.0.0')
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
-    expect(wrapper.find('.repo-url').text()).toContain('No repository URL found')
+    expect(wrapper.find('.result-table').exists()).toBe(true)
+
+    resolvePurlsMock.mockRejectedValueOnce(new Error('network down'))
+    await wrapper.find('textarea').setValue('pkg:pypi/other@1.0.0')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.find('.result-table').exists()).toBe(false)
   })
 })

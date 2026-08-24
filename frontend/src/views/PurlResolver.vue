@@ -4,12 +4,11 @@
     <p class="subtitle">{{ t('purlResolver.subtitle') }}</p>
 
     <form class="form-group" @submit.prevent="handleResolve">
-      <input
+      <textarea
         v-model="purlInput"
-        type="text"
         :placeholder="t('purlResolver.placeholder')"
-        required
-      />
+        rows="5"
+      ></textarea>
       <button type="submit" class="btn btn-primary" :disabled="loading">{{ t('purlResolver.resolve') }}</button>
     </form>
 
@@ -17,41 +16,39 @@
       <span class="spinner"></span> {{ t('purlResolver.resolving') }}
     </div>
 
-    <div v-if="result" class="result">
-      <div class="card">
-        <div class="card-title">{{ t('purlResolver.repoUrl') }}</div>
-        <div class="repo-url">
-          <a v-if="result.repository_url" :href="result.repository_url" target="_blank">{{ result.repository_url }}</a>
-          <span v-else>{{ t('purlResolver.noRepoUrl') }}</span>
-        </div>
-        <button
-          v-if="hasDetails"
-          class="details-toggle"
-          @click="showDetails = !showDetails"
-        >
-          {{ showDetails ? t('purlResolver.hideDetails') : t('purlResolver.showDetails') }}
-        </button>
-        <div v-if="showDetails && hasDetails" class="details show">
-          <dl>
-            <template v-if="result.warnings && result.warnings.length">
-              <dt class="warning">{{ t('purlResolver.warnings') }}</dt>
-              <dd>
-                <ul>
-                  <li v-for="(item, i) in result.warnings" :key="i" class="warning">{{ item }}</li>
-                </ul>
-              </dd>
-            </template>
-            <template v-if="result.found_by">
-              <dt>{{ t('purlResolver.foundBy') }}</dt>
-              <dd>{{ result.found_by }}</dd>
-            </template>
-            <template v-if="result.resolver">
-              <dt>{{ t('purlResolver.resolver') }}</dt>
-              <dd>{{ result.resolver }}</dd>
-            </template>
-          </dl>
-        </div>
-      </div>
+    <div v-if="results.length" class="result">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>{{ t('purlResolver.purl') }}</th>
+            <th>{{ t('purlResolver.repoUrl') }}</th>
+            <th>{{ t('purlResolver.foundBy') }}</th>
+            <th>{{ t('purlResolver.resolver') }}</th>
+            <th>{{ t('purlResolver.warnings') }}</th>
+            <th>{{ t('purlResolver.status') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in results" :key="item.purl">
+            <td class="purl-cell">{{ item.purl }}</td>
+            <td>
+              <a v-if="item.repository_url" :href="item.repository_url" target="_blank">{{ item.repository_url }}</a>
+              <span v-else class="muted">&mdash;</span>
+            </td>
+            <td>{{ item.found_by || '—' }}</td>
+            <td>{{ item.resolver || '—' }}</td>
+            <td>
+              <ul v-if="item.warnings && item.warnings.length" class="warnings-list">
+                <li v-for="(warning, i) in item.warnings" :key="i">{{ warning }}</li>
+              </ul>
+              <span v-else class="muted">&mdash;</span>
+            </td>
+            <td>
+              <span :class="statusClass(item)" class="status-badge">{{ statusText(item) }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div v-if="error" class="error-msg">{{ error }}</div>
@@ -59,38 +56,48 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { resolvePurl } from '../api/purl'
+import { resolvePurls } from '../api/purl'
 import { ApiError } from '../api/client'
-import type { ResolveResponse } from '../types/api'
+import type { BatchResolveItem } from '../types/api'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const purlInput = ref('')
 const loading = ref(false)
-const result = ref<ResolveResponse | null>(null)
+const results = ref<BatchResolveItem[]>([])
 const error = ref<string | null>(null)
-const showDetails = ref(false)
 
-const hasDetails = computed(() => {
-  const r = result.value
-  if (!r) return false
-  return !!((r.warnings && r.warnings.length) || r.found_by || r.resolver)
-})
+function statusText(item: BatchResolveItem): string {
+  if (item.error) {
+    const key = 'errors.' + item.error
+    return te(key) ? t(key) : item.error
+  }
+  if (item.repository_url) return t('purlResolver.statusResolved')
+  return t('purlResolver.statusNotFound')
+}
+
+function statusClass(item: BatchResolveItem): string {
+  if (item.error) return 'status-error'
+  if (item.repository_url) return 'status-resolved'
+  return 'status-notfound'
+}
 
 async function handleResolve() {
-  const purl = purlInput.value.trim()
-  if (!purl) return
+  const purls = purlInput.value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (!purls.length) return
 
-  result.value = null
+  results.value = []
   error.value = null
-  showDetails.value = false
   loading.value = true
 
   try {
-    const res = await resolvePurl({ purl })
-    result.value = res
+    const res = await resolvePurls({ purls })
+    results.value = res.results
   } catch (e: unknown) {
     if (e instanceof ApiError) {
       error.value = t('errors.' + e.error, e.data)
@@ -107,7 +114,7 @@ async function handleResolve() {
 
 <style scoped>
 .container {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 2rem 1rem;
   flex: 1;
@@ -125,88 +132,103 @@ h1 {
 
 .form-group {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-input[type="text"] {
-  flex: 1;
+textarea {
+  width: 100%;
   padding: 0.75rem 1rem;
   border: 1px solid var(--color-input-border);
   border-radius: var(--border-radius);
   font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
 }
 
-input[type="text"]:focus {
+textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-focus);
+}
+
+.form-group .btn {
+  align-self: flex-start;
 }
 
 .result {
   margin-top: 1.5rem;
 }
 
-.repo-url {
-  font-size: 1.1rem;
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.result-table th,
+.result-table td {
+  border: 1px solid var(--color-input-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
   word-break: break-all;
 }
 
-.repo-url a {
+.result-table th {
+  background: var(--color-card-header-bg, transparent);
+  font-weight: 600;
+}
+
+.result-table a {
   color: var(--color-primary);
   text-decoration: none;
 }
 
-.repo-url a:hover {
+.result-table a:hover {
   text-decoration: underline;
 }
 
-.meta {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
+.purl-cell {
+  font-family: monospace;
 }
 
-.details-toggle {
-  background: none;
-  border: none;
-  color: var(--color-primary);
-  cursor: pointer;
-  font-size: 0.875rem;
-  padding: 0;
-  margin-top: 0.75rem;
-}
-
-.details-toggle:hover {
-  text-decoration: underline;
-}
-
-.details {
-  margin-top: 0.75rem;
-  font-size: 0.875rem;
-  color: var(--color-muted);
-}
-
-.details dt {
-  font-weight: 600;
-  margin-top: 0.5rem;
-}
-
-.details dd {
-  margin-left: 0;
-}
-
-.details ul {
+.warnings-list {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
-.details li {
-  padding: 0.25rem 0;
+.warnings-list li {
+  padding: 0.15rem 0;
 }
 
-.warning {
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.status-resolved {
+  background: var(--color-success-bg, #e6f4ea);
+  color: var(--color-success, #1a7f37);
+}
+
+.status-notfound {
+  background: var(--color-warning-bg, #fff8e6);
+  color: var(--color-warning, #9a6700);
+}
+
+.status-error {
+  background: var(--color-error-bg);
   color: var(--color-error);
+}
+
+.muted {
+  color: var(--color-muted);
 }
 
 .error-msg {

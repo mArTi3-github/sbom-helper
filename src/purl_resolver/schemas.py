@@ -5,10 +5,13 @@ from datetime import date
 from enum import Enum
 
 from pydantic import BaseModel, Field
+from typing import Annotated
 
 
-class ResolveRequest(BaseModel):
-    purl: str = Field(..., min_length=1, description="Package URL to resolve")
+class BatchResolveRequest(BaseModel):
+    purls: list[Annotated[str, Field(max_length=2048)]] = Field(
+        ..., min_length=1, max_length=1000, description="Package URLs to resolve"
+    )
 
 
 class ResolveResponse(BaseModel):
@@ -18,6 +21,14 @@ class ResolveResponse(BaseModel):
     resolver: str = ""
     found_by: str = ""
     resolved_at: str = ""
+
+
+class BatchResolveItem(ResolveResponse):
+    error: str | None = None
+
+
+class BatchResolveResponse(BaseModel):
+    results: list[BatchResolveItem]
 
 
 

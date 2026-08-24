@@ -18,7 +18,7 @@
 |  |  router.py (sub-routers in  |                   |
 |  |  routes/ subpackage)        |                   |
 |  |                             |                   |
-|  |  POST /api/v1/resolve      |                   |
+|  |  POST /api/v1/resolve/batch |                |
 |  |  GET /health               |                   |
 |  |  GET / (HTML page)         |                   |
 |  |  GET /sbom-updater         |                   |

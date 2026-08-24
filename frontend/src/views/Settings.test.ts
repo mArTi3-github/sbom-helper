@@ -21,6 +21,7 @@ const defaultSettings: SettingsResponse = {
   ecosystems_enabled: false,
   ecosystems_max_requests_per_second: 2,
   batch_semaphore_limit: 10,
+  batch_max_items: 100,
   connectivity_url: 'https://github.com',
   connectivity_timeout: 2,
   json_indent: 4,
@@ -106,6 +107,25 @@ describe('Settings.vue', () => {
 
       expect(successUpdate).toHaveBeenCalledTimes(1)
       expect(successUpdate).toHaveBeenCalledWith({ validate_db_urls: true })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('auto-saves batch max items change after debounce', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountSettings()
+      await flushPromises()
+
+      const numberInputs = wrapper.findAll<HTMLInputElement>('input[type="number"]')
+      const maxItemsInput = numberInputs.find((i) => i.element.value === '100')
+      expect(maxItemsInput).toBeDefined()
+      await maxItemsInput!.setValue(250)
+      await flush(500)
+
+      expect(successUpdate).toHaveBeenCalledTimes(1)
+      expect(successUpdate).toHaveBeenCalledWith({ batch_max_items: 250 })
     } finally {
       vi.useRealTimers()
     }

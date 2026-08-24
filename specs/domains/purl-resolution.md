@@ -7,7 +7,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 ## Key Files
 
 - `src/purl_resolver/router.py` — API endpoint handlers that call the Service Layer
-- `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `resolve_batch()` for concurrent resolution; `store_preexisting_references()` for SBOM pre-existing refs
+- `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `_resolve_concurrent()` core (semaphore + dedup by normalized key) shared by `resolve_many()` (batch endpoint, one row per input PURL) and `resolve_batch()` (SBOM flow, successful results only); `store_preexisting_references()` for SBOM pre-existing refs
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
 - `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, ecosyste.ms wrapper, libraries.io wrapper, apk wrapper, and factory module
@@ -22,7 +22,7 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 - `src/purl_resolver/sbom/enricher.py` — Inserts VCS external references into SBOM components
 - `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
-- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, batch_semaphore_limit, job_ttl_hours, connectivity settings)
+- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, batch_semaphore_limit, batch_max_items, job_ttl_hours, connectivity settings)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
 - `src/purl_resolver/url_validation_cache.py` — `UrlValidationCache`: diskcache-based URL validation result cache with TTL expiry; used by `UrlValidationService`
 - `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url()` with UrlValidationCache; consumed by `PurlResolutionService` and accessed by `SbomEnrichmentPipeline` through `PurlResolutionService.validation_service` property
@@ -36,10 +36,22 @@ Core capability of the system. Accepts a single Package URL (PURL) string and re
 ## Core Types
 
 ```python
-class ResolveRequest(BaseModel):
-    purl: str = Field(..., min_length=1, description="Package URL to resolve")
+class BatchResolveRequest(BaseModel):
+    purls: list[str]  # one PURL per list item
 
-class ResolveResponse(BaseModel):
+class BatchResolveItem(BaseModel):  # one row per input PURL, in input order
+    purl: str            # original input string (with version)
+    repository_url: str | None = None
+    warnings: list[str] = []
+    resolver: str = ""
+    found_by: str = ""
+    resolved_at: str = ""
+    error: str | None = None  # invalid_purl / upstream_error for this row
+
+class BatchResolveResponse(BaseModel):
+    results: list[BatchResolveItem]
+
+class ResolveResponse(BaseModel):  # stored canonical form, purl is normalized
     purl: str  # normalized form: scheme:type/namespace/name
     repository_url: str | None = None
     warnings: list[str] = []
@@ -76,12 +88,14 @@ class UrlValidationOutput:
 ```
 Client                    API Layer (router)         Service Layer             purl_utils        Storage          Resolver
   |                          |                          |                        |                |                |
-  | POST /api/v1/resolve     |                          |                        |                |                |
-  | {"purl": "pkg:..."}      |                          |                        |                |                |
+  | POST /api/v1/resolve/batch |                        |                        |                |                |
+  | {"purls": ["pkg:...", ...]} |                       |                        |                |                |
   |------------------------->|                          |                        |                |                |
-  |                          | service.resolve_purl()   |                        |                |                |
+  |                          | service.resolve_many()   |                        |                |                |
   |                          |------------------------->|                        |                |                |
-  |                          |                          | validate(purl_str)     |                |                |
+  |                          |   per unique PURL:      |                        |                |                |
+  |                          |   service.resolve_purl() |                        |                |                |
+  |                          |   validate(purl_str)     |                        |                |                |
   |                          |                          |----------------------->|                |                |
   |                          |                          | PurlComponents         |                |                |
   |                          |                          |<-----------------------|                |                |
@@ -144,7 +158,7 @@ Client                    API Layer (router)         Service Layer             p
    |                          |                          | storage.store(result)  |                |                |
    |                          |                          |--------------------------------------->|                |
   |                          |                          |                        |                |                |
-  |                          | 200 {normalized purl}    |                        |                |                |
+  |                          | 200 {results: [...]}     |                        |                |                |
   |<-------------------------|--------------------------|                        |                |                |
 ```
 
@@ -176,10 +190,13 @@ Client                    API Layer (router)         Service Layer             p
 
 ## Invariants
 
-- Every valid PURL returns HTTP 200 (with `repository_url: null` if unresolved)
-- Invalid PURL format is caught at the application level (purl_utils) before any resolver or storage call — HTTP 400
-- Unsupported ecosystems return HTTP 200 with `repository_url: null` and a warning (purl2repo returns `Resolution(None)`, resolver chain continues)
-- Upstream errors (registry timeout, network failure) always return HTTP 502
+- `POST /api/v1/resolve/batch` always returns HTTP 200 with one result row per input PURL, in input order
+- Every valid PURL row: `repository_url: null` if unresolved, `error: null`
+- Invalid PURL format is caught at the application level (purl_utils) before any resolver or storage call — the row carries `error: "invalid_purl"` instead of failing the whole request
+- Unsupported ecosystems return a row with `repository_url: null` and a warning (purl2repo returns `Resolution(None)`, resolver chain continues)
+- Upstream errors (registry timeout, network failure) produce a row with `error: "upstream_error"`
+- More than `batch_max_items` PURLs in one request → HTTP 400 `batch_too_large`
+- Network connectivity probe failure → HTTP 503 `network_unavailable`
 - The response format is canonical — it does not expose purl2repo's internal structure
 - Empty purl strings are rejected at the Pydantic validation level (HTTP 422)
 - **Normalized cache keys**: storage uses `scheme:type/namespace/name` form — version/qualifiers/subpath are stripped

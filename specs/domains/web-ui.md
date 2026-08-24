@@ -56,14 +56,16 @@ User                   Browser (Vue SPA)             API Layer
   |                       | Vue Router mounts         |
   |                       | PurlResolver.vue          |
   |                       |                           |
-  | Enters PURL, clicks   |                           |
-  | "Resolve"             |                           |
+  | Enters one or more      |                           |
+  | PURLs (one per line),   |                           |
+  | clicks "Resolve"        |                           |
   |---------------------->|                           |
-  |                       | POST /api/v1/resolve      |
+  |                       | POST /api/v1/resolve/batch |
+  |                       | {"purls": [...]}          |
   |                       |-------------------------->|
-  |                       | 200 {result}              |
+  |                       | 200 {results: [...]}      |
   |                       |<--------------------------|
-  | Sees result card      |                           |
+  | Sees results table    |                           |
   |<----------------------|                           |
 ```
 

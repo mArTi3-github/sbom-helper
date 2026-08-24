@@ -11,64 +11,73 @@ All API endpoints are served from the root path. No version prefix in the base U
 
 ## Endpoints
 
-### `POST /api/v1/resolve`
+### `POST /api/v1/resolve/batch`
 
-Resolve a single PURL to its repository URL.
+Resolve one or more PURLs to their repository URLs. Returns one result row per input PURL, in input order.
 
 #### Request
 
 ```json
 {
-  "purl": "pkg:pypi/requests@2.31.0"
+  "purls": ["pkg:pypi/requests@2.31.0", "pkg:pypi/flask@3.0.0"]
 }
 ```
 
-- `purl`: required, non-empty string. The response `purl` field contains the normalized form (`scheme:type/namespace/name`), not the original input PURL.
+- `purls`: required, non-empty list of strings (1 to `batch_max_items` items, configurable in settings, default 100).
+- Each item's `purl` field in the response contains the original input string (with version), not the normalized form.
 
-#### Success Response (200) — resolved
+#### Success Response (200)
 
 ```json
 {
-  "purl": "pkg:pypi/requests",
-  "repository_url": "https://github.com/psf/requests",
-  "warnings": [],
-  "resolver": "purl2repo",
-  "found_by": "resolver",
-  "resolved_at": "2026-05-31T12:00:00Z"
+  "results": [
+    {
+      "purl": "pkg:pypi/requests@2.31.0",
+      "repository_url": "https://github.com/psf/requests",
+      "warnings": [],
+      "resolver": "purl2repo",
+      "found_by": "resolver",
+      "resolved_at": "2026-05-31T12:00:00Z",
+      "error": null
+    },
+    {
+      "purl": "pkg:pypi/obscure-package@0.1.0",
+      "repository_url": null,
+      "warnings": ["No resolver found a repository URL"],
+      "resolver": "",
+      "found_by": "",
+      "resolved_at": "",
+      "error": null
+    }
+  ]
 }
 ```
 
-Note: `purl` field contains the normalized form (version, qualifiers, subpath stripped). The original PURL is only used internally for resolver processing.
+Each row is one of:
+- **Resolved** — `repository_url` set, `error` is `null`.
+- **Unresolved** — `repository_url` is `null`, `error` is `null`, warnings explain why.
+- **Error** — `error` contains an error code (`invalid_purl`, `upstream_error`), `repository_url` is `null`. A single invalid PURL does not fail the whole request.
 
-#### Success Response (200) — unresolved
+#### Error Response (400) — too many PURLs
 
 ```json
 {
-  "purl": "pkg:pypi/obscure-package",
-  "repository_url": null,
-  "warnings": ["No repository URL found for this PURL"]
+  "error": "batch_too_large",
+  "detail": "Maximum 100 PURLs per request"
 }
 ```
 
-#### Error Response (400) — invalid PURL
+#### Error Response (503) — network unavailable
 
 ```json
 {
-  "error": "invalid_purl"
-}
-```
-
-#### Error Response (502) — upstream error
-
-```json
-{
-  "error": "upstream_error"
+  "error": "network_unavailable"
 }
 ```
 
 #### Validation Error (422) — request body invalid
 
-Standard FastAPI/Pydantic 422 response with field-level validation details.
+Standard FastAPI/Pydantic 422 response with field-level validation details (e.g. empty `purls` list).
 
 ### `GET /health`
 

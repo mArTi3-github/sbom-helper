@@ -164,30 +164,65 @@ class PurlResolutionService:
             )
         )
 
+    async def _resolve_concurrent(
+        self,
+        purls: list[str],
+        resolver: str = "",
+        on_progress: Callable[[int, int], Awaitable[None]] | None = None,
+    ) -> list[ResolveResult]:
+        if self._settings_store is not None:
+            batch_limit = self._settings_store.load().batch_semaphore_limit
+        else:
+            batch_limit = _BATCH_SEMAPHORE_LIMIT
+        semaphore = asyncio.Semaphore(batch_limit)
+
+        resolve_sources: list[str] = []
+        source_index: dict[str, int] = {}
+        per_input: list[int] = []
+        for original in purls:
+            key = safe_normalize(original)
+            if key not in source_index:
+                source_index[key] = len(resolve_sources)
+                resolve_sources.append(original)
+            per_input.append(source_index[key])
+
+        async def _resolve_one(original: str) -> ResolveResult:
+            async with semaphore:
+                return await self.resolve_purl(original, resolver=resolver)
+
+        unique_results = await asyncio.gather(*[_resolve_one(p) for p in resolve_sources])
+        results = [unique_results[idx] for idx in per_input]
+
+        if on_progress is not None:
+            total = len(purls)
+            counter = itertools.count(1)
+            for _ in results:
+                await on_progress(next(counter), total)
+
+        return results
+
+    async def resolve_many(
+        self,
+        purls: list[str],
+        resolver: str = "",
+    ) -> list[ResolveResult]:
+        return await self._resolve_concurrent(purls, resolver=resolver)
+
     async def resolve_batch(
         self,
         purls: list[str],
         resolver: str = "",
         on_progress: Callable[[int, int], Awaitable[None]] | None = None,
     ) -> dict[str, ResolveResponse]:
-        batch_limit = self._settings_store.load().batch_semaphore_limit if self._settings_store else _BATCH_SEMAPHORE_LIMIT
-        semaphore = asyncio.Semaphore(batch_limit)
-        total = len(purls)
-        counter = itertools.count(1)
-
-        async def _resolve_one(original: str) -> tuple[str, ResolveResponse | None]:
-            async with semaphore:
-                result = await self.resolve_purl(original, resolver=resolver)
-                key = safe_normalize(original)
-                if on_progress is not None:
-                    await on_progress(next(counter), total)
-                if result.response and result.response.repository_url:
-                    return (key, result.response)
-                return (key, None)
-
-        tasks = [_resolve_one(p) for p in purls]
-        results = await asyncio.gather(*tasks)
-        return {k: v for k, v in results if v is not None}
+        results = await self._resolve_concurrent(
+            purls, resolver=resolver, on_progress=on_progress
+        )
+        batch: dict[str, ResolveResponse] = {}
+        for original, result in zip(purls, results):
+            if result.response is None or not result.response.repository_url:
+                continue
+            batch[safe_normalize(original)] = result.response
+        return batch
 
     async def store_preexisting_references(
         self,

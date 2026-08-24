@@ -28,17 +28,18 @@
   },
   "purlResolver": {
     "title": "Resolve PURL",
-    "subtitle": "Resolve a Package URL to its source code repository",
-    "placeholder": "pkg:pypi/requests\\@2.31.0",
+    "subtitle": "Resolve one or more Package URLs to their source code repositories",
+    "placeholder": "Enter one PURL per line",
     "resolve": "Resolve",
     "resolving": "Resolving...",
-    "noRepoUrl": "No repository URL found",
-    "hideDetails": "Hide details",
-    "showDetails": "Show details",
-    "warnings": "Warnings",
+    "purl": "PURL",
+    "repoUrl": "Repository URL",
     "foundBy": "Found by",
     "resolver": "Resolver",
-    "repoUrl": "Repository URL"
+    "warnings": "Warnings",
+    "status": "Status",
+    "statusResolved": "Resolved",
+    "statusNotFound": "Not found"
   },
   "sbomUpdater": {
     "title": "Enrich SBOM",
@@ -248,6 +249,8 @@
       "title": "Network & Performance",
       "batchLimit": "Batch concurrency limit",
       "batchLimitDesc": "Maximum number of parallel PURL resolution requests in a batch (1–100). Default: 10.",
+      "batchMaxItems": "Max PURLs per request",
+      "batchMaxItemsDesc": "Maximum number of PURLs accepted in a single resolve request (1–1000). Default: 100.",
       "probeUrl": "Connectivity probe URL",
       "probeUrlDesc": "Target URL used to check internet access before URL validation. Set to empty to disable the probe.",
       "probeTimeout": "Connectivity probe timeout (seconds)",
@@ -304,6 +307,7 @@
     "invalid_csv": "Invalid CSV file",
     "invalid_purl": "Invalid PURL",
     "upstream_error": "Upstream resolution error",
+    "batch_too_large": "Too many PURLs in one request",
     "network_error": "Network error: could not reach the server.",
     "unexpected_error": "An unexpected error occurred.",
     "unknown_error": "An unknown error occurred"

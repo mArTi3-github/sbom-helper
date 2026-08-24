@@ -122,9 +122,9 @@ Additional settings (URL validation timeout, retry config, batch concurrency, jo
 Server settings are persisted in `data/settings.json`.
 
 ## Web UI Sections
-
 ### PURL Resolver (`/purl-resolver`)
-Accepts a PURL and returns the corresponding source code repository URL. The returned URL points to the project-level repository, not a specific version.
+
+Accepts one or more PURLs (one per line) and returns the corresponding source code repository URLs in a results table. The returned URL points to the project-level repository, not a specific version.
 
 ### SBOM Enricher (`/sbom-updater`)
 Accepts a CycloneDX SBOM and returns an enriched SBOM with VCS repository URLs added to all components (recursively).

@@ -16,6 +16,21 @@ def storage() -> InMemoryCache:
 class TestResolveBatch:
 
     @pytest.mark.asyncio
+    async def test_duplicate_purls_resolved_once(self, storage: InMemoryCache) -> None:
+        resolver = FakeResolver(
+            resolution=Resolution(
+                purl="pkg:pypi/requests@2.31.0",
+                repository_url="https://github.com/psf/requests",
+            )
+        )
+        service = PurlResolutionService(storage, [resolver])
+        results = await service.resolve_many(
+            ["pkg:pypi/requests@2.31.0", "pkg:pypi/requests@2.31.0"]
+        )
+        assert len(results) == 2
+        assert resolver.call_count == 1
+
+    @pytest.mark.asyncio
     async def test_resolves_multiple_purls(self, storage: InMemoryCache) -> None:
         resolver = FakeResolver(
             resolution=Resolution(

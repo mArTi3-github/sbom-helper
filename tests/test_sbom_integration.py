@@ -576,15 +576,15 @@ class TestFileUrlInvalidation:
 class TestConnectivityPreCheck:
     """Integration tests: connectivity check happens once per user action."""
 
-    def test_single_resolve_fails_when_connectivity_down(self, client: TestClient) -> None:
+    def test_batch_resolve_fails_when_connectivity_down(self, client: TestClient) -> None:
         with patch(
             "purl_resolver.routes.resolve.ensure_connectivity",
             new_callable=AsyncMock,
             side_effect=ConnectionError("Cannot reach https://github.com"),
         ):
             response = client.post(
-                "/api/v1/resolve",
-                json={"purl": "pkg:pypi/requests@2.31.0"},
+                "/api/v1/resolve/batch",
+                json={"purls": ["pkg:pypi/requests@2.31.0"]},
             )
         assert response.status_code == 503
         data = response.json()

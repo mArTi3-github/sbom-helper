@@ -1,5 +1,5 @@
-export interface ResolveRequest {
-  purl: string
+export interface BatchResolveRequest {
+  purls: string[]
 }
 
 export interface ResolveResponse {
@@ -9,6 +9,14 @@ export interface ResolveResponse {
   resolver: string
   found_by: string
   resolved_at: string
+}
+
+export interface BatchResolveItem extends ResolveResponse {
+  error: string | null
+}
+
+export interface BatchResolveResponse {
+  results: BatchResolveItem[]
 }
 
 export interface ErrorResponse {
@@ -37,6 +45,7 @@ export interface SettingsResponse {
   ecosystems_enabled: boolean
   ecosystems_max_requests_per_second: number
   batch_semaphore_limit: number
+  batch_max_items: number
   job_ttl_hours: number
   connectivity_url: string
   connectivity_timeout: number
@@ -66,6 +75,7 @@ export interface SettingsUpdate {
   retry_base_cooldown_seconds?: number
   log_level?: string
   batch_semaphore_limit?: number
+  batch_max_items?: number
   job_ttl_hours?: number
   connectivity_url?: string
   connectivity_timeout?: number

@@ -46,6 +46,7 @@ class SettingsUpdate(BaseModel):
     retry_base_cooldown_seconds: float | None = Field(None, ge=0.5, le=120.0)
     log_level: str | None = Field(None, pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     batch_semaphore_limit: int | None = Field(None, ge=1, le=100)
+    batch_max_items: int | None = Field(None, ge=1, le=1000)
     connectivity_url: str | None = None
     connectivity_timeout: int | None = Field(None, ge=1, le=30)
     json_indent: Literal[1, 2, 4] | None = Field(None)
@@ -93,6 +94,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "ecosystems_enabled": app_settings.ecosystems_enabled,
         "ecosystems_max_requests_per_second": app_settings.ecosystems_max_requests_per_second,
         "batch_semaphore_limit": app_settings.batch_semaphore_limit,
+        "batch_max_items": app_settings.batch_max_items,
         "connectivity_url": app_settings.connectivity_url,
         "connectivity_timeout": app_settings.connectivity_timeout,
         "json_indent": app_settings.json_indent,
@@ -158,6 +160,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "ecosystems_enabled": updated.ecosystems_enabled,
         "ecosystems_max_requests_per_second": updated.ecosystems_max_requests_per_second,
         "batch_semaphore_limit": updated.batch_semaphore_limit,
+        "batch_max_items": updated.batch_max_items,
         "connectivity_url": updated.connectivity_url,
         "connectivity_timeout": updated.connectivity_timeout,
         "json_indent": updated.json_indent,

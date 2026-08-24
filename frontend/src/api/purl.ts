@@ -1,8 +1,8 @@
 import { apiFetch } from './client'
-import type { ResolveRequest, ResolveResponse } from '../types/api'
+import type { BatchResolveRequest, BatchResolveResponse } from '../types/api'
 
-export function resolvePurl(body: ResolveRequest): Promise<ResolveResponse> {
-  return apiFetch<ResolveResponse>('/api/v1/resolve', {
+export function resolvePurls(body: BatchResolveRequest): Promise<BatchResolveResponse> {
+  return apiFetch<BatchResolveResponse>('/api/v1/resolve/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

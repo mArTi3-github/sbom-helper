@@ -321,6 +321,15 @@
         </div>
         <div class="setting-row">
           <div>
+            <div class="setting-label">{{ t('settings.network.batchMaxItems') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.network.batchMaxItemsDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="batchMaxItems" min="1" max="1000" @change="debouncedAutoSave({ batch_max_items: batchMaxItems })" class="num-input">
+        </div>
+        <div class="setting-row">
+          <div>
             <div class="setting-label">{{ t('settings.network.probeUrl') }}</div>
             <div class="setting-desc">
               {{ t('settings.network.probeUrlDesc') }}
@@ -411,7 +420,7 @@ const {
   validateDbUrls, validateSbomRefs, sbomMultipleVcsBehavior, urlValidationTimeout, revalidationCooldownHours,
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, depsdevEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
-  batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout,
+  batchSemaphoreLimit, batchMaxItems, jobTtlHours, connectivityUrl, connectivityTimeout,
   tokenSet, loading, jsonIndent,
   llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
 } = storeToRefs(store)
