@@ -206,6 +206,73 @@
       </div>
 
       <div class="card">
+        <div class="card-title">{{ t('settings.llmResolver.title') }}</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.enable') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.enableDesc') }}
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" v-model="llmEnabled" @change="debouncedAutoSave({ llm_resolver_enabled: llmEnabled })">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.baseUrl') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.baseUrlDesc') }}
+            </div>
+          </div>
+          <input type="text" v-model="llmBaseUrl" :disabled="!llmEnabled" @blur="debouncedAutoSave({ llm_resolver_base_url: llmBaseUrl || null })" class="txt-input">
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.apiKey') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.apiKeyDesc') }}
+            </div>
+            <div class="setting-desc status-desc">
+              {{ t('settings.llmResolver.status') }} <span :class="tokenSet.llm_resolver_api_key ? 'status-set' : 'status-not-set'">{{ tokenSet.llm_resolver_api_key ? t('settings.set') : t('settings.notSet') }}</span>
+              <button v-if="tokenSet.llm_resolver_api_key" class="btn btn-danger btn-sm" @click="clearLlmKey">{{ t('settings.clearKey') }}</button>
+            </div>
+          </div>
+          <div class="input-right">
+            <input type="password" :value="llmApiKeyInput" :disabled="!llmEnabled" @input="llmApiKeyInput = ($event.target as HTMLInputElement).value" @blur="onLlmKeyBlur" placeholder="OpenAI-compatible API key" class="pw-input">
+          </div>
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.model') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.modelDesc') }}
+            </div>
+          </div>
+          <input type="text" v-model="llmModel" :disabled="!llmEnabled" @blur="debouncedAutoSave({ llm_resolver_model: llmModel || null })" class="txt-input">
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.attemptsCount') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.attemptsCountDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="llmAttemptsCount" :disabled="!llmEnabled" min="1" max="10" @change="debouncedAutoSave({ llm_resolver_attempts_count: llmAttemptsCount })" class="num-input">
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.timeout') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.timeoutDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="llmTimeout" :disabled="!llmEnabled" min="1" max="600" @change="debouncedAutoSave({ llm_resolver_timeout: llmTimeout })" class="num-input">
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">{{ t('settings.resolverBehaviour.title') }}</div>
         <div class="setting-row">
           <div>
@@ -332,10 +399,12 @@ const {
   librariesioEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout,
   tokenSet, loading, jsonIndent,
+  llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
 } = storeToRefs(store)
 
 const librariesioKeyInput = ref('')
 const ecosystemsKeyInput = ref('')
+const llmApiKeyInput = ref('')
 
 const toast = ref<{ text: string; isError: boolean } | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -361,6 +430,7 @@ function autoSave(partial: SettingsUpdate) {
       showToast(t('settings.savedToast'), false)
       if ('librariesio_api_key' in partial) librariesioKeyInput.value = ''
       if ('ecosystems_api_key' in partial) ecosystemsKeyInput.value = ''
+      if ('llm_resolver_api_key' in partial) llmApiKeyInput.value = ''
     })
     .catch((err: Error) => {
       const apiErr = err as import('../api/client').ApiError
@@ -383,6 +453,12 @@ async function onEcosystemsKeyBlur() {
   await autoSave({ ecosystems_api_key: value } as SettingsUpdate)
 }
 
+async function onLlmKeyBlur() {
+  const value = llmApiKeyInput.value.trim()
+  if (!value) return
+  await autoSave({ llm_resolver_api_key: value } as SettingsUpdate)
+}
+
 async function clearLibrariesIoKey() {
   try {
     await store.clearToken('librariesio_api_key')
@@ -394,6 +470,14 @@ async function clearLibrariesIoKey() {
 async function clearEcosystemsKey() {
   try {
     await store.clearToken('ecosystems_api_key')
+    showToast(t('settings.tokenCleared'), false)
+    await store.load()
+  } catch { showToast(t('settings.errorMessages.keyClearFailed'), true) }
+}
+
+async function clearLlmKey() {
+  try {
+    await store.clearToken('llm_resolver_api_key')
     showToast(t('settings.tokenCleared'), false)
     await store.load()
   } catch { showToast(t('settings.errorMessages.keyClearFailed'), true) }

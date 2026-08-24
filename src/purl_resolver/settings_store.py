@@ -32,6 +32,12 @@ class AppSettings(BaseModel):
     connectivity_timeout: int = Field(default=2, ge=1, le=30)
     json_indent: Literal[1, 2, 4] = Field(default=4)
     apk_resolver_enabled: bool = True
+    llm_resolver_enabled: bool = False
+    llm_resolver_base_url: str | None = Field(default=None, pattern=r"^https?://.+")
+    llm_resolver_api_key: str | None = None
+    llm_resolver_model: str | None = None
+    llm_resolver_attempts_count: int = Field(default=2, ge=1, le=10)
+    llm_resolver_timeout: float = Field(default=60.0, ge=1, le=600)
 
     def log_level_as_int(self) -> int:
         return getattr(logging, self.log_level.upper(), logging.INFO)

@@ -192,7 +192,7 @@
       "clearCacheBtn": "Clear cache"
     },
     "librariesio": {
-      "title": "Libraries.io Resolver (optional)",
+      "title": "Libraries.io Resolver",
       "enable": "Enable libraries.io resolver",
       "enableDesc": "When enabled, libraries.io is used as a fallback resolver when purl2repo cannot find a repository URL.",
       "apiKey": "API Key",
@@ -205,8 +205,24 @@
       "enable": "Enable APK resolver",
       "enableDesc": "When enabled, Alpine Linux APK packages (pkg:apk/...) resolve to https://github.com/alpinelinux/aports as a fallback."
     },
+    "llmResolver": {
+      "title": "LLM Resolver",
+      "enable": "Enable LLM resolver",
+      "enableDesc": "When enabled and all other resolvers fail, an LLM with web-search/web-fetch tools is asked for the source repository. The returned URL is verified with an HTTP HEAD request before use.",
+      "baseUrl": "Base URL (OpenAI-compatible)",
+      "baseUrlDesc": "HTTP endpoint of the LLM API in OpenAI format, e.g. https://api.deepseek.com",
+      "apiKey": "API Key",
+      "apiKeyDesc": "API key for the LLM endpoint.",
+      "status": "Status:",
+      "model": "Model",
+      "modelDesc": "Model name, e.g. deepseek-v4-flash",
+      "attemptsCount": "Attempts count",
+      "attemptsCountDesc": "Total number of LLM requests per PURL, including the first one. On a rejected answer (bad JSON, mismatched PURL, invalid or unreachable URL) the model receives feedback and is asked to retry. Default: 2. Range: 1–10.",
+      "timeout": "Timeout (seconds)",
+      "timeoutDesc": "Timeout for each LLM request and HTTP HEAD check (1–600 seconds). Default: 60."
+    },
     "ecosystems": {
-      "title": "ecosyste.ms Resolver (optional)",
+      "title": "ecosyste.ms Resolver",
       "enable": "Enable ecosyste.ms resolver",
       "enableDesc": "Live query to ecosyste.ms API for repository URL lookup. Works without API key. Key is optional for higher rate limits.",
       "apiKey": "API Key (optional)",

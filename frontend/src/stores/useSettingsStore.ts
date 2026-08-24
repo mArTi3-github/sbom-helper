@@ -21,13 +21,19 @@ export const useSettingsStore = defineStore('settings', () => {
   const connectivityUrl = ref('https://github.com')
   const connectivityTimeout = ref(2)
   const jsonIndent = ref(4)
-  const tokenSet = ref({ librariesio_api_key: false, ecosystems_api_key: false })
+  const llmEnabled = ref(false)
+  const llmBaseUrl = ref('')
+  const llmModel = ref('')
+  const llmAttemptsCount = ref(2)
+  const llmTimeout = ref(60)
+  const tokenSet = ref({ librariesio_api_key: false, ecosystems_api_key: false, llm_resolver_api_key: false })
   const librariesioKey = ref('')
   const ecosystemsKey = ref('')
+  const llmApiKey = ref('')
   const loading = ref(true)
 
   const hasAnyToken = computed(() =>
-    tokenSet.value.librariesio_api_key || tokenSet.value.ecosystems_api_key
+    tokenSet.value.librariesio_api_key || tokenSet.value.ecosystems_api_key || tokenSet.value.llm_resolver_api_key
   )
 
   async function load() {
@@ -50,6 +56,11 @@ export const useSettingsStore = defineStore('settings', () => {
       connectivityUrl.value = data.connectivity_url
       connectivityTimeout.value = data.connectivity_timeout
       jsonIndent.value = data.json_indent
+      llmEnabled.value = data.llm_resolver_enabled
+      llmBaseUrl.value = data.llm_resolver_base_url ?? ''
+      llmModel.value = data.llm_resolver_model ?? ''
+      llmAttemptsCount.value = data.llm_resolver_attempts_count
+      llmTimeout.value = data.llm_resolver_timeout
       tokenSet.value = data.token_set
     } catch {
       throw new Error('Failed to load settings')
@@ -61,9 +72,10 @@ export const useSettingsStore = defineStore('settings', () => {
     tokenSet.value = data.token_set
     if ('librariesio_api_key' in partial) librariesioKey.value = ''
     if ('ecosystems_api_key' in partial) ecosystemsKey.value = ''
+    if ('llm_resolver_api_key' in partial) llmApiKey.value = ''
   }
 
-  async function clearToken(field: 'librariesio_api_key' | 'ecosystems_api_key') {
+  async function clearToken(field: 'librariesio_api_key' | 'ecosystems_api_key' | 'llm_resolver_api_key') {
     await updateSettings({ [field]: null } as SettingsUpdate)
   }
 
@@ -72,7 +84,8 @@ export const useSettingsStore = defineStore('settings', () => {
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
-    tokenSet, librariesioKey, ecosystemsKey, loading,
+    llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
+    tokenSet, librariesioKey, ecosystemsKey, llmApiKey, loading,
     hasAnyToken, load, save, clearToken,
   }
 })

@@ -137,6 +137,52 @@ class TestApkSettings:
         assert loaded.apk_resolver_enabled is False
 
 
+class TestLlmResolverSettings:
+    def test_defaults(self) -> None:
+        settings = AppSettings()
+        assert settings.llm_resolver_enabled is False
+        assert settings.llm_resolver_base_url is None
+        assert settings.llm_resolver_api_key is None
+        assert settings.llm_resolver_model is None
+        assert settings.llm_resolver_attempts_count == 2
+        assert settings.llm_resolver_timeout == 60.0
+
+    def test_save_and_load_roundtrip(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        settings = store.load()
+        updated = settings.model_copy(update={
+            "llm_resolver_enabled": True,
+            "llm_resolver_base_url": "https://api.deepseek.com",
+            "llm_resolver_api_key": "sk-test",
+            "llm_resolver_model": "deepseek-v4-flash",
+            "llm_resolver_attempts_count": 3,
+            "llm_resolver_timeout": 120.0,
+        })
+        store.save(updated)
+
+        loaded = store.load()
+        assert loaded.llm_resolver_enabled is True
+        assert loaded.llm_resolver_base_url == "https://api.deepseek.com"
+        assert loaded.llm_resolver_api_key == "sk-test"
+        assert loaded.llm_resolver_model == "deepseek-v4-flash"
+        assert loaded.llm_resolver_attempts_count == 3
+        assert loaded.llm_resolver_timeout == 120.0
+
+    def test_attempts_count_must_be_at_least_one(self) -> None:
+        with pytest.raises(Exception):
+            AppSettings(llm_resolver_attempts_count=0)
+
+    def test_base_url_must_be_http(self) -> None:
+        with pytest.raises(Exception):
+            AppSettings(llm_resolver_base_url="ftp://example.com")
+
+    def test_timeout_bounds(self) -> None:
+        with pytest.raises(Exception):
+            AppSettings(llm_resolver_timeout=0)
+        with pytest.raises(Exception):
+            AppSettings(llm_resolver_timeout=601)
+
+
 class TestSettingsStoreCache:
 
     def test_load_returns_cached_value_after_first_read(self, store: SettingsStore, tmp_settings_file: Path):

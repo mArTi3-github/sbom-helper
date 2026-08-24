@@ -49,12 +49,22 @@ class SettingsUpdate(BaseModel):
     connectivity_timeout: int | None = Field(None, ge=1, le=30)
     json_indent: Literal[1, 2, 4] | None = Field(None)
     job_ttl_hours: int | None = Field(None, ge=1, le=720)
+    llm_resolver_enabled: bool | None = None
+    llm_resolver_base_url: str | None = Field(None, pattern=r"^https?://.+")
+    llm_resolver_api_key: str | None = None
+    llm_resolver_model: str | None = None
+    llm_resolver_attempts_count: int | None = Field(None, ge=1, le=10)
+    llm_resolver_timeout: float | None = Field(None, ge=1, le=600)
 
 
 def _rebuild_resolvers(request: Request) -> None:
     store: SettingsStore = request.app.state.settings_store
     app_settings = store.load()
-    request.app.state.resolvers = build_resolvers(settings, app_settings)
+    resolvers = build_resolvers(settings, app_settings)
+    request.app.state.resolvers = resolvers
+    service = getattr(request.app.state, "resolution_service", None)
+    if service is not None:
+        service.set_resolvers(resolvers)
 
 
 def _reconfigure_logging(request: Request) -> None:
@@ -85,9 +95,15 @@ async def get_settings(request: Request) -> JSONResponse:
         "connectivity_timeout": app_settings.connectivity_timeout,
         "json_indent": app_settings.json_indent,
         "job_ttl_hours": app_settings.job_ttl_hours,
+        "llm_resolver_enabled": app_settings.llm_resolver_enabled,
+        "llm_resolver_base_url": app_settings.llm_resolver_base_url,
+        "llm_resolver_model": app_settings.llm_resolver_model,
+        "llm_resolver_attempts_count": app_settings.llm_resolver_attempts_count,
+        "llm_resolver_timeout": app_settings.llm_resolver_timeout,
         "token_set": {
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
             "ecosystems_api_key": app_settings.ecosystems_api_key is not None,
+            "llm_resolver_api_key": app_settings.llm_resolver_api_key is not None,
         },
     })
 
@@ -143,9 +159,15 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "connectivity_timeout": updated.connectivity_timeout,
         "json_indent": updated.json_indent,
         "job_ttl_hours": updated.job_ttl_hours,
+        "llm_resolver_enabled": updated.llm_resolver_enabled,
+        "llm_resolver_base_url": updated.llm_resolver_base_url,
+        "llm_resolver_model": updated.llm_resolver_model,
+        "llm_resolver_attempts_count": updated.llm_resolver_attempts_count,
+        "llm_resolver_timeout": updated.llm_resolver_timeout,
         "token_set": {
             "librariesio_api_key": updated.librariesio_api_key is not None,
             "ecosystems_api_key": updated.ecosystems_api_key is not None,
+            "llm_resolver_api_key": updated.llm_resolver_api_key is not None,
         },
     })
 

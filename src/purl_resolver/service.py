@@ -37,6 +37,9 @@ class PurlResolutionService:
     def settings_store(self) -> SettingsStore | None:
         return self._settings_store
 
+    def set_resolvers(self, resolvers: list[Resolver]) -> None:
+        self._resolvers = resolvers
+
     @property
     def validation_service(self) -> UrlValidationService | None:
         return self._validation_service

@@ -192,7 +192,7 @@
       "clearCacheBtn": "Очистить кеш"
     },
     "librariesio": {
-      "title": "Libraries.io резолвер (опционально)",
+      "title": "Libraries.io резолвер",
       "enable": "Включить libraries.io резолвер",
       "enableDesc": "При включении libraries.io используется как запасной резолвер, когда purl2repo не может найти URL репозитория.",
       "apiKey": "API ключ",
@@ -205,8 +205,24 @@
       "enable": "Включить APK резолвер",
       "enableDesc": "При включении пакеты Alpine Linux APK (pkg:apk/...) резолвятся в https://github.com/alpinelinux/aports как запасной вариант."
     },
+    "llmResolver": {
+      "title": "LLM-резолвер",
+      "enable": "Включить LLM-резолвер",
+      "enableDesc": "Когда включён и все остальные резолверы не нашли репозиторий, выполняется запрос к LLM с инструментами web-search/web-fetch. Полученный URL проверяется HTTP HEAD-запросом перед использованием.",
+      "baseUrl": "Base URL (OpenAI-совместимый)",
+      "baseUrlDesc": "HTTP-эндпоинт LLM API в формате OpenAI, например https://api.deepseek.com",
+      "apiKey": "API ключ",
+      "apiKeyDesc": "API-ключ для эндпоинта LLM.",
+      "status": "Статус:",
+      "model": "Модель",
+      "modelDesc": "Название модели, например deepseek-v4-flash",
+      "attemptsCount": "Число попыток",
+      "attemptsCountDesc": "Общее количество запросов к LLM на один PURL, включая первый. При отклонённом ответе (не JSON, PURL не совпал, невалидный или недоступный URL) модель получает фидбек и повторную попытку. По умолчанию: 2. Диапазон: 1–10.",
+      "timeout": "Таймаут (секунд)",
+      "timeoutDesc": "Таймаут для каждого запроса к LLM и HTTP HEAD проверки (1–600 секунд). По умолчанию: 60."
+    },
     "ecosystems": {
-      "title": "ecosyste.ms резолвер (опционально)",
+      "title": "ecosyste.ms резолвер",
       "enable": "Включить ecosyste.ms резолвер",
       "enableDesc": "Запросы к ecosyste.ms API для поиска URL репозитория. Работает без ключа. Ключ опционален для повышенных лимитов.",
       "apiKey": "API ключ (опционально)",

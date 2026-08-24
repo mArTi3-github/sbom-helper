@@ -221,3 +221,64 @@ class TestLibrariesIoSettings:
         assert response.status_code == 200
         data = response.json()
         assert data["token_set"]["librariesio_api_key"] is False
+
+
+class TestResolverChainRebuild:
+    def test_patch_settings_updates_resolution_service_chain(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        response = client.patch("/api/v1/settings", json={
+            "librariesio_enabled": False,
+            "ecosystems_enabled": False,
+            "llm_resolver_enabled": True,
+            "llm_resolver_base_url": "https://api.example.com",
+            "llm_resolver_api_key": "test-key",
+            "llm_resolver_model": "test-model",
+        })
+        assert response.status_code == 200
+        names = [r.name for r in client.app.state.resolution_service._resolvers]
+        assert "fake" not in names, "service must use the rebuilt chain, not the startup one"
+        assert names[-1] == "llm"
+
+    def test_patch_settings_rebuilt_chain_resolves_with_new_resolver(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+
+        with (
+            patch("purl_resolver.resolver.factory.Purl2RepoResolver") as purl2repo_cls,
+            patch("purl_resolver.resolver.factory.LlmResolver") as llm_cls,
+        ):
+            fake_purl2repo = purl2repo_cls.return_value
+            fake_purl2repo.name = "purl2repo"
+            fake_purl2repo.resolve = AsyncMock(
+                return_value=Resolution(purl="pkg:pypi/requests@2.31.0")
+            )
+
+            fake_llm = llm_cls.return_value
+            fake_llm.name = "llm"
+            fake_llm.resolve = AsyncMock(return_value=Resolution(
+                purl="pkg:pypi/requests@2.31.0",
+                repository_url="https://github.com/psf/requests",
+            ))
+
+            response = client.patch("/api/v1/settings", json={
+                "librariesio_enabled": False,
+                "ecosystems_enabled": False,
+                "llm_resolver_enabled": True,
+                "llm_resolver_base_url": "https://api.example.com",
+                "llm_resolver_api_key": "test-key",
+                "llm_resolver_model": "test-model",
+            })
+            assert response.status_code == 200
+
+            resolve_response = client.post(
+                "/api/v1/resolve",
+                json={"purl": "pkg:pypi/requests@2.31.0"},
+            )
+        assert resolve_response.status_code == 200
+        data = resolve_response.json()
+        assert data["repository_url"] == "https://github.com/psf/requests"
+        assert data["resolver"] == "llm"
+        fake_llm.resolve.assert_awaited_once()

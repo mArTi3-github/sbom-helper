@@ -24,7 +24,12 @@ const defaultSettings: SettingsResponse = {
   connectivity_timeout: 2,
   json_indent: 4,
   job_ttl_hours: 24,
-  token_set: { librariesio_api_key: false, ecosystems_api_key: false },
+  llm_resolver_enabled: false,
+  llm_resolver_base_url: null,
+  llm_resolver_model: null,
+  llm_resolver_attempts_count: 2,
+  llm_resolver_timeout: 60,
+  token_set: { librariesio_api_key: false, ecosystems_api_key: false, llm_resolver_api_key: false },
 }
 
 const successUpdate = vi.fn().mockResolvedValue(defaultSettings)
@@ -60,7 +65,7 @@ describe('Settings.vue', () => {
     await flushPromises()
     expect(wrapper.find('.loading').exists()).toBe(false)
     expect(wrapper.findAll('input[type="number"]').length).toBeGreaterThan(0)
-    expect(wrapper.findAll('input[type="password"]').length).toBe(2)
+    expect(wrapper.findAll('input[type="password"]').length).toBe(3)
     expect(getSettingsMock).toHaveBeenCalledTimes(1)
   })
 

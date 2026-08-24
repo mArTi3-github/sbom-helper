@@ -19,6 +19,7 @@ export interface ErrorResponse {
 export interface SettingsTokenSet {
   librariesio_api_key: boolean
   ecosystems_api_key: boolean
+  llm_resolver_api_key: boolean
 }
 
 export interface SettingsResponse {
@@ -39,6 +40,11 @@ export interface SettingsResponse {
   connectivity_url: string
   connectivity_timeout: number
   json_indent: number
+  llm_resolver_enabled: boolean
+  llm_resolver_base_url: string | null
+  llm_resolver_model: string | null
+  llm_resolver_attempts_count: number
+  llm_resolver_timeout: number
   token_set: SettingsTokenSet
 }
 
@@ -62,6 +68,12 @@ export interface SettingsUpdate {
   connectivity_url?: string
   connectivity_timeout?: number
   json_indent?: number
+  llm_resolver_enabled?: boolean
+  llm_resolver_base_url?: string | null
+  llm_resolver_api_key?: string | null
+  llm_resolver_model?: string | null
+  llm_resolver_attempts_count?: number
+  llm_resolver_timeout?: number
 }
 
 export interface ImageItem {
