@@ -13,3 +13,4 @@ data/
 docker-compose.override.yml
 docs/superpowers/
 .superpowers/
+.misc/architechture_analysis_results/
