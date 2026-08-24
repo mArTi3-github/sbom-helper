@@ -192,8 +192,8 @@
       "clearCacheBtn": "Clear cache"
     },
     "librariesio": {
-      "title": "Libraries.io Resolver",
-      "enable": "Enable libraries.io resolver",
+      "title": "Resolver \"Libraries.io\"",
+      "enable": "Enable resolver \"Libraries.io\"",
       "enableDesc": "When enabled, libraries.io is used as a fallback resolver when purl2repo cannot find a repository URL.",
       "apiKey": "API Key",
       "apiKeyDesc": "Optional API key for higher rate limits (60 req/min vs 10 req/min).",
@@ -201,7 +201,7 @@
       "status": "Status:"
     },
     "apkResolver": {
-      "title": "APK Resolver (Alpine Linux)",
+      "title": "Resolver \"APK\" (Alpine Linux)",
       "enable": "Enable APK resolver",
       "enableDesc": "When enabled, Alpine Linux APK packages (pkg:apk/...) resolve to https://github.com/alpinelinux/aports as a fallback."
     },
@@ -222,8 +222,8 @@
       "timeoutDesc": "Timeout for each LLM request and HTTP HEAD check (1–600 seconds). Default: 60."
     },
     "ecosystems": {
-      "title": "ecosyste.ms Resolver",
-      "enable": "Enable ecosyste.ms resolver",
+      "title": "Resolver \"Ecosyste.ms\"",
+      "enable": "Enable resolver \"Ecosyste.ms\"",
       "enableDesc": "Live query to ecosyste.ms API for repository URL lookup. Works without API key. Key is optional for higher rate limits.",
       "apiKey": "API Key (optional)",
       "apiKeyDesc": "Optional API key for higher rate limits.",

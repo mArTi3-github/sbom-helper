@@ -192,8 +192,8 @@
       "clearCacheBtn": "Очистить кеш"
     },
     "librariesio": {
-      "title": "Libraries.io резолвер",
-      "enable": "Включить libraries.io резолвер",
+      "title": "Резолвер \"Libraries.io\"",
+      "enable": "Включить резолвер \"Libraries.io\" ",
       "enableDesc": "При включении libraries.io используется как запасной резолвер, когда purl2repo не может найти URL репозитория.",
       "apiKey": "API ключ",
       "apiKeyDesc": "Опциональный API ключ для повышенных лимитов (60 запр/мин против 10 запр/мин).",
@@ -201,8 +201,8 @@
       "status": "Статус:"
     },
     "apkResolver": {
-      "title": "APK резолвер (Alpine Linux)",
-      "enable": "Включить APK резолвер",
+      "title": "Резолвер \"APK\" (Alpine Linux)",
+      "enable": "Включить резолвер \"apk\"",
       "enableDesc": "При включении пакеты Alpine Linux APK (pkg:apk/...) резолвятся в https://github.com/alpinelinux/aports как запасной вариант."
     },
     "llmResolver": {
@@ -222,8 +222,8 @@
       "timeoutDesc": "Таймаут для каждого запроса к LLM и HTTP HEAD проверки (1–600 секунд). По умолчанию: 60."
     },
     "ecosystems": {
-      "title": "ecosyste.ms резолвер",
-      "enable": "Включить ecosyste.ms резолвер",
+      "title": "Резолвер \"Ecosyste.ms\"",
+      "enable": "Включить резолвер \"Ecosyste.ms\"",
       "enableDesc": "Запросы к ecosyste.ms API для поиска URL репозитория. Работает без ключа. Ключ опционален для повышенных лимитов.",
       "apiKey": "API ключ (опционально)",
       "apiKeyDesc": "Опциональный API ключ для повышенных лимитов.",
