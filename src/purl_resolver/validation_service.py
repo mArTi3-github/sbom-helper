@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 
 from .settings_store import SettingsStore
-from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url
 from .url_validation_cache import UrlValidationCache
+from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url
 
 logger = logging.getLogger(__name__)
 

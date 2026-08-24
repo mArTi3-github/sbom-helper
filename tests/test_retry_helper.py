@@ -15,7 +15,9 @@ class TestRetryableErrorPolicy:
 
     def test_429_is_retryable(self) -> None:
         response = httpx.Response(429)
-        exc = httpx.HTTPStatusError("rate limit", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "rate limit", request=httpx.Request("GET", "/"), response=response
+        )
         assert RetryableErrorPolicy.is_retryable(exc)
 
     def test_500_is_retryable(self) -> None:
@@ -25,17 +27,23 @@ class TestRetryableErrorPolicy:
 
     def test_503_is_retryable(self) -> None:
         response = httpx.Response(503)
-        exc = httpx.HTTPStatusError("unavailable", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "unavailable", request=httpx.Request("GET", "/"), response=response
+        )
         assert RetryableErrorPolicy.is_retryable(exc)
 
     def test_404_is_not_retryable(self) -> None:
         response = httpx.Response(404)
-        exc = httpx.HTTPStatusError("not found", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "not found", request=httpx.Request("GET", "/"), response=response
+        )
         assert not RetryableErrorPolicy.is_retryable(exc)
 
     def test_400_is_not_retryable(self) -> None:
         response = httpx.Response(400)
-        exc = httpx.HTTPStatusError("bad request", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "bad request", request=httpx.Request("GET", "/"), response=response
+        )
         assert not RetryableErrorPolicy.is_retryable(exc)
 
     def test_network_error_is_retryable(self) -> None:
@@ -62,8 +70,12 @@ class TestRetryHelper:
         response = httpx.Response(429)
         mock = AsyncMock()
         mock.side_effect = [
-            httpx.HTTPStatusError("rate limit", request=httpx.Request("GET", "/"), response=response),
-            httpx.HTTPStatusError("rate limit", request=httpx.Request("GET", "/"), response=response),
+            httpx.HTTPStatusError(
+                "rate limit", request=httpx.Request("GET", "/"), response=response
+            ),
+            httpx.HTTPStatusError(
+                "rate limit", request=httpx.Request("GET", "/"), response=response
+            ),
             "ok",
         ]
         result = await helper.execute(lambda: mock())
@@ -74,7 +86,9 @@ class TestRetryHelper:
     async def test_all_attempts_fail(self) -> None:
         helper = RetryHelper(RetryConfig(max_attempts=2, base_cooldown_seconds=0.01))
         response = httpx.Response(503)
-        exc = httpx.HTTPStatusError("unavailable", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "unavailable", request=httpx.Request("GET", "/"), response=response
+        )
         mock = AsyncMock()
         mock.side_effect = [exc, exc]
         with pytest.raises(httpx.HTTPStatusError):
@@ -85,7 +99,9 @@ class TestRetryHelper:
     async def test_non_retryable_raises_immediately(self) -> None:
         helper = RetryHelper(RetryConfig(max_attempts=3, base_cooldown_seconds=0.01))
         response = httpx.Response(404)
-        exc = httpx.HTTPStatusError("not found", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "not found", request=httpx.Request("GET", "/"), response=response
+        )
         mock = AsyncMock()
         mock.side_effect = [exc]
         with pytest.raises(httpx.HTTPStatusError):
@@ -96,7 +112,9 @@ class TestRetryHelper:
     async def test_cooldown_respects_linear_backoff(self) -> None:
         helper = RetryHelper(RetryConfig(max_attempts=3, base_cooldown_seconds=0.1))
         response = httpx.Response(429)
-        exc = httpx.HTTPStatusError("rate limit", request=httpx.Request("GET", "/"), response=response)
+        exc = httpx.HTTPStatusError(
+            "rate limit", request=httpx.Request("GET", "/"), response=response
+        )
         mock = AsyncMock()
         mock.side_effect = [exc, exc, "ok"]
         import time

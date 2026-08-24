@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from purl_resolver.resolver.apk import ApkResolver
-from purl_resolver.resolver.interface import Resolution
+
 
 @pytest.mark.asyncio
 async def test_resolve_apk_purl():
@@ -43,9 +43,9 @@ def test_resolver_name():
 
 @pytest.mark.asyncio
 async def test_apk_resolver_is_last_in_chain(monkeypatch):
-    from purl_resolver.settings_store import AppSettings
     from purl_resolver.config import Settings
     from purl_resolver.resolver.factory import build_resolvers
+    from purl_resolver.settings_store import AppSettings
 
     app_settings = AppSettings(
         ecosystems_enabled=False,

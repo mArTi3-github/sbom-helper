@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from .csv_io import parse_csv_import, render_csv_export
+from .purl_utils import PurlValidationError, validate
 from .schemas import (
     ImportErrorItem,
     ImportResponse,
@@ -11,7 +12,6 @@ from .schemas import (
     PurlListResponse,
     PurlUpdateRequest,
 )
-from .purl_utils import PurlValidationError, validate
 from .storage.interface import PurlFilters, Storage, UpsertRow
 
 logger = logging.getLogger(__name__)

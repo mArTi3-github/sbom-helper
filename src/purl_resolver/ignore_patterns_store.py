@@ -27,7 +27,11 @@ class IgnorePatternsStore:
             result: list[dict[str, str]] = []
             for item in data:
                 if isinstance(item, dict):
-                    cleaned = {str(k): str(v) for k, v in item.items() if isinstance(v, (str, int, float, bool))}
+                    cleaned = {
+                        str(k): str(v)
+                        for k, v in item.items()
+                        if isinstance(v, (str, int, float, bool))
+                    }
                     result.append(cleaned)
             return result
         except (json.JSONDecodeError, OSError) as exc:

@@ -89,7 +89,10 @@ class EcosystemsResolver(Resolver):
         package = data[0]
         repo_url = select_repository_url(package)
         if not repo_url:
-            return Resolution(purl=purl, warnings=[f"No repository URL found on ecosyste.ms for {purl}"])
+            return Resolution(
+                purl=purl,
+                warnings=[f"No repository URL found on ecosyste.ms for {purl}"],
+            )
 
         return Resolution(
             purl=purl,

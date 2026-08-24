@@ -93,7 +93,9 @@ def build_report(
 
     return {
         "summary": {
-            "total_purls": found_count + not_found_count + ignored_count + len(skipped) + len(removed),
+            "total_purls": (
+                found_count + not_found_count + ignored_count + len(skipped) + len(removed)
+            ),
             "found": found_count,
             "not_found": not_found_count,
             "skipped": len(skipped),

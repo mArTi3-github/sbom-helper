@@ -95,7 +95,9 @@ class ImagesListConverter:
                 cls._walk_and_collect(item, containers)
 
     @classmethod
-    def _build_image_infos(cls, components: list[dict], dup_counts: dict[str, int] | None = None) -> list[ImageInfo]:
+    def _build_image_infos(
+        cls, components: list[dict], dup_counts: dict[str, int] | None = None
+    ) -> list[ImageInfo]:
         if dup_counts is None:
             dup_counts = {}
         images: list[ImageInfo] = []

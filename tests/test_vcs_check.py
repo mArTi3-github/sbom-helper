@@ -234,28 +234,40 @@ class TestGitProbe:
     @pytest.mark.asyncio
     async def test_not_found_stderr_returns_false(self):
         from purl_resolver.url_validator import _git_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc(128, b"fatal: not found\n")):
+        with patch(
+            "asyncio.create_subprocess_exec",
+            return_value=_make_proc(128, b"fatal: not found\n"),
+        ):
             result = await _git_probe("https://github.com/missing/repo", 5)
             assert result is False
 
     @pytest.mark.asyncio
     async def test_does_not_exist_stderr_returns_false(self):
         from purl_resolver.url_validator import _git_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc(128, b"repository does not exist\n")):
+        with patch(
+            "asyncio.create_subprocess_exec",
+            return_value=_make_proc(128, b"repository does not exist\n"),
+        ):
             result = await _git_probe("https://github.com/missing/repo", 5)
             assert result is False
 
     @pytest.mark.asyncio
     async def test_other_stderr_returns_none(self):
         from purl_resolver.url_validator import _git_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc(128, b"some random error\n")):
+        with patch(
+            "asyncio.create_subprocess_exec",
+            return_value=_make_proc(128, b"some random error\n"),
+        ):
             result = await _git_probe("https://github.com/example/repo", 5)
             assert result is None
 
     @pytest.mark.asyncio
     async def test_timeout_returns_none(self):
         from purl_resolver.url_validator import _git_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
+        with patch(
+            "asyncio.create_subprocess_exec",
+            return_value=_make_proc_timeout(),
+        ) as mock_exec:
             result = await _git_probe("https://github.com/psf/requests", 5)
             assert result is None
             mock_exec.return_value.wait.assert_awaited_once()
@@ -281,7 +293,10 @@ class TestSvnProbe:
     @pytest.mark.asyncio
     async def test_timeout_returns_none(self):
         from purl_resolver.url_validator import _svn_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
+        with patch(
+            "asyncio.create_subprocess_exec",
+            return_value=_make_proc_timeout(),
+        ) as mock_exec:
             result = await _svn_probe("https://example.com/svn-repo", 5)
             assert result is None
             mock_exec.return_value.wait.assert_awaited_once()
@@ -308,7 +323,10 @@ class TestHgProbe:
     @pytest.mark.asyncio
     async def test_timeout_returns_none(self):
         from purl_resolver.url_validator import _hg_probe
-        with patch("asyncio.create_subprocess_exec", return_value=_make_proc_timeout()) as mock_exec:
+        with patch(
+            "asyncio.create_subprocess_exec",
+            return_value=_make_proc_timeout(),
+        ) as mock_exec:
             result = await _hg_probe("https://example.com/hg-repo", 5)
             assert result is None
             mock_exec.return_value.wait.assert_awaited_once()
@@ -379,7 +397,10 @@ class TestFossilProbeXfer:
     async def test_xfer_url_appends_xfer_path(self):
         from purl_resolver.url_validator import _fossil_probe_xfer
         mock_cm = _make_streaming_response(200, "text/html")
-        with _patch_private(), patch("httpx.AsyncClient.stream", return_value=mock_cm) as mock_stream:
+        with (
+            _patch_private(),
+            patch("httpx.AsyncClient.stream", return_value=mock_cm) as mock_stream,
+        ):
             await _fossil_probe_xfer("https://example.com/fossil/repo", 5)
             call_url = mock_stream.call_args[0][1]
             assert call_url.endswith("/xfer")
@@ -397,7 +418,11 @@ class TestFossilProbeFooter:
     @pytest.mark.asyncio
     async def test_200_with_footer_returns_true(self):
         from purl_resolver.url_validator import _fossil_probe_footer
-        body = '<html><body><div id="footer">this page was generated in about 0.05s by fossil</div></body></html>'
+        body = (
+            '<html><body><div id="footer">'
+            "this page was generated in about 0.05s by fossil"
+            "</div></body></html>"
+        )
         with _patch_private(), patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = _make_httpx_response(200, body)
             result = await _fossil_probe_footer("https://example.com/fossil", 5)
@@ -407,7 +432,9 @@ class TestFossilProbeFooter:
     async def test_200_without_footer_returns_false(self):
         from purl_resolver.url_validator import _fossil_probe_footer
         with _patch_private(), patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = _make_httpx_response(200, "<html><body>Hello world</body></html>")
+            mock_get.return_value = _make_httpx_response(
+                200, "<html><body>Hello world</body></html>"
+            )
             result = await _fossil_probe_footer("https://example.com/plain-html", 5)
             assert result is False
 
@@ -508,8 +535,17 @@ class TestValidateUrlUsesCheckVcs:
     @pytest.mark.asyncio
     async def test_check_vcs_true_returns_valid(self):
         from purl_resolver.url_validator import validate_url
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
-             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=True):
+        with (
+            patch(
+                "purl_resolver.url_validator._head_request",
+                new_callable=AsyncMock,
+            ) as mock_head,
+            patch(
+                "purl_resolver.url_validator._check_vcs",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+        ):
             mock_head.return_value = MagicMock(status_code=200, headers={}, url="https://example.com/repo")
             result = await validate_url("https://example.com/repo", timeout=5)
             assert result.result == UrlValidationResult.VALID
@@ -517,8 +553,17 @@ class TestValidateUrlUsesCheckVcs:
     @pytest.mark.asyncio
     async def test_check_vcs_false_returns_invalid(self):
         from purl_resolver.url_validator import validate_url
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
-             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=False):
+        with (
+            patch(
+                "purl_resolver.url_validator._head_request",
+                new_callable=AsyncMock,
+            ) as mock_head,
+            patch(
+                "purl_resolver.url_validator._check_vcs",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
             mock_head.return_value = MagicMock(status_code=200, headers={}, url="https://example.com/repo")
             result = await validate_url("https://example.com/repo", timeout=5)
             assert result.result == UrlValidationResult.INVALID
@@ -526,8 +571,17 @@ class TestValidateUrlUsesCheckVcs:
     @pytest.mark.asyncio
     async def test_check_vcs_none_returns_network_error(self):
         from purl_resolver.url_validator import validate_url
-        with patch("purl_resolver.url_validator._head_request", new_callable=AsyncMock) as mock_head, \
-             patch("purl_resolver.url_validator._check_vcs", new_callable=AsyncMock, return_value=None):
+        with (
+            patch(
+                "purl_resolver.url_validator._head_request",
+                new_callable=AsyncMock,
+            ) as mock_head,
+            patch(
+                "purl_resolver.url_validator._check_vcs",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+        ):
             mock_head.return_value = MagicMock(status_code=200, headers={}, url="https://example.com/repo")
             result = await validate_url("https://example.com/repo", timeout=5)
             assert result.result == UrlValidationResult.NETWORK_ERROR

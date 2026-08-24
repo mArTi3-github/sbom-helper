@@ -7,7 +7,6 @@ import pytest
 
 from purl_resolver.schemas import ResolveResponse
 from purl_resolver.service import PurlResolutionService
-from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.url_validator import UrlValidationOutput, UrlValidationResult
 from purl_resolver.validation_service import UrlValidationService
 
@@ -27,8 +26,15 @@ class TestFoundBy:
             resolved_at=datetime.now().isoformat(),
         )
         mock_storage.lookup = AsyncMock(return_value=cached)
-        with patch.object(PurlResolutionService, "_validate_stored_url", new_callable=AsyncMock, return_value=cached):
-            result = await PurlResolutionService(mock_storage, [resolver], mock_settings_store).resolve_purl(
+        with patch.object(
+            PurlResolutionService,
+            "_validate_stored_url",
+            new_callable=AsyncMock,
+            return_value=cached,
+        ):
+            result = await PurlResolutionService(
+                mock_storage, [resolver], mock_settings_store
+            ).resolve_purl(
                 "pkg:pypi/requests@2.31.0"
             )
         assert result.response is not None
@@ -39,7 +45,9 @@ class TestFoundBy:
     async def test_found_by_resolver_when_fresh(self, mock_storage, resolver):
         mock_storage.lookup = AsyncMock(return_value=None)
         resolver.name = "fake_resolver"
-        result = await PurlResolutionService(mock_storage, [resolver], settings_store=None).resolve_purl(
+        result = await PurlResolutionService(
+            mock_storage, [resolver], settings_store=None
+        ).resolve_purl(
             "pkg:pypi/requests@2.31.0"
         )
         assert result.response is not None
@@ -95,7 +103,9 @@ def resolver():
 
 class TestValidationIntegration:
     @pytest.mark.asyncio
-    async def test_valid_url_updates_resolved_at(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_valid_url_updates_resolved_at(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.VALID)
         result = await PurlResolutionService(
@@ -108,7 +118,9 @@ class TestValidationIntegration:
         mock_storage.delete_purls.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_valid_url_with_redirect_stores(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_valid_url_with_redirect_stores(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.VALID, final_url="https://github.com/psf/requests-v2")
         result = await PurlResolutionService(
@@ -121,7 +133,9 @@ class TestValidationIntegration:
         mock_storage.delete_purls.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_invalid_url_deletes_and_falls_through(self, mock_storage, mock_settings_store, mock_validation_service, resolver):
+    async def test_invalid_url_deletes_and_falls_through(
+        self, mock_storage, mock_settings_store, mock_validation_service, resolver
+    ):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.INVALID)
         await PurlResolutionService(
@@ -133,9 +147,13 @@ class TestValidationIntegration:
         resolver.resolve.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_network_error_returns_cached(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_network_error_returns_cached(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
-        mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.NETWORK_ERROR)
+        mock_validation_service.validate_url.return_value = _url_output(
+            UrlValidationResult.NETWORK_ERROR
+        )
         result = await PurlResolutionService(
             mock_storage, [],
             settings_store=mock_settings_store,
@@ -169,7 +187,9 @@ class TestValidateStoredUrl:
             settings_store=MagicMock(),
             validation_service=AsyncMock(spec=UrlValidationService),
         )
-        service._validation_service.validate_url.return_value = _url_output(UrlValidationResult.VALID)
+        service._validation_service.validate_url.return_value = _url_output(
+            UrlValidationResult.VALID
+        )
         result = await service._validate_stored_url(cached, "pkg:pypi/requests")
         assert result is cached
 
@@ -183,7 +203,9 @@ class TestValidateStoredUrl:
             settings_store=MagicMock(),
             validation_service=AsyncMock(spec=UrlValidationService),
         )
-        service._validation_service.validate_url.return_value = _url_output(UrlValidationResult.INVALID)
+        service._validation_service.validate_url.return_value = _url_output(
+            UrlValidationResult.INVALID
+        )
         result = await service._validate_stored_url(cached, "pkg:pypi/requests")
         assert result is None
         storage.delete_purls.assert_called_once_with(["pkg:pypi/requests"])
@@ -197,7 +219,9 @@ class TestValidateStoredUrl:
             settings_store=MagicMock(),
             validation_service=AsyncMock(spec=UrlValidationService),
         )
-        service._validation_service.validate_url.return_value = _url_output(UrlValidationResult.NETWORK_ERROR)
+        service._validation_service.validate_url.return_value = _url_output(
+            UrlValidationResult.NETWORK_ERROR
+        )
         result = await service._validate_stored_url(cached, "pkg:pypi/requests")
         assert result is cached
         storage.delete_purls.assert_not_called()
@@ -250,7 +274,9 @@ class TestFreshResolverValidation:
     """Validation of freshly resolved URLs (not cached) when validate_db_urls is enabled."""
 
     @pytest.mark.asyncio
-    async def test_skips_invalid_fresh_url_to_next_resolver(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_skips_invalid_fresh_url_to_next_resolver(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         first = AsyncMock()
         first.name = "first_resolver"
         first.resolve = AsyncMock(return_value=AsyncMock(
@@ -281,7 +307,9 @@ class TestFreshResolverValidation:
         assert mock_storage.store.call_args[0][0].repository_url == "https://github.com/valid/repo"
 
     @pytest.mark.asyncio
-    async def test_accepts_valid_fresh_url(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_accepts_valid_fresh_url(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup = AsyncMock(return_value=None)
         resolver = AsyncMock()
         resolver.name = "test_resolver"
@@ -300,7 +328,9 @@ class TestFreshResolverValidation:
         mock_storage.store.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_accepts_fresh_url_on_network_error(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_accepts_fresh_url_on_network_error(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup = AsyncMock(return_value=None)
         resolver = AsyncMock()
         resolver.name = "test_resolver"
@@ -308,7 +338,9 @@ class TestFreshResolverValidation:
             repository_url="https://github.com/some/repo",
         ))
 
-        mock_validation_service.validate_url.return_value = _url_output(UrlValidationResult.NETWORK_ERROR)
+        mock_validation_service.validate_url.return_value = _url_output(
+            UrlValidationResult.NETWORK_ERROR
+        )
         result = await PurlResolutionService(
             mock_storage, [resolver],
             settings_store=mock_settings_store,
@@ -338,7 +370,9 @@ class TestFreshResolverValidation:
         assert result.response is not None
 
     @pytest.mark.asyncio
-    async def test_all_resolvers_return_invalid_returns_unresolved(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_all_resolvers_return_invalid_returns_unresolved(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup = AsyncMock(return_value=None)
         first = AsyncMock()
         first.name = "first"
@@ -364,7 +398,9 @@ class TestFreshResolverValidation:
         mock_storage.store.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_uses_final_url_on_redirect(self, mock_storage, mock_settings_store, mock_validation_service):
+    async def test_uses_final_url_on_redirect(
+        self, mock_storage, mock_settings_store, mock_validation_service
+    ):
         mock_storage.lookup = AsyncMock(return_value=None)
         resolver = AsyncMock()
         resolver.name = "test_resolver"
@@ -391,10 +427,14 @@ class TestValidationServiceDelegation:
     """Verify delegation to UrlValidationService when injected."""
 
     @pytest.mark.asyncio
-    async def test_cached_url_delegates_to_validation_service(self, mock_storage, mock_settings_store):
+    async def test_cached_url_delegates_to_validation_service(
+        self, mock_storage, mock_settings_store
+    ):
         mock_storage.lookup.return_value = _cached_response(days_ago=3)
         mock_validation = AsyncMock(spec=UrlValidationService)
-        mock_validation.validate_url = AsyncMock(return_value=_url_output(UrlValidationResult.VALID))
+        mock_validation.validate_url = AsyncMock(
+            return_value=_url_output(UrlValidationResult.VALID)
+        )
 
         result = await PurlResolutionService(
             mock_storage, [], settings_store=mock_settings_store,
@@ -409,10 +449,14 @@ class TestValidationServiceDelegation:
         )
 
     @pytest.mark.asyncio
-    async def test_fresh_resolve_delegates_to_validation_service(self, mock_storage, mock_settings_store):
+    async def test_fresh_resolve_delegates_to_validation_service(
+        self, mock_storage, mock_settings_store
+    ):
         mock_storage.lookup = AsyncMock(return_value=None)
         mock_validation = AsyncMock(spec=UrlValidationService)
-        mock_validation.validate_url = AsyncMock(return_value=_url_output(UrlValidationResult.VALID))
+        mock_validation.validate_url = AsyncMock(
+            return_value=_url_output(UrlValidationResult.VALID)
+        )
         resolver = AsyncMock()
         resolver.name = "test_resolver"
         resolver.resolve = AsyncMock(return_value=AsyncMock(

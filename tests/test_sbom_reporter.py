@@ -8,8 +8,20 @@ from purl_resolver.schemas import ResolveResponse
 class TestBuildReport:
     def test_all_found(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
-            SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
+            SbomComponent(
+                name="b",
+                version="2",
+                purl="pkg:pypi/b@2",
+                path=("components", 1),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {
             "pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a"),
@@ -23,8 +35,20 @@ class TestBuildReport:
 
     def test_partial_results(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
-            SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
+            SbomComponent(
+                name="b",
+                version="2",
+                purl="pkg:pypi/b@2",
+                path=("components", 1),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         skipped = [{"purl": "pkg:pypi/c@1", "name": "c", "version": "1"}]
@@ -36,7 +60,13 @@ class TestBuildReport:
 
     def test_result_items_have_correct_structure(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved)
@@ -47,7 +77,13 @@ class TestBuildReport:
 
     def test_not_found_status(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved: dict[str, ResolveResponse] = {}
         report = build_report(components, resolved)
@@ -57,8 +93,20 @@ class TestBuildReport:
 
     def test_deduplicates_by_normalized_purl_in_report(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
-            SbomComponent(name="a", version="2", purl="pkg:pypi/a@2", path=("components", 1), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
+            SbomComponent(
+                name="a",
+                version="2",
+                purl="pkg:pypi/a@2",
+                path=("components", 1),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved)
@@ -66,8 +114,20 @@ class TestBuildReport:
 
     def test_skips_components_without_enrichment_needed(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=False),
-            SbomComponent(name="b", version="2", purl="pkg:pypi/b@2", path=("components", 1), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=False,
+            ),
+            SbomComponent(
+                name="b",
+                version="2",
+                purl="pkg:pypi/b@2",
+                path=("components", 1),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/b": ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b")}
         report = build_report(components, resolved)
@@ -78,7 +138,13 @@ class TestBuildReport:
 
     def test_removed_count_in_summary(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
@@ -88,7 +154,13 @@ class TestBuildReport:
 
     def test_removed_entries_in_results(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         removed = [{"purl": "pkg:pypi/b@2", "name": "b", "version": "2"}]
@@ -101,7 +173,13 @@ class TestBuildReport:
 
     def test_no_removed_when_empty_list(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved, removed=[])
@@ -111,7 +189,13 @@ class TestBuildReport:
     def test_found_result_includes_found_by_and_resolver(self) -> None:
         from purl_resolver.schemas import ResolveResponse
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {
             "pkg:pypi/a": ResolveResponse(
@@ -128,7 +212,13 @@ class TestBuildReport:
 
     def test_not_found_result_has_empty_found_by(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved: dict[str, ResolveResponse] = {}
         report = build_report(components, resolved)
@@ -138,7 +228,13 @@ class TestBuildReport:
 
     def test_no_removed_when_parameter_omitted(self) -> None:
         components = [
-            SbomComponent(name="a", version="1", purl="pkg:pypi/a@1", path=("components", 0), needs_enrichment=True),
+            SbomComponent(
+                name="a",
+                version="1",
+                purl="pkg:pypi/a@1",
+                path=("components", 0),
+                needs_enrichment=True,
+            ),
         ]
         resolved = {"pkg:pypi/a": ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a")}
         report = build_report(components, resolved)

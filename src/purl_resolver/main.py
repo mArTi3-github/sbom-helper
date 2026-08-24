@@ -2,16 +2,27 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import pathlib
 from contextlib import asynccontextmanager
 
 import asyncpg
-import pathlib
 import uvicorn
-
 from fastapi import FastAPI
 from starlette.exceptions import HTTPException
-from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
+
+from .config import settings, storage_settings
+from .db_admin_service import DbAdminService
+from .ignore_patterns_store import IgnorePatternsStore
+from .job_manager import JobManager
+from .resolver.factory import build_resolvers
+from .router import router
+from .service import PurlResolutionService
+from .settings_store import SettingsStore
+from .storage.inmemory import InMemoryCache
+from .storage.postgres import PostgresCache, create_pool
+from .url_validation_cache import UrlValidationCache
+from .validation_service import UrlValidationService
 
 
 class SPAStaticFiles(StaticFiles):
@@ -22,19 +33,6 @@ class SPAStaticFiles(StaticFiles):
             if self.html:
                 return await super().get_response("index.html", scope)
             raise
-
-from .config import settings, storage_settings
-from .db_admin_service import DbAdminService
-from .job_manager import JobManager
-from .ignore_patterns_store import IgnorePatternsStore
-from .resolver.factory import build_resolvers
-from .router import router
-from .service import PurlResolutionService
-from .settings_store import SettingsStore
-from .storage.inmemory import InMemoryCache
-from .storage.postgres import PostgresCache, create_pool
-from .validation_service import UrlValidationService
-from .url_validation_cache import UrlValidationCache
 
 logger = logging.getLogger(__name__)
 

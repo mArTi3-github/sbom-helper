@@ -428,8 +428,12 @@ class TestAdminListResolvers:
     def test_list_with_data(self, storage, admin_client):
         from purl_resolver.schemas import ResolveResponse
         entries = [
-            ResolveResponse(purl="pkg:pypi/a", repository_url="https://a.com", resolver="purl2repo"),
-            ResolveResponse(purl="pkg:pypi/b", repository_url="https://b.com", resolver="import-csv"),
+            ResolveResponse(
+                purl="pkg:pypi/a", repository_url="https://a.com", resolver="purl2repo"
+            ),
+            ResolveResponse(
+                purl="pkg:pypi/b", repository_url="https://b.com", resolver="import-csv"
+            ),
         ]
         for e in entries:
             storage._store[e.purl] = e

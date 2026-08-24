@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
-from ..settings_store import SettingsStore
-from ..validation_service import UrlValidationService
 from ..config import settings
 from ..resolver.factory import build_resolvers
+from ..settings_store import SettingsStore
+from ..validation_service import UrlValidationService
 
 router = APIRouter()
 

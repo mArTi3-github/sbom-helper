@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import pathlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from purl_resolver.resolver.librariesio import LibrariesIoResolver
 from purl_resolver.resolver.purl2repo import Purl2RepoResolver

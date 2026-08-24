@@ -28,7 +28,7 @@ async def convert_images_list(
 
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         return JSONResponse(
             status_code=400,
             content={"error": "invalid_json"},

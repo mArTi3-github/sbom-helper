@@ -12,7 +12,7 @@ from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import PurlResolutionService
 from .settings_store import AppSettings
-from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url
+from .url_validator import UrlValidationResult, validate_url
 
 
 class ProgressReporter(Protocol):
@@ -89,8 +89,16 @@ class SbomEnrichmentPipeline:
                     voutput = await validate_url(
                         ref["url"], timeout=val_timeout,
                     )
-                if voutput.result in (UrlValidationResult.INVALID, UrlValidationResult.NETWORK_ERROR):
-                    logger.info("Removed VCS ref %s for %s (reason=%s)", ref["url"], comp.purl, voutput.result.value)
+                if voutput.result in (
+                    UrlValidationResult.INVALID,
+                    UrlValidationResult.NETWORK_ERROR,
+                ):
+                    logger.info(
+                        "Removed VCS ref %s for %s (reason=%s)",
+                        ref["url"],
+                        comp.purl,
+                        voutput.result.value,
+                    )
                     continue
                 if voutput.final_url and voutput.final_url != ref["url"]:
                     ref["url"] = voutput.final_url
@@ -98,7 +106,11 @@ class SbomEnrichmentPipeline:
 
             if len(valid_vcs) >= 2 and behavior == "keep-first":
                 for extra in valid_vcs[1:]:
-                    logger.info("Removed extra valid VCS ref %s for %s (keep-first)", extra["url"], comp.purl)
+                    logger.info(
+                        "Removed extra valid VCS ref %s for %s (keep-first)",
+                        extra["url"],
+                        comp.purl,
+                    )
                 valid_vcs = valid_vcs[:1]
 
             comp.existing_references = other_refs + valid_vcs
@@ -160,7 +172,9 @@ class SbomEnrichmentPipeline:
             try:
                 n = normalize(validate(comp.purl))
             except Exception:
-                skipped_comps.append({"purl": comp.purl, "name": comp.name, "version": comp.version})
+                skipped_comps.append(
+                    {"purl": comp.purl, "name": comp.name, "version": comp.version}
+                )
                 continue
             if n not in seen:
                 seen.add(n)

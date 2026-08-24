@@ -37,7 +37,9 @@ class LibrariesIoResolver(Resolver):
         "swift": "SwiftPM",
     }
 
-    def __init__(self, api_key: str, timeout: float = 15.0, retry_config: RetryConfig | None = None) -> None:
+    def __init__(
+        self, api_key: str, timeout: float = 15.0, retry_config: RetryConfig | None = None
+    ) -> None:
         self._api_key = api_key
         self._timeout = timeout
         self._min_interval = 1.0
@@ -68,7 +70,9 @@ class LibrariesIoResolver(Resolver):
         encoded_name = quote(name, safe="")
         url = f"{_API_BASE}/{platform}/{encoded_name}"
         try:
-            response = await self._retry.execute(lambda: self._client.get(url, params={"api_key": self._api_key}))
+            response = await self._retry.execute(
+                lambda: self._client.get(url, params={"api_key": self._api_key})
+            )
             response.raise_for_status()
             logger.info("libraries.io resolved %s/%s successfully", platform, name)
         except httpx.TimeoutException:
@@ -77,15 +81,24 @@ class LibrariesIoResolver(Resolver):
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
             logger.warning("libraries.io returned %d for %s/%s", status, platform, name)
-            return Resolution(purl=purl, warnings=[f"libraries.io error {status} for {platform}/{name}"])
+            return Resolution(
+                purl=purl,
+                warnings=[f"libraries.io error {status} for {platform}/{name}"],
+            )
         except httpx.HTTPError as exc:
             logger.warning("libraries.io request failed for %s/%s: %s", platform, name, exc)
-            return Resolution(purl=purl, warnings=[f"libraries.io network error for {platform}/{name}: {exc}"])
+            return Resolution(
+                purl=purl,
+                warnings=[f"libraries.io network error for {platform}/{name}: {exc}"],
+            )
 
         data = response.json()
         repo_url = data.get("repository_url", "")
         if not repo_url:
-            return Resolution(purl=purl, warnings=[f"No repository found on libraries.io for {platform}/{name}"])
+            return Resolution(
+                purl=purl,
+                warnings=[f"No repository found on libraries.io for {platform}/{name}"],
+            )
 
         return Resolution(
             purl=purl,

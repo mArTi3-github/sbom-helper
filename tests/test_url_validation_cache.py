@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import time
 import tempfile
+import time
+
 import pytest
+
 from purl_resolver.url_validation_cache import UrlValidationCache
 
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -182,7 +181,9 @@ class TestValidateExistingRefs:
                 settings_store=settings_store_no_validation,
             ),
         )
-        with patch("purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock) as mock_validate:
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url", new_callable=AsyncMock
+        ) as mock_validate:
             await pipeline.process(sbom)
         mock_validate.assert_not_called()
 
@@ -567,7 +568,9 @@ class TestFileUrlInvalidation:
         result = await pipeline.process(sbom)
         # DB entry should be deleted after processing
         remaining = await storage_with_file_url.lookup("pkg:pypi/ptaf-task-manager")
-        assert remaining is None, "file:// entry should have been deleted from storage after pipeline run"
+        assert remaining is None, (
+            "file:// entry should have been deleted from storage after pipeline run"
+        )
         # Report should show not_found (resolvers can't find this package)
         summary = result.report["summary"]
         assert summary["not_found"] >= 1, "Component with file:// URL should show as not_found"

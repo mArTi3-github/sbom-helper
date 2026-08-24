@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from purl_resolver.resolver.interface import Resolution
 from purl_resolver.router import router
 from purl_resolver.service import PurlResolutionService
-from purl_resolver.settings_store import AppSettings, SettingsStore
+from purl_resolver.settings_store import SettingsStore
 from purl_resolver.storage.inmemory import InMemoryCache
 from tests.helpers import FakeResolver
 
@@ -260,7 +260,9 @@ class TestLibrariesIoSettings:
         data = response.json()
         assert data["librariesio_enabled"] is True
 
-    def test_patch_settings_with_valid_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
+    def test_patch_settings_with_valid_librariesio_key(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
         with patch("purl_resolver.routes.settings.validate_librariesio_key", return_value=True):
             response = client.patch("/api/v1/settings", json={
@@ -270,7 +272,9 @@ class TestLibrariesIoSettings:
         data = response.json()
         assert data["token_set"]["librariesio_api_key"] is True
 
-    def test_patch_settings_with_invalid_librariesio_key(self, client: TestClient, tmp_path: Path) -> None:
+    def test_patch_settings_with_invalid_librariesio_key(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
         client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
         with patch("purl_resolver.routes.settings.validate_librariesio_key", return_value=False):
             response = client.patch("/api/v1/settings", json={

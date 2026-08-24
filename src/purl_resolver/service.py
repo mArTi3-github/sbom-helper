@@ -4,7 +4,6 @@ import asyncio
 import itertools
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import datetime
 
 from .purl_utils import normalize, safe_normalize, validate
 from .resolver.interface import InvalidPurlError, Resolver, UpstreamError
@@ -12,7 +11,7 @@ from .sbom.collector import SbomComponent
 from .schemas import ResolveResponse, ResolveResult
 from .settings_store import SettingsStore
 from .storage.interface import Storage
-from .url_validator import UrlValidationOutput, UrlValidationResult
+from .url_validator import UrlValidationResult
 from .validation_service import UrlValidationService
 
 logger = logging.getLogger(__name__)
@@ -63,7 +62,12 @@ class PurlResolutionService:
         if voutput.result == UrlValidationResult.VALID:
             new_url = voutput.final_url or cached.repository_url
             if new_url != cached.repository_url:
-                logger.info("Updated repository URL for %s: %s -> %s", purl_key, cached.repository_url, new_url)
+                logger.info(
+                    "Updated repository URL for %s: %s -> %s",
+                    purl_key,
+                    cached.repository_url,
+                    new_url,
+                )
                 cached.repository_url = new_url
                 try:
                     await self._storage.store(cached)
@@ -72,11 +76,19 @@ class PurlResolutionService:
             return cached
 
         if voutput.result == UrlValidationResult.INVALID:
-            logger.warning("Cached URL %s is invalid for %s, deleting", cached.repository_url, purl_key)
+            logger.warning(
+                "Cached URL %s is invalid for %s, deleting",
+                cached.repository_url,
+                purl_key,
+            )
             try:
                 await self._storage.delete_purls([purl_key])
             except Exception:
-                logger.warning("Failed to delete invalid cached URL for %s", purl_key, exc_info=True)
+                logger.warning(
+                    "Failed to delete invalid cached URL for %s",
+                    purl_key,
+                    exc_info=True,
+                )
             return None
 
         return cached  # NETWORK_ERROR / RATE_LIMITED — keep
@@ -136,7 +148,8 @@ class PurlResolutionService:
                         continue
                     if voutput.result == UrlValidationResult.NETWORK_ERROR:
                         logger.warning(
-                            "URL validation inconclusive for %s (resolver=%s, result=%s), accepting anyway",
+                            "URL validation inconclusive for %s "
+                            "(resolver=%s, result=%s), accepting anyway",
                             repo_url, r.name, voutput.result.value,
                         )
                     repo_url = voutput.final_url or repo_url
@@ -232,7 +245,11 @@ class PurlResolutionService:
         for comp in components:
             if comp.needs_enrichment:
                 continue
-            vcs_refs = [ref for ref in comp.existing_references if ref.get("type") == "vcs" and ref.get("url")]
+            vcs_refs = [
+                ref
+                for ref in comp.existing_references
+                if ref.get("type") == "vcs" and ref.get("url")
+            ]
             if not vcs_refs:
                 continue
             purl_key = safe_normalize(comp.purl)

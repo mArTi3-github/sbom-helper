@@ -9,7 +9,10 @@ from purl_resolver.sbom.collector import collect_components
 from purl_resolver.sbom.reporter import build_report
 from purl_resolver.sbom_enrichment import _component_matches_any_pattern
 
-TEST_SBOM = Path(__file__).parent.parent / ".misc/addictional_materials/sbom_example_missed_references.json"
+TEST_SBOM = (
+    Path(__file__).parent.parent
+    / ".misc/addictional_materials/sbom_example_missed_references.json"
+)
 
 
 @pytest.fixture

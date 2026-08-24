@@ -50,7 +50,12 @@ class TestRemoveUnresolvedComponents:
                     "version": "1.0",
                     "purl": "pkg:generic/parent@1.0",
                     "components": [
-                        {"type": "library", "name": "child", "version": "1.0", "purl": "pkg:pypi/child@1.0"},
+                        {
+                            "type": "library",
+                            "name": "child",
+                            "version": "1.0",
+                            "purl": "pkg:pypi/child@1.0",
+                        },
                     ],
                 }
             ]
@@ -75,8 +80,18 @@ class TestRemoveUnresolvedComponents:
                     "version": "1.0",
                     "purl": "pkg:generic/parent@1.0",
                     "components": [
-                        {"type": "library", "name": "resolved-child", "version": "1.0", "purl": "pkg:pypi/rc@1.0"},
-                        {"type": "library", "name": "unresolved-child", "version": "1.0", "purl": "pkg:pypi/uc@1.0"},
+                        {
+                            "type": "library",
+                            "name": "resolved-child",
+                            "version": "1.0",
+                            "purl": "pkg:pypi/rc@1.0",
+                        },
+                        {
+                            "type": "library",
+                            "name": "unresolved-child",
+                            "version": "1.0",
+                            "purl": "pkg:pypi/uc@1.0",
+                        },
                     ],
                 }
             ]
@@ -127,7 +142,12 @@ class TestRemoveUnresolvedComponents:
     def test_removed_list_contains_name_and_version(self) -> None:
         sbom = {
             "components": [
-                {"type": "library", "name": "special", "version": "3.2.1", "purl": "pkg:pypi/special@3.2.1"},
+                {
+                    "type": "library",
+                    "name": "special",
+                    "version": "3.2.1",
+                    "purl": "pkg:pypi/special@3.2.1",
+                },
             ]
         }
         components = [
@@ -135,7 +155,11 @@ class TestRemoveUnresolvedComponents:
         ]
         resolved: dict[str, str] = {}
         removed = remove_unresolved_components(sbom, components, resolved)
-        assert removed[0] == {"purl": "pkg:pypi/special@3.2.1", "name": "special", "version": "3.2.1"}
+        assert removed[0] == {
+            "purl": "pkg:pypi/special@3.2.1",
+            "name": "special",
+            "version": "3.2.1",
+        }
 
     def test_empty_components_list(self) -> None:
         sbom = {"components": []}

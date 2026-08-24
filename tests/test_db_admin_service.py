@@ -142,8 +142,12 @@ class TestDbAdminServiceListResolvers:
     @pytest.mark.asyncio
     async def test_list_resolvers_with_data(self, storage, service):
         entries = [
-            ResolveResponse(purl="pkg:pypi/a", repository_url="https://a.com", resolver="purl2repo"),
-            ResolveResponse(purl="pkg:pypi/b", repository_url="https://b.com", resolver="import-csv"),
+            ResolveResponse(
+                purl="pkg:pypi/a", repository_url="https://a.com", resolver="purl2repo"
+            ),
+            ResolveResponse(
+                purl="pkg:pypi/b", repository_url="https://b.com", resolver="import-csv"
+            ),
         ]
         for e in entries:
             storage._store[e.purl] = e

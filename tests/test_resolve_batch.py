@@ -94,7 +94,9 @@ class TestResolveBatch:
         assert cached.repository_url == "https://github.com/psf/requests"
 
     @pytest.mark.asyncio
-    async def test_resolved_entries_have_found_by_and_resolver(self, storage: InMemoryCache) -> None:
+    async def test_resolved_entries_have_found_by_and_resolver(
+        self, storage: InMemoryCache
+    ) -> None:
         resolver = FakeResolver(
             resolution=Resolution(
                 purl="pkg:pypi/requests@2.31.0",

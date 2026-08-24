@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import time
 import logging
+import time
+
 from diskcache import Cache
 
 logger = logging.getLogger(__name__)

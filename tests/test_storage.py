@@ -50,9 +50,15 @@ class TestInMemoryCache:
 
     @pytest.mark.asyncio
     async def test_list_resolvers(self, storage: InMemoryCache) -> None:
-        r1 = ResolveResponse(purl="pkg:pypi/a", repository_url="https://example.com/a", resolver="purl2repo")
-        r2 = ResolveResponse(purl="pkg:pypi/b", repository_url="https://example.com/b", resolver="import-csv")
-        r3 = ResolveResponse(purl="pkg:pypi/c", repository_url="https://example.com/c", resolver="purl2repo")
+        r1 = ResolveResponse(
+            purl="pkg:pypi/a", repository_url="https://example.com/a", resolver="purl2repo"
+        )
+        r2 = ResolveResponse(
+            purl="pkg:pypi/b", repository_url="https://example.com/b", resolver="import-csv"
+        )
+        r3 = ResolveResponse(
+            purl="pkg:pypi/c", repository_url="https://example.com/c", resolver="purl2repo"
+        )
         await storage.store(r1)
         await storage.store(r2)
         await storage.store(r3)

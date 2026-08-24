@@ -38,7 +38,9 @@ class TestAppSettingsDefaults:
 
 
 class TestSettingsStoreLoad:
-    def test_file_missing_creates_with_defaults(self, store: SettingsStore, tmp_settings_file: Path):
+    def test_file_missing_creates_with_defaults(
+        self, store: SettingsStore, tmp_settings_file: Path
+    ):
         result = store.load()
         assert result.validate_db_urls is False
         assert result.url_validation_timeout == 5
@@ -198,7 +200,9 @@ class TestLlmResolverSettings:
 
 class TestSettingsStoreCache:
 
-    def test_load_returns_cached_value_after_first_read(self, store: SettingsStore, tmp_settings_file: Path):
+    def test_load_returns_cached_value_after_first_read(
+        self, store: SettingsStore, tmp_settings_file: Path
+    ):
         import json
         tmp_settings_file.write_text(json.dumps({"validate_db_urls": True}))
         first = store.load()

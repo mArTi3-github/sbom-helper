@@ -163,8 +163,14 @@ class TestEnrichSbom:
         resolved = {"pkg:pypi/lib-a": ResolveResponse(purl="pkg:pypi/lib-a", repository_url="https://github.com/example/lib-a")}
         components = collect_components(sbom)
         enrich_sbom(sbom, components, resolved)
-        assert sbom["components"][0]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"].repository_url
-        assert sbom["components"][1]["externalReferences"][0]["url"] == resolved["pkg:pypi/lib-a"].repository_url
+        assert (
+            sbom["components"][0]["externalReferences"][0]["url"]
+            == resolved["pkg:pypi/lib-a"].repository_url
+        )
+        assert (
+            sbom["components"][1]["externalReferences"][0]["url"]
+            == resolved["pkg:pypi/lib-a"].repository_url
+        )
 
     def test_build_report_includes_removed(self) -> None:
         from purl_resolver.sbom.reporter import build_report

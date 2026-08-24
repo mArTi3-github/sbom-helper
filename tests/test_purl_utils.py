@@ -91,7 +91,9 @@ class TestNormalize:
 class TestValidateAndNormalizeRoundtrip:
 
     def test_full_purl_normalizes_correctly(self) -> None:
-        components = validate("pkg:maven/org.apache.commons/io@1.3.4?repository_url=repo.spring.io#sub")
+        components = validate(
+            "pkg:maven/org.apache.commons/io@1.3.4?repository_url=repo.spring.io#sub"
+        )
         assert normalize(components) == "pkg:maven/org.apache.commons/io"
 
     def test_purl_without_namespace_normalizes(self) -> None:
