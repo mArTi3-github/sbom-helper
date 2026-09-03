@@ -480,6 +480,188 @@ class TestValidateExistingRefs:
             timeout=5,
         )
 
+    @pytest.mark.asyncio
+    async def test_duplicate_invalid_url_validated_once_and_removed_everywhere(
+        self,
+        fake_resolvers,
+        settings_store_with_validation,
+    ):
+        shared_url = "https://github.com/psf/requests-invalid"
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": shared_url},
+                    ],
+                },
+                {
+                    "type": "library",
+                    "name": "requests-cli",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests-cli@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": shared_url},
+                    ],
+                },
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation,
+            ),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url",
+            new_callable=AsyncMock,
+            return_value=_url_output(UrlValidationResult.INVALID),
+        ) as mock_validate:
+            await pipeline.process(sbom)
+        mock_validate.assert_called_once_with(shared_url, timeout=5)
+        for comp in sbom["components"]:
+            refs = comp.get("externalReferences", [])
+            assert not any(
+                r.get("type") == "vcs" and r.get("url") == shared_url
+                for r in refs
+            ), (
+                "Duplicate invalid ref should be removed from %s, got: %s"
+                % (comp["name"], refs)
+            )
+
+    @pytest.mark.asyncio
+    async def test_duplicate_valid_url_validated_once_and_redirect_applied_everywhere(
+        self,
+        fake_resolvers,
+        settings_store_with_validation,
+    ):
+        shared_url = "https://old-url.com/psf/requests"
+        final_url = "https://github.com/psf/requests"
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": shared_url},
+                    ],
+                },
+                {
+                    "type": "library",
+                    "name": "requests-cli",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests-cli@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": shared_url},
+                    ],
+                },
+            ],
+        }
+        storage = InMemoryCache()
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation,
+            ),
+        )
+        with patch(
+            "purl_resolver.sbom_enrichment.validate_url",
+            new_callable=AsyncMock,
+            return_value=_url_output(
+                UrlValidationResult.VALID, final_url=final_url
+            ),
+        ) as mock_validate:
+            await pipeline.process(sbom)
+        mock_validate.assert_called_once_with(shared_url, timeout=5)
+        for comp in sbom["components"]:
+            vcs_refs = [
+                r
+                for r in comp.get("externalReferences", [])
+                if r.get("type") == "vcs"
+            ]
+            assert len(vcs_refs) == 1, (
+                "Redirected ref should remain once in %s, got: %s"
+                % (comp["name"], vcs_refs)
+            )
+            assert vcs_refs[0]["url"] == final_url
+
+    @pytest.mark.asyncio
+    async def test_duplicate_url_validated_once_via_validation_service(
+        self,
+        fake_resolvers,
+        settings_store_with_validation,
+    ):
+        shared_url = "https://github.com/psf/requests-invalid"
+        sbom = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "components": [
+                {
+                    "type": "library",
+                    "name": "requests",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": shared_url},
+                    ],
+                },
+                {
+                    "type": "library",
+                    "name": "requests-cli",
+                    "version": "2.31.0",
+                    "purl": "pkg:pypi/requests-cli@2.31.0",
+                    "externalReferences": [
+                        {"type": "vcs", "url": shared_url},
+                    ],
+                },
+            ],
+        }
+        storage = InMemoryCache()
+        mock_validation = AsyncMock(spec=UrlValidationService)
+        mock_validation.validate_url = AsyncMock(
+            return_value=_url_output(UrlValidationResult.INVALID),
+        )
+        pipeline = SbomEnrichmentPipeline(
+            resolution_service=PurlResolutionService(
+                storage, fake_resolvers,
+                settings_store=settings_store_with_validation,
+                validation_service=mock_validation,
+            ),
+        )
+        await pipeline.process(sbom)
+        shared_calls = [
+            c
+            for c in mock_validation.validate_url.call_args_list
+            if c.args and c.args[0] == shared_url
+        ]
+        assert len(shared_calls) == 1, (
+            "Shared URL should be validated once, got: %s"
+            % mock_validation.validate_url.call_args_list
+        )
+        mock_validation.validate_url.assert_any_call(shared_url, timeout=5)
+        for comp in sbom["components"]:
+            refs = comp.get("externalReferences", [])
+            assert not any(
+                r.get("type") == "vcs" and r.get("url") == shared_url
+                for r in refs
+            ), (
+                "Duplicate invalid ref should be removed from %s, got: %s"
+                % (comp["name"], refs)
+            )
+
 
 class TestFileUrlInvalidation:
     """Verify that file:// URLs in cache are invalidated and deleted during SBOM pipeline."""

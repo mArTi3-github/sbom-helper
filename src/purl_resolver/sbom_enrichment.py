@@ -12,7 +12,7 @@ from .sbom.remover import remove_unresolved_components
 from .sbom.reporter import build_report
 from .service import PurlResolutionService
 from .settings_store import AppSettings
-from .url_validator import UrlValidationResult, validate_url
+from .url_validator import UrlValidationOutput, UrlValidationResult, validate_url
 
 
 class ProgressReporter(Protocol):
@@ -67,28 +67,39 @@ class SbomEnrichmentPipeline:
     ) -> None:
         val_timeout = app_settings.url_validation_timeout
         behavior = app_settings.sbom_multiple_vcs_behavior
+        vs = self._resolution_service.validation_service
 
+        pending: list[tuple[SbomComponent, list[dict], list[dict]]] = []
+        unique_urls: dict[str, None] = {}
         for comp in components:
             if comp.ignored:
                 continue
 
-            vcs_refs: list[dict] = []
             other_refs: list[dict] = []
+            vcs_refs: list[dict] = []
             for ref in comp.existing_references:
                 if ref.get("type") == "vcs" and ref.get("url"):
                     vcs_refs.append(ref)
                 else:
                     other_refs.append(ref)
 
+            if not vcs_refs:
+                continue
+            pending.append((comp, other_refs, vcs_refs))
+            for ref in vcs_refs:
+                unique_urls[ref["url"]] = None
+
+        results: dict[str, UrlValidationOutput] = {}
+        for url in unique_urls:
+            if vs is not None:
+                results[url] = await vs.validate_url(url, timeout=val_timeout)
+            else:
+                results[url] = await validate_url(url, timeout=val_timeout)
+
+        for comp, other_refs, vcs_refs in pending:
             valid_vcs: list[dict] = []
             for ref in vcs_refs:
-                vs = self._resolution_service.validation_service
-                if vs is not None:
-                    voutput = await vs.validate_url(ref["url"], timeout=val_timeout)
-                else:
-                    voutput = await validate_url(
-                        ref["url"], timeout=val_timeout,
-                    )
+                voutput = results[ref["url"]]
                 if voutput.result in (
                     UrlValidationResult.INVALID,
                     UrlValidationResult.NETWORK_ERROR,
