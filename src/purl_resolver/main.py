@@ -22,6 +22,7 @@ from .settings_store import SettingsStore
 from .storage.inmemory import InMemoryCache
 from .storage.postgres import PostgresCache, create_pool
 from .url_validation_cache import UrlValidationCache
+from .url_validator import enable_child_subreaper, reap_orphaned_processes
 from .validation_service import UrlValidationService
 
 
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    enable_child_subreaper()
     pool = None
     try:
         pool = await create_pool()
@@ -98,11 +100,21 @@ async def lifespan(app: FastAPI):
             max_age = current_settings.revalidation_cooldown_hours * 3600
             app.state.validation_cache.expire(max_age)
 
+    async def _reap_orphaned_zombies():
+        while True:
+            await asyncio.sleep(1.0)
+            try:
+                reap_orphaned_processes()
+            except Exception:
+                logger.warning("Failed to reap orphaned processes", exc_info=True)
+
     expire_task = asyncio.create_task(_expire_url_cache())
+    reap_task = asyncio.create_task(_reap_orphaned_zombies())
 
     try:
         yield
     finally:
+        reap_task.cancel()
         expire_task.cancel()
         if app.state.job_manager is not None:
             await app.state.job_manager.stop()
