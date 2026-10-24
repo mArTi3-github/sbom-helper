@@ -212,6 +212,7 @@ Client                    API Layer (router)         Service Layer             p
 - **Validation cooldown applies uniformly**: the `revalidation_cooldown_hours` window is enforced per URL via the URL validation cache (diskcache) for all cached entries, regardless of the resolver that produced them
 - **Cooldown disabled at zero**: Setting `revalidation_cooldown_hours=0` disables cooldown entirely — every cached entry triggers validation when `validate_db_urls=true`
 - **SBOM existing-ref validation**: Optional checkbox `validate_existing_refs` in SBOM Updater validates existing VCS references via HEAD + multi-VCS probe (`_check_vcs`); `INVALID` results mark the component for re-resolution (`needs_enrichment=True`)
+- **SBOM validation progress**: during the `validating_refs` phase the pipeline reports progress over unique VCS URLs (`(0, total)` followed by one update per validated URL), so the job progress bar reflects the validation stage the same way it does for PURL resolution
 - **Connection errors preserve cache**: network errors during validation return `NETWORK_ERROR`, preserving the cached URL
 - **Validation never crashes**: `validate_url()` always returns a `UrlValidationOutput`, never raises exceptions
 - **Non-HTTP/HTTPS URLs skip redirect resolution**: URLs are validated by syntax (non-empty hostname) and SSRF guard (non-private IP) before VCS probes. HTTP/HTTPS URLs additionally undergo HEAD redirect resolution. Non-HTTP/HTTPS URLs skip redirect resolution and go directly to VCS probes.

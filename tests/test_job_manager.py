@@ -252,11 +252,11 @@ class TestJobProgressReporter:
         clock = FakeClock([0.0, 0.0, 0.1, 3.0, 9.0, 9.0])
         reporter = _JobProgressReporter(mock_repo, "j1", monotonic=clock)
 
-        await reporter.on_resolved(0, 10)    # initial -> write (0, 10)
-        await reporter.on_resolved(1, 10)    # 0.0 - 0.0 < 2 -> skip
-        await reporter.on_resolved(2, 10)    # 0.1 - 0.0 < 2 -> skip
-        await reporter.on_resolved(5, 10)    # 3.0 - 0.1 >= 2 -> write (5, 10)
-        await reporter.on_resolved(10, 10)   # current == total -> forced write
+        await reporter.on_progress(0, 10)    # initial -> write (0, 10)
+        await reporter.on_progress(1, 10)    # 0.0 - 0.0 < 2 -> skip
+        await reporter.on_progress(2, 10)    # 0.1 - 0.0 < 2 -> skip
+        await reporter.on_progress(5, 10)    # 3.0 - 0.1 >= 2 -> write (5, 10)
+        await reporter.on_progress(10, 10)   # current == total -> forced write
 
         writes = [
             c.kwargs for c in mock_repo.update_progress.call_args_list
@@ -285,7 +285,7 @@ class TestJobProgressReporter:
         reporter = _JobProgressReporter(mock_repo, "j1")
 
         await reporter.on_phase("resolving")
-        await reporter.on_resolved(0, 10)
+        await reporter.on_progress(0, 10)
 
 
 class TestProcessJobProgress:

@@ -49,7 +49,7 @@ class _JobProgressReporter:
     async def on_phase(self, phase: str) -> None:
         await self._write(progress_phase=phase)
 
-    async def on_resolved(self, current: int, total: int) -> None:
+    async def on_progress(self, current: int, total: int) -> None:
         if current == 0 or current == total:
             await self._write(progress_current=current, progress_total=total)
             return

@@ -18,7 +18,7 @@ from .url_validator import UrlValidationOutput, UrlValidationResult, validate_ur
 class ProgressReporter(Protocol):
     async def on_phase(self, phase: str) -> None: ...
 
-    async def on_resolved(self, current: int, total: int) -> None: ...
+    async def on_progress(self, current: int, total: int) -> None: ...
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,7 @@ class SbomEnrichmentPipeline:
         self,
         components: list[SbomComponent],
         app_settings: AppSettings,
+        progress_reporter: ProgressReporter | None = None,
     ) -> None:
         val_timeout = app_settings.url_validation_timeout
         behavior = app_settings.sbom_multiple_vcs_behavior
@@ -90,11 +91,17 @@ class SbomEnrichmentPipeline:
                 unique_urls[ref["url"]] = None
 
         results: dict[str, UrlValidationOutput] = {}
-        for url in unique_urls:
+        urls = list(unique_urls)
+        total = len(urls)
+        if progress_reporter is not None:
+            await progress_reporter.on_progress(0, total)
+        for current, url in enumerate(urls, start=1):
             if vs is not None:
                 results[url] = await vs.validate_url(url, timeout=val_timeout)
             else:
                 results[url] = await validate_url(url, timeout=val_timeout)
+            if progress_reporter is not None:
+                await progress_reporter.on_progress(current, total)
 
         for comp, other_refs, vcs_refs in pending:
             valid_vcs: list[dict] = []
@@ -156,7 +163,9 @@ class SbomEnrichmentPipeline:
             if app_settings.validate_sbom_refs:
                 if progress_reporter is not None:
                     await progress_reporter.on_phase("validating_refs")
-                await self._validate_external_references(components, app_settings)
+                await self._validate_external_references(
+                    components, app_settings, progress_reporter
+                )
                 # Sync filtered existing_references back to SBOM data
                 # Components that go through validation but keep valid VCS refs
                 # (no enrichment needed) must have their filtered refs written back
@@ -193,11 +202,11 @@ class SbomEnrichmentPipeline:
 
         if progress_reporter is not None:
             await progress_reporter.on_phase("resolving")
-            await progress_reporter.on_resolved(0, len(unique_purls))
+            await progress_reporter.on_progress(0, len(unique_purls))
 
         async def _report_resolved(current: int, total: int) -> None:
             if progress_reporter is not None:
-                await progress_reporter.on_resolved(current, total)
+                await progress_reporter.on_progress(current, total)
 
         resolved = await self._resolution_service.resolve_batch(
             unique_purls,
