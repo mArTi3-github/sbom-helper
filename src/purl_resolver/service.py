@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import itertools
 import logging
 from collections.abc import Awaitable, Callable
 
@@ -199,18 +198,22 @@ class PurlResolutionService:
                 resolve_sources.append(original)
             per_input.append(source_index[key])
 
+        total = len(resolve_sources)
+        completed = 0
+        progress_lock = asyncio.Lock()
+
         async def _resolve_one(original: str) -> ResolveResult:
+            nonlocal completed
             async with semaphore:
-                return await self.resolve_purl(original, resolver=resolver)
+                result = await self.resolve_purl(original, resolver=resolver)
+            if on_progress is not None:
+                async with progress_lock:
+                    completed += 1
+                    await on_progress(completed, total)
+            return result
 
         unique_results = await asyncio.gather(*[_resolve_one(p) for p in resolve_sources])
         results = [unique_results[idx] for idx in per_input]
-
-        if on_progress is not None:
-            total = len(purls)
-            counter = itertools.count(1)
-            for _ in results:
-                await on_progress(next(counter), total)
 
         return results
 
