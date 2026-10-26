@@ -285,7 +285,7 @@ import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
 import type { SbomFixIssue, SbomFixOptions, SbomFixResponse } from '../types/api'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const settingsStore = useSettingsStore()
 
@@ -298,6 +298,7 @@ const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 const saveError = ref<string | null>(null)
 const statsOpen = ref(true)
 const issuesOpen = ref(false)
+const downloadIndent = ref(4)
 let changedWhileSaving = false
 
 function defaultFixOptions(): SbomFixOptions {
@@ -427,7 +428,8 @@ function describeError(e: unknown): string {
 }
 
 function issueLabel(issue: SbomFixIssue): string {
-  return t('sbomFixer.issues.' + issue.code, issue.details)
+  const key = 'sbomFixer.issues.' + issue.code
+  return te(key) ? t(key, issue.details) : issue.code
 }
 
 function issueDetails(issue: SbomFixIssue): string {
@@ -451,7 +453,7 @@ function downloadResult(): void {
   downloadJson(
     result.value.fixed_sbom,
     selectedFile.value.name.replace(/\.json$/, '') + '_fixed.json',
-    settingsStore.jsonIndent,
+    downloadIndent.value,
   )
 }
 
@@ -514,11 +516,14 @@ async function handleFix(): Promise<void> {
 }
 
 onMounted(async () => {
-  const [optionsResult] = await Promise.allSettled([getFixOptions(), settingsStore.load()])
+  const [optionsResult, settingsResult] = await Promise.allSettled([getFixOptions(), settingsStore.load()])
   if (optionsResult.status === 'fulfilled') {
     applyOptions(optionsResult.value.options)
   } else {
     optionsWarning.value = true
+  }
+  if (settingsResult.status === 'fulfilled') {
+    downloadIndent.value = settingsStore.jsonIndent
   }
 })
 </script>

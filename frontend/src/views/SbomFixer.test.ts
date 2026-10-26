@@ -564,6 +564,33 @@ describe('SbomFixer.vue', () => {
     expect(rows[1].text()).toContain('{"expected":"1.6 or 1.7"}')
   })
 
+  it('falls back to the bare issue code when no translation exists', async () => {
+    fixSbomMock.mockResolvedValueOnce({
+      ...issuesResponse,
+      issues: [
+        {
+          code: 'custom.unknown_issue',
+          path: '$',
+          component: null,
+          details: { reason: 'test' },
+        },
+      ],
+    })
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const spoiler = wrapper.find('.issues-spoiler')
+    ;(spoiler.element as HTMLDetailsElement).open = true
+    await spoiler.trigger('toggle')
+    await wrapper.vm.$nextTick()
+
+    const cell = wrapper.find('.issues-table tbody tr td')
+    expect(cell.text()).toBe('custom.unknown_issue')
+    expect(cell.text()).not.toContain('sbomFixer.issues')
+  })
+
   it('shows a green card and no spoiler when no issues remain', async () => {
     fixSbomMock.mockResolvedValueOnce(unchangedResponse)
     const wrapper = await mountFixer()
@@ -600,6 +627,20 @@ describe('SbomFixer.vue', () => {
     await wrapper.find('.download-button').trigger('click')
 
     expect(downloadJson).toHaveBeenCalledWith(statsResponse.fixed_sbom, 'my-sbom_fixed.json', 4)
+  })
+
+  it('uses indent 4 on settings failure even when the store holds a stale value', async () => {
+    useSettingsStore().jsonIndent = 2
+    getSettingsMock.mockRejectedValueOnce(new Error('settings down'))
+    fixSbomMock.mockResolvedValueOnce(statsResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper, 'stale.json')
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('.download-button').trigger('click')
+
+    expect(downloadJson).toHaveBeenCalledWith(statsResponse.fixed_sbom, 'stale_fixed.json', 4)
   })
 
   it('collapses and reopens the statistics spoiler', async () => {
