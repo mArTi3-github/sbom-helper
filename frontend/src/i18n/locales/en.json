@@ -106,6 +106,16 @@
     "specVersion": "Spec version",
     "changed": "Changes applied",
     "unchanged": "No changes needed",
+    "statistics": "Change statistics",
+    "rule": "Rule",
+    "changes": "Changes",
+    "noIssues": "No non-conformities remaining",
+    "issuesToggle": "Show non-conformities ({count})",
+    "issuesCode": "Code",
+    "issuesPath": "Path",
+    "issuesComponent": "Component",
+    "issuesDetails": "Details",
+    "download": "Download fixed SBOM",
     "rules": {
       "root": {
         "reorder": "Reorder root fields",
@@ -135,6 +145,41 @@
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
         "fill_missing_gost_properties": "Add missing GOST properties"
+      }
+    },
+    "issues": {
+      "root": {
+        "missing_spec_version": "Missing specVersion",
+        "invalid_spec_version": "Invalid specVersion type",
+        "spec_version_not_allowed": "specVersion is not allowed",
+        "missing_version": "Missing version",
+        "invalid_version": "Invalid version",
+        "missing_metadata": "Missing metadata",
+        "invalid_metadata": "Invalid metadata",
+        "invalid_components": "Invalid components"
+      },
+      "metadata": {
+        "missing_timestamp": "Missing timestamp",
+        "missing_component": "Missing metadata.component",
+        "invalid_component": "Invalid metadata.component"
+      },
+      "metadata_component": {
+        "missing_type": "Missing metadata.component.type",
+        "missing_name": "Missing metadata.component.name",
+        "missing_version": "Missing metadata.component.version",
+        "missing_manufacturer": "Missing metadata.component.manufacturer"
+      },
+      "component": {
+        "invalid_entry": "Invalid component entry",
+        "missing_type": "Missing component type",
+        "missing_name": "Missing component name",
+        "missing_version": "Missing component version",
+        "missing_purl": "Missing component purl",
+        "invalid_properties": "Invalid component properties",
+        "missing_gost_properties": "Missing GOST properties: {missing}",
+        "invalid_external_references": "Invalid component external references",
+        "missing_source_reference": "Missing source reference",
+        "invalid_subcomponents": "Invalid nested components"
       }
     }
   },

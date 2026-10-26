@@ -5,6 +5,7 @@ import { mountWithI18n } from '../tests/i18n'
 import SbomFixer from './SbomFixer.vue'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
+import { downloadJson } from '../composables/useDownload'
 import type { SbomFixOptions, SbomFixResponse, SettingsResponse } from '../types/api'
 
 const defaultOptions: SbomFixOptions = {
@@ -80,6 +81,36 @@ const unchangedResponse: SbomFixResponse = {
   fixed_sbom: { bomFormat: 'CycloneDX' },
   stats: [],
   issues: [],
+}
+
+const statsResponse: SbomFixResponse = {
+  changed: true,
+  fixed_sbom: { bomFormat: 'CycloneDX' },
+  stats: [
+    { rule_id: 'root.reorder', count: 2 },
+    { rule_id: 'components.remove_hashes', count: 0 },
+  ],
+  issues: [],
+}
+
+const issuesResponse: SbomFixResponse = {
+  changed: true,
+  fixed_sbom: { bomFormat: 'CycloneDX' },
+  stats: [{ rule_id: 'root.reorder', count: 2 }],
+  issues: [
+    {
+      code: 'component.missing_gost_properties',
+      path: '$.components[0]',
+      component: 'openssl',
+      details: { missing: ['GOST:attack_surface', 'GOST:security_function'] },
+    },
+    {
+      code: 'root.spec_version_not_allowed',
+      path: '$',
+      component: null,
+      details: { expected: '1.6 or 1.7' },
+    },
+  ],
 }
 
 const getFixOptionsMock = vi.fn()
@@ -475,5 +506,142 @@ describe('SbomFixer.vue', () => {
     await selectFile(wrapper, 'other.json')
 
     expect(wrapper.find('.error-msg').exists()).toBe(false)
+  })
+
+  it('renders change statistics in an open spoiler, including zero counts', async () => {
+    fixSbomMock.mockResolvedValueOnce(statsResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const spoiler = wrapper.find('.stats-spoiler')
+    expect(spoiler.exists()).toBe(true)
+    expect((spoiler.element as HTMLDetailsElement).open).toBe(true)
+
+    expect(wrapper.find('.stats-table').text()).toContain('Rule')
+    expect(wrapper.find('.stats-table').text()).toContain('Changes')
+    const rows = wrapper.findAll('.stats-table tbody tr')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].text()).toContain('Reorder root fields')
+    expect(rows[0].text()).toContain('2')
+    expect(rows[1].text()).toContain('Remove hashes')
+    expect(rows[1].text()).toContain('0')
+  })
+
+  it('renders issues in a closed spoiler and builds the table only when opened', async () => {
+    fixSbomMock.mockResolvedValueOnce(issuesResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const spoiler = wrapper.find('.issues-spoiler')
+    expect(spoiler.exists()).toBe(true)
+    expect((spoiler.element as HTMLDetailsElement).open).toBe(false)
+    expect(spoiler.text()).toContain('Show non-conformities (2)')
+    expect(wrapper.find('.issues-table').exists()).toBe(false)
+
+    ;(spoiler.element as HTMLDetailsElement).open = true
+    await spoiler.trigger('toggle')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.issues-table').exists()).toBe(true)
+    const headers = wrapper.find('.issues-table thead').text()
+    expect(headers).toContain('Code')
+    expect(headers).toContain('Path')
+    expect(headers).toContain('Component')
+    expect(headers).toContain('Details')
+
+    const rows = wrapper.findAll('.issues-table tbody tr')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].text()).toContain('Missing GOST properties')
+    expect(rows[0].text()).toContain('$.components[0]')
+    expect(rows[0].text()).toContain('openssl')
+    expect(rows[0].text()).toContain('GOST:attack_surface, GOST:security_function')
+    expect(rows[0].findAll('td')[0].attributes('title')).toBeTruthy()
+    expect(rows[1].text()).toContain('specVersion')
+    expect(rows[1].text()).toContain('{"expected":"1.6 or 1.7"}')
+  })
+
+  it('shows a green card and no spoiler when no issues remain', async () => {
+    fixSbomMock.mockResolvedValueOnce(unchangedResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const card = wrapper.find('.no-issues-card')
+    expect(card.exists()).toBe(true)
+    expect(card.text()).toContain('No non-conformities remaining')
+    expect(wrapper.find('.issues-spoiler').exists()).toBe(false)
+  })
+
+  it('downloads the fixed sbom using the configured indent', async () => {
+    fixSbomMock.mockResolvedValueOnce(statsResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('.download-button').trigger('click')
+
+    expect(downloadJson).toHaveBeenCalledWith(statsResponse.fixed_sbom, 'sbom_fixed.json', 2)
+  })
+
+  it('falls back to indent 4 for downloads when settings fail to load', async () => {
+    getSettingsMock.mockRejectedValueOnce(new Error('settings down'))
+    fixSbomMock.mockResolvedValueOnce(statsResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper, 'my-sbom.json')
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('.download-button').trigger('click')
+
+    expect(downloadJson).toHaveBeenCalledWith(statsResponse.fixed_sbom, 'my-sbom_fixed.json', 4)
+  })
+
+  it('collapses and reopens the statistics spoiler', async () => {
+    fixSbomMock.mockResolvedValueOnce(statsResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    let spoiler = wrapper.find('.stats-spoiler')
+    ;(spoiler.element as HTMLDetailsElement).open = false
+    await spoiler.trigger('toggle')
+    await wrapper.vm.$nextTick()
+    spoiler = wrapper.find('.stats-spoiler')
+    expect((spoiler.element as HTMLDetailsElement).open).toBe(false)
+
+    ;(spoiler.element as HTMLDetailsElement).open = true
+    await spoiler.trigger('toggle')
+    await wrapper.vm.$nextTick()
+    spoiler = wrapper.find('.stats-spoiler')
+    expect((spoiler.element as HTMLDetailsElement).open).toBe(true)
+  })
+
+  it('resets spoiler state when a new result arrives', async () => {
+    fixSbomMock.mockResolvedValue(issuesResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const issuesSpoiler = wrapper.find('.issues-spoiler')
+    ;(issuesSpoiler.element as HTMLDetailsElement).open = true
+    await issuesSpoiler.trigger('toggle')
+    const statsSpoiler = wrapper.find('.stats-spoiler')
+    ;(statsSpoiler.element as HTMLDetailsElement).open = false
+    await statsSpoiler.trigger('toggle')
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.find('.issues-spoiler').element as HTMLDetailsElement).open).toBe(false)
+    expect((wrapper.find('.stats-spoiler').element as HTMLDetailsElement).open).toBe(true)
   })
 })

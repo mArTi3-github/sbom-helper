@@ -220,6 +220,57 @@
         <span v-if="result.changed">&#9888; {{ t('sbomFixer.changed') }}</span>
         <span v-else>&#10003; {{ t('sbomFixer.unchanged') }}</span>
       </div>
+
+      <details class="stats-spoiler" :open="statsOpen" @toggle="onStatsToggle">
+        <summary>{{ t('sbomFixer.statistics') }}</summary>
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th>{{ t('sbomFixer.rule') }}</th>
+              <th>{{ t('sbomFixer.changes') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="stat in result.stats" :key="stat.rule_id">
+              <td>{{ t('sbomFixer.rules.' + stat.rule_id) }}</td>
+              <td class="stat-count">{{ stat.count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
+
+      <div v-if="result.issues.length === 0" class="no-issues-card">
+        &#10003; {{ t('sbomFixer.noIssues') }}
+      </div>
+      <details v-else class="issues-spoiler" :open="issuesOpen" @toggle="onIssuesToggle">
+        <summary>{{ t('sbomFixer.issuesToggle', { count: result.issues.length }) }}</summary>
+        <div class="issues-table-wrapper">
+          <table v-if="issuesOpen" class="issues-table">
+            <thead>
+              <tr>
+                <th>{{ t('sbomFixer.issuesCode') }}</th>
+                <th>{{ t('sbomFixer.issuesPath') }}</th>
+                <th>{{ t('sbomFixer.issuesComponent') }}</th>
+                <th>{{ t('sbomFixer.issuesDetails') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(issue, index) in result.issues" :key="index">
+                <td class="issue-code" :title="issueLabel(issue)">{{ issueLabel(issue) }}</td>
+                <td class="issue-path" :title="issue.path">{{ issue.path }}</td>
+                <td class="issue-component" :title="issue.component ?? ''">{{ issue.component ?? '' }}</td>
+                <td class="issue-details" :title="issueDetails(issue)">{{ issueDetails(issue) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <div class="download-toolbar">
+        <button class="btn btn-primary download-button" @click="downloadResult">
+          {{ t('sbomFixer.download') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -231,7 +282,8 @@ import FileUploadZone from '../components/FileUploadZone.vue'
 import { fixSbom, getFixOptions, saveFixOptions } from '../api/sbom'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
-import type { SbomFixOptions, SbomFixResponse } from '../types/api'
+import { downloadJson } from '../composables/useDownload'
+import type { SbomFixIssue, SbomFixOptions, SbomFixResponse } from '../types/api'
 
 const { t } = useI18n()
 
@@ -244,6 +296,8 @@ const result = ref<SbomFixResponse | null>(null)
 const optionsWarning = ref(false)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 const saveError = ref<string | null>(null)
+const statsOpen = ref(true)
+const issuesOpen = ref(false)
 let changedWhileSaving = false
 
 function defaultFixOptions(): SbomFixOptions {
@@ -372,6 +426,35 @@ function describeError(e: unknown): string {
   return t('errors.unexpected_error')
 }
 
+function issueLabel(issue: SbomFixIssue): string {
+  return t('sbomFixer.issues.' + issue.code, issue.details)
+}
+
+function issueDetails(issue: SbomFixIssue): string {
+  const missing = issue.details?.missing
+  if (Array.isArray(missing)) {
+    return missing.join(', ')
+  }
+  return JSON.stringify(issue.details)
+}
+
+function onStatsToggle(event: Event): void {
+  statsOpen.value = (event.target as HTMLDetailsElement).open
+}
+
+function onIssuesToggle(event: Event): void {
+  issuesOpen.value = (event.target as HTMLDetailsElement).open
+}
+
+function downloadResult(): void {
+  if (!result.value || !selectedFile.value) return
+  downloadJson(
+    result.value.fixed_sbom,
+    selectedFile.value.name.replace(/\.json$/, '') + '_fixed.json',
+    settingsStore.jsonIndent,
+  )
+}
+
 watch(
   options,
   () => {
@@ -421,6 +504,8 @@ async function handleFix(): Promise<void> {
 
   try {
     result.value = await fixSbom(selectedFile.value, plainOptions())
+    statsOpen.value = true
+    issuesOpen.value = false
   } catch (e: unknown) {
     error.value = describeError(e)
   } finally {
@@ -618,5 +703,97 @@ h1 {
 
 .status-unchanged {
   border-left: 4px solid var(--color-success);
+}
+
+.stats-spoiler,
+.issues-spoiler {
+  margin-top: 1rem;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--border-radius-lg);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--color-card-shadow);
+}
+
+.stats-spoiler summary,
+.issues-spoiler summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.stats-table,
+.issues-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.stats-table th,
+.stats-table td,
+.issues-table th,
+.issues-table td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--color-row-border);
+  vertical-align: top;
+}
+
+.stats-table th,
+.issues-table th {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.stat-count {
+  width: 6rem;
+}
+
+.issues-table-wrapper {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.issues-table {
+  table-layout: fixed;
+}
+
+.issues-table th,
+.issues-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-code {
+  width: 30%;
+}
+
+.issue-path {
+  width: 25%;
+}
+
+.issue-component {
+  width: 15%;
+}
+
+.issue-details {
+  width: 30%;
+}
+
+.no-issues-card {
+  margin-top: 1rem;
+  background: var(--color-success-bg, rgba(16, 185, 129, 0.12));
+  border: 1px solid var(--color-success);
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--border-radius-lg);
+  padding: 1rem;
+  color: var(--color-success);
+}
+
+.download-toolbar {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
 }
 </style>

@@ -106,6 +106,16 @@
     "specVersion": "Версия спецификации",
     "changed": "Изменения внесены",
     "unchanged": "Изменений не потребовалось",
+    "statistics": "Статистика изменений",
+    "rule": "Правило",
+    "changes": "Изменений",
+    "noIssues": "Несоответствий не осталось",
+    "issuesToggle": "Показать несоответствия ({count})",
+    "issuesCode": "Код",
+    "issuesPath": "Путь",
+    "issuesComponent": "Компонент",
+    "issuesDetails": "Детали",
+    "download": "Скачать исправленный SBOM",
     "rules": {
       "root": {
         "reorder": "Упорядочить поля корня",
@@ -135,6 +145,41 @@
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
         "filter_properties": "Оставить только GOST-свойства",
         "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
+      }
+    },
+    "issues": {
+      "root": {
+        "missing_spec_version": "Отсутствует specVersion",
+        "invalid_spec_version": "Некорректный тип specVersion",
+        "spec_version_not_allowed": "Недопустимое значение specVersion",
+        "missing_version": "Отсутствует version",
+        "invalid_version": "Некорректное значение version",
+        "missing_metadata": "Отсутствует metadata",
+        "invalid_metadata": "Некорректный metadata",
+        "invalid_components": "Некорректный components"
+      },
+      "metadata": {
+        "missing_timestamp": "Отсутствует timestamp",
+        "missing_component": "Отсутствует metadata.component",
+        "invalid_component": "Некорректный metadata.component"
+      },
+      "metadata_component": {
+        "missing_type": "Отсутствует metadata.component.type",
+        "missing_name": "Отсутствует metadata.component.name",
+        "missing_version": "Отсутствует metadata.component.version",
+        "missing_manufacturer": "Отсутствует metadata.component.manufacturer"
+      },
+      "component": {
+        "invalid_entry": "Некорректный элемент массива компонентов",
+        "missing_type": "Отсутствует type компонента",
+        "missing_name": "Отсутствует name компонента",
+        "missing_version": "Отсутствует version компонента",
+        "missing_purl": "Отсутствует purl компонента",
+        "invalid_properties": "Некорректные properties компонента",
+        "missing_gost_properties": "Отсутствуют ГОСТ-свойства: {missing}",
+        "invalid_external_references": "Некорректные externalReferences компонента",
+        "missing_source_reference": "Отсутствует ссылка на исходный код",
+        "invalid_subcomponents": "Некорректные вложенные components"
       }
     }
   },
