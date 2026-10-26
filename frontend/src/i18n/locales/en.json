@@ -86,7 +86,57 @@
   },
   "sbomFixer": {
     "title": "Fix SBOM",
-    "subtitle": "Upload a CycloneDX SBOM (JSON) and apply selected formal fixes"
+    "subtitle": "Upload a CycloneDX SBOM (JSON) and apply selected formal fixes",
+    "warning": "Almost all fixes are enabled by default, including field removals. Review the set before running.",
+    "saveSettings": "Save settings",
+    "saved": "Saved",
+    "saveFailed": "Could not save settings",
+    "loadFailed": "Could not load saved settings; built-in defaults are used.",
+    "resetDefaults": "Restore defaults",
+    "fix": "Fix",
+    "processing": "Fixing SBOM...",
+    "groups": {
+      "root": "Root object",
+      "metadata": "metadata",
+      "components": "components",
+      "metadataComponent": "metadata.component"
+    },
+    "selectAll": "Select all",
+    "clearAll": "Clear all",
+    "specVersion": "Spec version",
+    "changed": "Changes applied",
+    "unchanged": "No changes needed",
+    "rules": {
+      "root": {
+        "reorder": "Reorder root fields",
+        "set_spec_version": "Set specVersion",
+        "remove_dependencies": "Remove dependencies",
+        "remove_services": "Remove services",
+        "increment_version": "Increment version"
+      },
+      "metadata": {
+        "add_timestamp": "Add timestamp if missing",
+        "reorder": "Reorder metadata fields",
+        "remove_properties": "Remove metadata properties",
+        "remove_tools": "Remove metadata tools"
+      },
+      "metadata_component": {
+        "reorder": "Reorder metadata.component fields",
+        "remove_external_references": "Remove external references",
+        "remove_properties": "Remove properties",
+        "remove_purl": "Remove purl",
+        "remove_scope": "Remove scope",
+        "rename_supplier": "Rename supplier to manufacturer"
+      },
+      "components": {
+        "reorder": "Reorder component fields",
+        "remove_hashes": "Remove hashes",
+        "remove_scope": "Remove scope",
+        "filter_external_references": "Keep only VCS and source-distribution references",
+        "filter_properties": "Keep only GOST properties",
+        "fill_missing_gost_properties": "Add missing GOST properties"
+      }
+    }
   },
   "imagesListConverter": {
     "title": "Generate Images List",
@@ -311,6 +361,8 @@
     "purl_not_found": "PURL not found",
     "invalid_csv": "Invalid CSV file",
     "invalid_purl": "Invalid PURL",
+    "invalid_options": "Invalid fix options",
+    "options_save_failed": "Could not save fix options",
     "upstream_error": "Upstream resolution error",
     "batch_too_large": "Too many PURLs in one request",
     "network_error": "Network error: could not reach the server.",

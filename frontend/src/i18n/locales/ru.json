@@ -86,7 +86,57 @@
   },
   "sbomFixer": {
     "title": "Исправить SBOM",
-    "subtitle": "Загрузите CycloneDX SBOM (JSON) и примените выбранные формальные исправления"
+    "subtitle": "Загрузите CycloneDX SBOM (JSON) и примените выбранные формальные исправления",
+    "warning": "По умолчанию включены почти все правки, включая удаление полей. Проверьте набор перед запуском.",
+    "saveSettings": "Сохранить настройки",
+    "saved": "Сохранено",
+    "saveFailed": "Не удалось сохранить настройки",
+    "loadFailed": "Не удалось загрузить сохранённые настройки; используются встроенные значения по умолчанию.",
+    "resetDefaults": "Вернуть значения по умолчанию",
+    "fix": "Исправить",
+    "processing": "Исправление SBOM...",
+    "groups": {
+      "root": "Корневой объект",
+      "metadata": "metadata",
+      "components": "components",
+      "metadataComponent": "metadata.component"
+    },
+    "selectAll": "Выбрать всё",
+    "clearAll": "Снять всё",
+    "specVersion": "Версия спецификации",
+    "changed": "Изменения внесены",
+    "unchanged": "Изменений не потребовалось",
+    "rules": {
+      "root": {
+        "reorder": "Упорядочить поля корня",
+        "set_spec_version": "Установить specVersion",
+        "remove_dependencies": "Удалить dependencies",
+        "remove_services": "Удалить services",
+        "increment_version": "Увеличить version"
+      },
+      "metadata": {
+        "add_timestamp": "Добавить timestamp, если отсутствует",
+        "reorder": "Упорядочить поля metadata",
+        "remove_properties": "Удалить metadata.properties",
+        "remove_tools": "Удалить metadata.tools"
+      },
+      "metadata_component": {
+        "reorder": "Упорядочить поля metadata.component",
+        "remove_external_references": "Удалить externalReferences",
+        "remove_properties": "Удалить properties",
+        "remove_purl": "Удалить purl",
+        "remove_scope": "Удалить scope",
+        "rename_supplier": "Переименовать supplier в manufacturer"
+      },
+      "components": {
+        "reorder": "Упорядочить поля компонентов",
+        "remove_hashes": "Удалить hashes",
+        "remove_scope": "Удалить scope",
+        "filter_external_references": "Оставить только VCS и source-distribution ссылки",
+        "filter_properties": "Оставить только GOST-свойства",
+        "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
+      }
+    }
   },
   "imagesListConverter": {
     "title": "Генерировать список образов",
@@ -311,6 +361,8 @@
     "purl_not_found": "PURL не найден",
     "invalid_csv": "Неверный CSV файл",
     "invalid_purl": "Неверный PURL",
+    "invalid_options": "Неверные параметры исправлений",
+    "options_save_failed": "Не удалось сохранить параметры исправлений",
     "upstream_error": "Ошибка вышестоящего сервиса",
     "batch_too_large": "Слишком много PURL в одном запросе",
     "network_error": "Сетевая ошибка: не удалось связаться с сервером.",
