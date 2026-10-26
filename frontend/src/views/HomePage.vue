@@ -5,6 +5,7 @@ const { t } = useI18n()
 const sections = [
   { route: '/purl-resolver', ns: 'purlResolver' },
   { route: '/sbom-updater', ns: 'sbomUpdater' },
+  { route: '/fix-sbom', ns: 'sbomFixer' },
   { route: '/images-list-converter', ns: 'imagesListConverter' },
   { route: '/db-admin', ns: 'dbAdmin' },
   { route: '/settings', ns: 'settings' },

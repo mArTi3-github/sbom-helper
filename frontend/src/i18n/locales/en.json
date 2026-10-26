@@ -22,6 +22,7 @@
   "nav": {
     "purlResolver": "Resolve PURL",
     "sbomUpdater": "Enrich SBOM",
+    "sbomFixer": "Fix SBOM",
     "imagesListConverter": "Generate Images List",
     "dbAdmin": "Manage Database",
     "settings": "Settings"
@@ -82,6 +83,10 @@
       "enriching": "Enriching SBOM"
     },
     "progressCounter": "{current} / {total} · {percent}%"
+  },
+  "sbomFixer": {
+    "title": "Fix SBOM",
+    "subtitle": "Upload a CycloneDX SBOM (JSON) and apply selected formal fixes"
   },
   "imagesListConverter": {
     "title": "Generate Images List",

@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 const routes = [
   { path: '/sbom-updater', nameKey: 'nav.sbomUpdater' },
+  { path: '/fix-sbom', nameKey: 'nav.sbomFixer' },
   { path: '/images-list-converter', nameKey: 'nav.imagesListConverter' },
   { path: '/db-admin', nameKey: 'nav.dbAdmin' },
 ]

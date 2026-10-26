@@ -29,6 +29,11 @@ const router = createRouter({
       component: () => import('../views/SbomUpdater.vue'),
     },
     {
+      path: '/fix-sbom',
+      name: 'fix-sbom',
+      component: () => import('../views/SbomFixer.vue'),
+    },
+    {
       path: '/db-admin',
       name: 'db-admin',
       component: () => import('../views/DatabaseAdmin.vue'),

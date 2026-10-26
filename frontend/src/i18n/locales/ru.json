@@ -22,6 +22,7 @@
   "nav": {
     "purlResolver": "Найти ссылку для PURL",
     "sbomUpdater": "Обогатить SBOM",
+    "sbomFixer": "Исправить SBOM",
     "imagesListConverter": "Генерировать список образов",
     "dbAdmin": "Управлять БД",
     "settings": "Настройки"
@@ -82,6 +83,10 @@
       "enriching": "Обогащение SBOM"
     },
     "progressCounter": "{current} / {total} · {percent}%"
+  },
+  "sbomFixer": {
+    "title": "Исправить SBOM",
+    "subtitle": "Загрузите CycloneDX SBOM (JSON) и примените выбранные формальные исправления"
   },
   "imagesListConverter": {
     "title": "Генерировать список образов",
