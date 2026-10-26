@@ -110,15 +110,15 @@ routes/sbom_fix.py
   v
 sbom/fixer.py::fix_sbom(data, options, now=None)
   |  1. fixed_sbom = copy.deepcopy(data)            (input never mutated)
-  |  2. root rules: set specVersion, remove dependencies, remove services
+  |  2. root rules: set specVersion, remove dependencies, remove services,
+  |     increment version
   |  3. metadata rules: add timestamp, remove properties, remove tools
   |  4. metadata.component rules: removes, supplier -> manufacturer
   |  5. components rules (recursive pre-order): remove hashes/scope,
   |     filter externalReferences/properties, fill GOST properties
-  |  6. root.increment_version
-  |  7. reorder pass LAST: root -> metadata -> metadata.component -> all components
-  |  8. stats for every enabled rule; changed = any(count > 0)
-  |  9. issues collected from the final fixed_sbom
+  |  6. reorder pass LAST: root -> metadata -> metadata.component -> all components
+  |  7. stats for every enabled rule; changed = any(count > 0)
+  |  8. issues collected from the final fixed_sbom
   v
 200 {changed, fixed_sbom, stats, issues}
 ```
@@ -136,7 +136,7 @@ Rules mutate a deep copy and never create issues; all issues come from a separat
 | 3 | `root.remove_dependencies` | on | Remove root `dependencies` key | 1 if key existed |
 | 4 | `root.remove_services` | on | Remove root `services` key | 1 if key existed |
 | 5 | `root.increment_version` | on | Increment `version` by 1 when it is an integer (not `bool`) | 1 if incremented |
-| 6 | `metadata.add_timestamp` | on | Set `metadata.timestamp` to current UTC when absent, `null`, or `""`; never overwrite an existing value | 1 if added |
+| 6 | `metadata.add_timestamp` | on | Add `metadata.timestamp` (current UTC, `YYYY-MM-DDTHH:MM:SSZ`) only when it is absent, `null`, or `""`; an existing non-empty value is never overwritten (a non-string value is left in place and reported) | 1 if added |
 | 7 | `metadata.reorder` | on | Order `timestamp`, `component`, then other keys | 1/0 |
 | 8 | `metadata.remove_properties` | on | Remove `metadata.properties` | 1/0 |
 | 9 | `metadata.remove_tools` | on | Remove `metadata.tools` (array or object) | 1/0 |
@@ -155,7 +155,7 @@ Rules mutate a deep copy and never create issues; all issues come from a separat
 
 Notes:
 
-- Component rules walk only the root `components[]` arrays and their nested `components` (pre-order); `metadata.component.components` is not walked. Rules 19–21 do not apply to `metadata.component`.
+- All component rules (16–21) apply only to the root `components[]` tree (each root component plus its nested `components`, walked pre-order); `metadata.component` and its nested components are outside this tree and are never touched by these rules. Rules 19–21 likewise never touch `metadata.component`.
 - `components.filter_properties` runs before `components.fill_missing_gost_properties`, so non-GOST properties are removed and then missing GOST properties are appended.
 - The reorder pass (rules 1, 7, 10, 16) runs after every mutation so the final key order reflects the final set of fields.
 - The `group` field is never modified anywhere.
@@ -263,7 +263,7 @@ Codes for the same field are mutually exclusive (`missing_*` / `invalid_*` / `no
 - Issues are collected **only** from the final fixed document; rules never emit issues, so there are no cascading duplicates.
 - The reorder pass is the final mutation; no rule runs after it.
 - `spec_version` is validated as `^\d+\.\d+$` regardless of `set_spec_version`; values outside `1.6`/`1.7` are allowed but reported as `root.spec_version_not_allowed`.
-- `metadata.timestamp` is only added when absent, `null`, or empty; an existing malformed value is left as-is and reported.
+- `metadata.timestamp` is added only when absent, `null`, or empty string. It is reported as `metadata.missing_timestamp` when absent, `null`, empty, or a non-string value. An existing non-empty string is never overwritten, and its format is not validated or reported.
 - The `group` field is unchanged at every level.
 - `components.remove_hashes` removes only the component's own `hashes`; `hashes` inside `externalReferences[]` are preserved.
 - `components.fill_missing_gost_properties` applies only to `components[]` items, never to `metadata.component`.

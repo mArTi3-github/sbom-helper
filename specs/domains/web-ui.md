@@ -35,7 +35,7 @@ A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepti
 - `frontend/src/tests/i18n.ts` — `mountWithI18n` helper for test mounting with vue-i18n plugin
 - `frontend/src/api/jobs.ts` — Background job API client (create, poll, download, cancel, list)
 - `frontend/src/api/images.ts` — Images list conversion API client
-- `frontend/src/types/api.ts` — TypeScript interfaces mirroring backend `schemas.py`, including the SBOM fix option/stat/issue/response types (`SbomFixOptions`, `SbomFixStat`, `SbomFixIssue`, `SbomFixResponse`, `SbomFixOptionsResponse`)
+- `frontend/src/types/api.ts` — TypeScript interfaces mirroring backend response models; the SBOM fix types mirror `sbom/fixer.py` (`SbomFixOptions` and its nested option models mirror the Pydantic models; `SbomFixStat`/`SbomFixIssue` mirror the dataclasses) while `SbomFixResponse` mirrors the `routes/sbom_fix.py` response payload and `SbomFixOptionsResponse` mirrors the options endpoint payload
 - `frontend/src/composables/useDownload.ts` — File download helper composable
 - `frontend/src/stores/useSettingsStore.ts` — Pinia store for application settings state (shared across views)
 - `frontend/src/stores/useDbAdminStore.ts` — Pinia store for database admin state (filtering, sorting, selection, pagination, page size, goToPage, changePageSize, resolver list via `resolvers` ref and `fetchResolvers()` action)

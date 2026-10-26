@@ -402,7 +402,7 @@
 - **Stores** (`src/stores/`): `useSettingsStore.ts` (Pinia store for settings), `useDbAdminStore.ts` (Pinia store for database admin state — includes pagination logic via `goToPage`, `changePageSize`, `totalPages`)
 - **i18n** (`src/i18n/`): `index.ts` (vue-i18n configuration with `legacy: false`), `locales/en.json` (English), `locales/ru.json` (Russian); `@intlify/unplugin-vue-i18n` Vite plugin for compile-time message compilation
 - **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts` (enrichment, ignore patterns, SBOM fix), `db.ts`, `settings.ts`, `images.ts`
-- **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`, including `SbomFixOptions`/`SbomFixStat`/`SbomFixIssue`/`SbomFixResponse`/`SbomFixOptionsResponse`
+- **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend response models. The SBOM fix option/stat/issue types mirror `sbom/fixer.py` (`SbomFixOptions` and nested models mirror the Pydantic option models; `SbomFixStat`/`SbomFixIssue` mirror the dataclasses); `SbomFixResponse` and `SbomFixOptionsResponse` mirror the `routes/sbom_fix.py` response payloads
 - **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 7 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`
 - FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass) mounted at `/` in `main.py`; `SPAStaticFiles` falls back to `index.html` for unmatched paths, enabling client-side routing
 - Each `.vue` component uses `<style scoped>` for CSS isolation; global CSS variables in `src/assets/main.css`
