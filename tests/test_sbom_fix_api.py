@@ -167,6 +167,26 @@ class TestSbomFixOptions:
         assert response.status_code == 200
         assert response.json() == {"options": SbomFixOptions().model_dump()}
 
+    def test_get_with_non_utf8_file_returns_defaults(self, client: TestClient) -> None:
+        store = client.app.state.sbom_fix_options_store
+        store._path.write_bytes(b'{"root": {"reorder": false}}\xff')
+        response = client.get("/api/v1/sbom/fix/options")
+        assert response.status_code == 200
+        assert response.json() == {"options": SbomFixOptions().model_dump()}
+
+    def test_post_trims_surrounding_spaces_in_spec_version(
+        self, client: TestClient
+    ) -> None:
+        response = client.post(
+            "/api/v1/sbom/fix/options",
+            json={"options": {"root": {"spec_version": " 1.7 "}}},
+        )
+        assert response.status_code == 200
+
+        response = client.get("/api/v1/sbom/fix/options")
+        assert response.status_code == 200
+        assert response.json()["options"]["root"]["spec_version"] == "1.7"
+
     def test_post_saves_and_get_returns_saved(self, client: TestClient) -> None:
         options = SbomFixOptions(
             metadata={"component": {"remove_purl": True}},

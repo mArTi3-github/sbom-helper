@@ -29,6 +29,14 @@ def test_corrupt_json_returns_defaults(tmp_path, caplog):
     assert "bad.json" in caplog.text
 
 
+def test_corrupt_non_utf8_file_returns_defaults(tmp_path, caplog):
+    path = tmp_path / "bad-encoding.json"
+    path.write_bytes(b'{"root": {"reorder": false}}\xff')
+    with caplog.at_level(logging.WARNING):
+        assert SbomFixOptionsStore(path).load() == SbomFixOptions()
+    assert "bad-encoding.json" in caplog.text
+
+
 def test_invalid_spec_version_returns_defaults(tmp_path, caplog):
     path = tmp_path / "invalid.json"
     path.write_text('{"root": {"spec_version": "9.9.9"}}', encoding="utf-8")

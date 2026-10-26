@@ -559,6 +559,7 @@ describe('SbomFixer.vue', () => {
     expect(rows[0].text()).toContain('$.components[0]')
     expect(rows[0].text()).toContain('openssl')
     expect(rows[0].text()).toContain('GOST:attack_surface, GOST:security_function')
+    expect(rows[0].findAll('td')[0].text()).toContain('GOST:attack_surface, GOST:security_function')
     expect(rows[0].findAll('td')[0].attributes('title')).toBeTruthy()
     expect(rows[1].text()).toContain('specVersion')
     expect(rows[1].text()).toContain('{"expected":"1.6 or 1.7"}')

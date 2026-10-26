@@ -85,10 +85,12 @@ class RootFixOptions(BaseModel):
     remove_services: bool = True
     increment_version: bool = True
 
-    @field_validator("spec_version")
+    @field_validator("spec_version", mode="before")
     @classmethod
-    def _validate_spec_version(cls, value: str) -> str:
-        if not SPEC_VERSION_PATTERN.fullmatch(value):
+    def _validate_spec_version(cls, value: object) -> str:
+        if isinstance(value, str):
+            value = value.strip()
+        if not isinstance(value, str) or not SPEC_VERSION_PATTERN.fullmatch(value):
             raise ValueError("spec_version must match ^\\d+\\.\\d+$")
         return value
 

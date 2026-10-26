@@ -28,10 +28,15 @@ def test_defaults_all_on_except_two_rules():
     assert o.components.filter_properties is True
 
 
-@pytest.mark.parametrize("value", ["", "1", "1.7.0", "v1.7", "1,7", 1.7])
+@pytest.mark.parametrize("value", ["", " ", "   ", "1", "1.7.0", "v1.7", "1,7", 1.7])
 def test_invalid_spec_version_rejected(value):
     with pytest.raises(ValidationError):
         SbomFixOptions(root={"spec_version": value})
+
+
+def test_spec_version_is_trimmed_before_validation():
+    options = SbomFixOptions(root={"spec_version": " 1.7 "})
+    assert options.root.spec_version == "1.7"
 
 
 def test_all_enabled_rules_yield_21_stats_in_canonical_order():

@@ -429,7 +429,12 @@ function describeError(e: unknown): string {
 
 function issueLabel(issue: SbomFixIssue): string {
   const key = 'sbomFixer.issues.' + issue.code
-  return te(key) ? t(key, issue.details) : issue.code
+  if (!te(key)) return issue.code
+  const params: Record<string, unknown> = { ...issue.details }
+  if (Array.isArray(params.missing)) {
+    params.missing = params.missing.join(', ')
+  }
+  return t(key, params)
 }
 
 function issueDetails(issue: SbomFixIssue): string {

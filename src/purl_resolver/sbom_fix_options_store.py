@@ -27,7 +27,12 @@ class SbomFixOptionsStore:
             raw = self._path.read_text(encoding="utf-8")
             data = json.loads(raw)
             return SbomFixOptions.model_validate(data)
-        except (json.JSONDecodeError, OSError, ValidationError) as exc:
+        except (
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+            OSError,
+            ValidationError,
+        ) as exc:
             logger.warning(
                 "Failed to load sbom fix options from %s: %s", self._path, exc
             )
