@@ -220,12 +220,12 @@ describe('SbomFixer.vue', () => {
       'metadata.reorder',
       'metadata.remove_properties',
       'metadata.remove_tools',
-      'metadata.component.reorder',
-      'metadata.component.remove_external_references',
-      'metadata.component.remove_properties',
-      'metadata.component.remove_purl',
-      'metadata.component.remove_scope',
-      'metadata.component.rename_supplier',
+      'metadata_component.reorder',
+      'metadata_component.remove_external_references',
+      'metadata_component.remove_properties',
+      'metadata_component.remove_purl',
+      'metadata_component.remove_scope',
+      'metadata_component.rename_supplier',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(true)
     }
@@ -236,12 +236,12 @@ describe('SbomFixer.vue', () => {
       'metadata.reorder',
       'metadata.remove_properties',
       'metadata.remove_tools',
-      'metadata.component.reorder',
-      'metadata.component.remove_external_references',
-      'metadata.component.remove_properties',
-      'metadata.component.remove_purl',
-      'metadata.component.remove_scope',
-      'metadata.component.rename_supplier',
+      'metadata_component.reorder',
+      'metadata_component.remove_external_references',
+      'metadata_component.remove_properties',
+      'metadata_component.remove_purl',
+      'metadata_component.remove_scope',
+      'metadata_component.rename_supplier',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(false)
     }
@@ -258,7 +258,7 @@ describe('SbomFixer.vue', () => {
     expect((wrapper.find(rule('metadata.add_timestamp')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('metadata.remove_properties')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('metadata.remove_tools')).element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.find(rule('metadata.component.reorder')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('metadata_component.reorder')).element as HTMLInputElement).checked).toBe(false)
   })
 
   it('marks partially selected masters as indeterminate', async () => {
@@ -268,7 +268,7 @@ describe('SbomFixer.vue', () => {
     expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(true)
     expect((masterFor(wrapper, 'components').element as HTMLInputElement).indeterminate).toBe(true)
 
-    await wrapper.find(rule('metadata.component.remove_purl')).setValue(true)
+    await wrapper.find(rule('metadata_component.remove_purl')).setValue(true)
     expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(false)
     expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).checked).toBe(true)
   })
@@ -284,11 +284,11 @@ describe('SbomFixer.vue', () => {
     expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
 
     await wrapper.find('[data-group="metadata-component"] .clear-all').trigger('click')
-    expect((wrapper.find(rule('metadata.component.remove_purl')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('metadata_component.remove_purl')).element as HTMLInputElement).checked).toBe(false)
     expect((wrapper.find(rule('metadata.reorder')).element as HTMLInputElement).checked).toBe(true)
 
     await wrapper.find('[data-group="metadata-component"] .select-all').trigger('click')
-    expect((wrapper.find(rule('metadata.component.remove_purl')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('metadata_component.remove_purl')).element as HTMLInputElement).checked).toBe(true)
   })
 
   it('restores defaults without saving them', async () => {
@@ -300,7 +300,7 @@ describe('SbomFixer.vue', () => {
 
     expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('components.fill_missing_gost_properties')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('metadata.component.remove_purl')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('metadata_component.remove_purl')).element as HTMLInputElement).checked).toBe(false)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).value).toBe('1.7')
     expect(saveFixOptionsMock).not.toHaveBeenCalled()
   })
@@ -321,6 +321,25 @@ describe('SbomFixer.vue', () => {
     expect(wrapper.find('.save-status').text()).toContain('Saved')
   })
 
+  it('clears the Saved status when options change or a new file is selected', async () => {
+    const wrapper = await mountFixer()
+
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).toContain('Saved')
+
+    await wrapper.find(rule('root.reorder')).setValue(false)
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).not.toContain('Saved')
+
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).toContain('Saved')
+
+    await selectFile(wrapper)
+    expect(wrapper.find('.save-status').text()).not.toContain('Saved')
+  })
+
   it('shows a save failure in save-status, not in the error block', async () => {
     saveFixOptionsMock.mockRejectedValueOnce(new ApiError(500, 'options_save_failed'))
     const wrapper = await mountFixer()
@@ -328,7 +347,7 @@ describe('SbomFixer.vue', () => {
     await wrapper.find('.save-settings').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.save-status').text()).toContain('Could not save settings')
+    expect(wrapper.find('.save-status').text()).toContain('Could not save fix options')
     expect(wrapper.find('.save-status').classes()).toContain('save-status-error')
     expect(wrapper.find('.error-msg').exists()).toBe(false)
   })
@@ -340,7 +359,7 @@ describe('SbomFixer.vue', () => {
     await wrapper.find('.save-settings').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.save-status').text()).toContain('Could not save settings')
+    expect(wrapper.find('.save-status').text()).toContain('Network error')
     expect(wrapper.find('.error-msg').exists()).toBe(false)
   })
 

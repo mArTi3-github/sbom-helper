@@ -16,7 +16,7 @@
           :class="['save-status', { 'save-status-saved': saveStatus === 'saved', 'save-status-error': saveStatus === 'error' }]"
         >
           <template v-if="saveStatus === 'saved'">{{ t('sbomFixer.saved') }}</template>
-          <template v-else-if="saveStatus === 'error'">{{ t('sbomFixer.saveFailed') }}</template>
+          <template v-else-if="saveStatus === 'error'">{{ saveError }}</template>
         </span>
         <button class="btn reset-defaults" @click="restoreDefaults">{{ t('sbomFixer.resetDefaults') }}</button>
       </div>
@@ -123,31 +123,31 @@
           </div>
           <div class="group-options">
             <label class="rule-row">
-              <input v-model="options.metadata.component.reorder" type="checkbox" :data-rule="'metadata.component.reorder'" />
+              <input v-model="options.metadata.component.reorder" type="checkbox" :data-rule="'metadata_component.reorder'" />
               <span>{{ t('sbomFixer.rules.metadata_component.reorder') }}</span>
             </label>
             <label class="rule-row">
               <input
                 v-model="options.metadata.component.remove_external_references"
                 type="checkbox"
-                :data-rule="'metadata.component.remove_external_references'"
+                :data-rule="'metadata_component.remove_external_references'"
               />
               <span>{{ t('sbomFixer.rules.metadata_component.remove_external_references') }}</span>
             </label>
             <label class="rule-row">
-              <input v-model="options.metadata.component.remove_properties" type="checkbox" :data-rule="'metadata.component.remove_properties'" />
+              <input v-model="options.metadata.component.remove_properties" type="checkbox" :data-rule="'metadata_component.remove_properties'" />
               <span>{{ t('sbomFixer.rules.metadata_component.remove_properties') }}</span>
             </label>
             <label class="rule-row">
-              <input v-model="options.metadata.component.remove_purl" type="checkbox" :data-rule="'metadata.component.remove_purl'" />
+              <input v-model="options.metadata.component.remove_purl" type="checkbox" :data-rule="'metadata_component.remove_purl'" />
               <span>{{ t('sbomFixer.rules.metadata_component.remove_purl') }}</span>
             </label>
             <label class="rule-row">
-              <input v-model="options.metadata.component.remove_scope" type="checkbox" :data-rule="'metadata.component.remove_scope'" />
+              <input v-model="options.metadata.component.remove_scope" type="checkbox" :data-rule="'metadata_component.remove_scope'" />
               <span>{{ t('sbomFixer.rules.metadata_component.remove_scope') }}</span>
             </label>
             <label class="rule-row">
-              <input v-model="options.metadata.component.rename_supplier" type="checkbox" :data-rule="'metadata.component.rename_supplier'" />
+              <input v-model="options.metadata.component.rename_supplier" type="checkbox" :data-rule="'metadata_component.rename_supplier'" />
               <span>{{ t('sbomFixer.rules.metadata_component.rename_supplier') }}</span>
             </label>
           </div>
@@ -225,7 +225,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import { fixSbom, getFixOptions, saveFixOptions } from '../api/sbom'
@@ -243,6 +243,8 @@ const error = ref<string | null>(null)
 const result = ref<SbomFixResponse | null>(null)
 const optionsWarning = ref(false)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+const saveError = ref<string | null>(null)
+let changedWhileSaving = false
 
 function defaultFixOptions(): SbomFixOptions {
   return {
@@ -360,23 +362,52 @@ const componentsMaster = computed({
 })
 const componentsIndeterminate = computed(() => !componentsMaster.value && componentValues().some(Boolean))
 
+function describeError(e: unknown): string {
+  if (e instanceof ApiError) {
+    return t('errors.' + e.error, e.data)
+  }
+  if (e instanceof Error) {
+    return t('errors.network_error')
+  }
+  return t('errors.unexpected_error')
+}
+
+watch(
+  options,
+  () => {
+    if (saveStatus.value === 'saving') {
+      changedWhileSaving = true
+    } else {
+      saveStatus.value = 'idle'
+      saveError.value = null
+    }
+  },
+  { deep: true },
+)
+
 function restoreDefaults(): void {
   applyOptions(defaultFixOptions())
   saveStatus.value = 'idle'
+  saveError.value = null
 }
 
 function onFileSelected(file: File): void {
   selectedFile.value = file
   error.value = null
   result.value = null
+  saveStatus.value = 'idle'
+  saveError.value = null
 }
 
 async function handleSave(): Promise<void> {
   saveStatus.value = 'saving'
+  saveError.value = null
+  changedWhileSaving = false
   try {
     await saveFixOptions(plainOptions())
-    saveStatus.value = 'saved'
-  } catch {
+    saveStatus.value = changedWhileSaving ? 'idle' : 'saved'
+  } catch (e: unknown) {
+    saveError.value = describeError(e)
     saveStatus.value = 'error'
   }
 }
@@ -391,13 +422,7 @@ async function handleFix(): Promise<void> {
   try {
     result.value = await fixSbom(selectedFile.value, plainOptions())
   } catch (e: unknown) {
-    if (e instanceof ApiError) {
-      error.value = t('errors.' + e.error, e.data)
-    } else if (e instanceof Error) {
-      error.value = t('errors.network_error')
-    } else {
-      error.value = t('errors.unexpected_error')
-    }
+    error.value = describeError(e)
   } finally {
     loading.value = false
   }
