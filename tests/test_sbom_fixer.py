@@ -6,7 +6,9 @@ from pydantic import ValidationError
 
 from purl_resolver.sbom.fixer import (
     RULE_IDS,
+    FixIssue,
     SbomFixOptions,
+    _collect_component_issues,
     _fill_gost_properties,
     _filter_external_references,
     _filter_properties,
@@ -1111,3 +1113,428 @@ def test_disabled_components_rules_leave_fields_untouched():
     assert result.fixed_sbom == data
     assert result.changed is False
     assert all(stat.count == 0 for stat in result.stats)
+
+
+_ABSENT = object()
+
+
+def _valid_component(**overrides):
+    component = {
+        "type": "library",
+        "name": "pkg",
+        "version": "1.0.0",
+        "purl": "pkg:generic/pkg@1.0.0",
+        "properties": [
+            {"name": "GOST:attack_surface", "value": "no"},
+            {"name": "GOST:security_function", "value": "no"},
+        ],
+        "externalReferences": [{"type": "vcs", "url": "https://example.com/repo"}],
+    }
+    component.update(overrides)
+    return component
+
+
+def _issue_codes(issues):
+    return [(issue.code, issue.path, issue.component) for issue in issues]
+
+
+def test_collect_component_issues_reports_missing_fields():
+    issues: list[FixIssue] = []
+    _collect_component_issues([{"type": "library"}], "$.components", issues)
+    assert [(i.code, i.path, i.component) for i in issues] == [
+        ("component.missing_name", "$.components[0]", None),
+        ("component.missing_version", "$.components[0]", None),
+        ("component.missing_purl", "$.components[0]", None),
+        ("component.missing_gost_properties", "$.components[0]", None),
+        ("component.missing_source_reference", "$.components[0]", None),
+    ]
+
+
+def test_collect_component_issues_valid_component_has_no_issues():
+    issues = []
+    _collect_component_issues([_valid_component()], "$.components", issues)
+    assert issues == []
+
+
+def test_collect_component_issues_invalid_entry_is_reported_and_others_processed():
+    issues = []
+    _collect_component_issues(
+        [None, _valid_component(), "not-an-object"], "$.components", issues
+    )
+    assert _issue_codes(issues) == [
+        ("component.invalid_entry", "$.components[0]", None),
+        ("component.invalid_entry", "$.components[2]", None),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("field", "code"),
+    [
+        ("type", "component.missing_type"),
+        ("name", "component.missing_name"),
+        ("version", "component.missing_version"),
+        ("purl", "component.missing_purl"),
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(_ABSENT, id="absent"),
+        pytest.param(None, id="null"),
+        pytest.param("", id="empty"),
+        pytest.param(0, id="int"),
+        pytest.param([], id="list"),
+        pytest.param({}, id="dict"),
+    ],
+)
+def test_collect_component_issues_missing_required_field(field, code, value):
+    component = _valid_component()
+    if value is _ABSENT:
+        del component[field]
+    else:
+        component[field] = value
+    name = component.get("name")
+    expected_component = name if isinstance(name, str) and name else None
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert _issue_codes(issues) == [(code, "$.components[0]", expected_component)]
+
+
+@pytest.mark.parametrize("value", [{}, "not-a-list", 42, True])
+def test_collect_component_issues_invalid_properties_does_not_duplicate_gost(value):
+    issues = []
+    _collect_component_issues(
+        [_valid_component(properties=value)], "$.components", issues
+    )
+    assert _issue_codes(issues) == [
+        ("component.invalid_properties", "$.components[0]", "pkg")
+    ]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(_ABSENT, id="absent"),
+        pytest.param(None, id="null"),
+        pytest.param([], id="empty"),
+    ],
+)
+def test_collect_component_issues_missing_gost_properties(value):
+    component = _valid_component()
+    if value is _ABSENT:
+        del component["properties"]
+    else:
+        component["properties"] = value
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert _issue_codes(issues) == [
+        ("component.missing_gost_properties", "$.components[0]", "pkg")
+    ]
+    assert issues[0].details == {
+        "missing": ["GOST:attack_surface", "GOST:security_function"]
+    }
+
+
+@pytest.mark.parametrize(
+    ("properties", "missing"),
+    [
+        (
+            [{"name": "GOST:attack_surface", "value": "no"}],
+            ["GOST:security_function"],
+        ),
+        (
+            [{"name": "GOST:security_function", "value": "no"}],
+            ["GOST:attack_surface"],
+        ),
+        (
+            [{"name": "custom"}, "not-an-object", {"name": 5}],
+            ["GOST:attack_surface", "GOST:security_function"],
+        ),
+    ],
+)
+def test_collect_component_issues_reports_missing_gost_names(properties, missing):
+    issues = []
+    _collect_component_issues(
+        [_valid_component(properties=properties)], "$.components", issues
+    )
+    assert _issue_codes(issues) == [
+        ("component.missing_gost_properties", "$.components[0]", "pkg")
+    ]
+    assert issues[0].details == {"missing": missing}
+
+
+def test_collect_component_issues_no_gost_issue_when_both_names_present():
+    component = _valid_component(
+        properties=[
+            {"name": "GOST:security_function"},
+            {"name": "GOST:attack_surface"},
+        ]
+    )
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert issues == []
+
+
+@pytest.mark.parametrize("value", [{}, "not-a-list", 42, True])
+def test_collect_component_issues_invalid_external_references_not_duplicated(value):
+    issues = []
+    _collect_component_issues(
+        [_valid_component(externalReferences=value)], "$.components", issues
+    )
+    assert _issue_codes(issues) == [
+        ("component.invalid_external_references", "$.components[0]", "pkg")
+    ]
+
+
+def test_collect_component_issues_invalid_fields_do_not_emit_missing_counterparts():
+    component = _valid_component(properties={}, externalReferences="not-a-list")
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert _issue_codes(issues) == [
+        ("component.invalid_properties", "$.components[0]", "pkg"),
+        ("component.invalid_external_references", "$.components[0]", "pkg"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(_ABSENT, id="absent"),
+        pytest.param(None, id="null"),
+        pytest.param([], id="empty"),
+        pytest.param([{"type": "website"}], id="wrong-type"),
+        pytest.param([None, "not-an-object", {"type": 5}], id="invalid-entries"),
+    ],
+)
+def test_collect_component_issues_missing_source_reference(value):
+    component = _valid_component()
+    if value is _ABSENT:
+        del component["externalReferences"]
+    else:
+        component["externalReferences"] = value
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert _issue_codes(issues) == [
+        ("component.missing_source_reference", "$.components[0]", "pkg")
+    ]
+
+
+@pytest.mark.parametrize(
+    "references",
+    [
+        [{"type": "vcs"}],
+        [{"type": "source-distribution"}],
+        [{"type": "website"}, {"type": "vcs", "url": "https://example.com"}],
+    ],
+)
+def test_collect_component_issues_source_reference_present(references):
+    issues = []
+    _collect_component_issues(
+        [_valid_component(externalReferences=references)], "$.components", issues
+    )
+    assert issues == []
+
+
+def test_collect_component_issues_non_empty_components_exempts_source_reference():
+    parent = _valid_component(
+        name="parent", components=[_valid_component(name="child")]
+    )
+    del parent["externalReferences"]
+    issues = []
+    _collect_component_issues([parent], "$.components", issues)
+    assert issues == []
+
+
+def test_collect_component_issues_empty_components_does_not_exempt_source_reference():
+    component = _valid_component(components=[])
+    del component["externalReferences"]
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert _issue_codes(issues) == [
+        ("component.missing_source_reference", "$.components[0]", "pkg")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("value", "exempt"),
+    [
+        pytest.param(_ABSENT, False, id="absent"),
+        ("certified", True),
+        ("", False),
+        (None, False),
+        (5, False),
+        (["certified"], False),
+    ],
+)
+def test_collect_component_issues_provided_by_exception(value, exempt):
+    properties = [{"name": "GOST:attack_surface"}, {"name": "GOST:security_function"}]
+    if value is _ABSENT:
+        properties.append({"name": "GOST:provided_by"})
+    else:
+        properties.append({"name": "GOST:provided_by", "value": value})
+    component = _valid_component(properties=properties)
+    del component["externalReferences"]
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    expected = (
+        []
+        if exempt
+        else [("component.missing_source_reference", "$.components[0]", "pkg")]
+    )
+    assert _issue_codes(issues) == expected
+
+
+@pytest.mark.parametrize(
+    ("licenses", "exempt"),
+    [
+        pytest.param(_ABSENT, False, id="absent"),
+        ([{"license": {"name": "Proprietary"}}], True),
+        ([{"license": {"name": "MIT"}}], False),
+        ([{"license": {"name": "proprietary"}}], False),
+        ([{"name": "Proprietary"}], False),
+        ([{"license": "Proprietary"}], False),
+        ([{"license": None}], False),
+        ("Proprietary", False),
+        (None, False),
+        ([], False),
+    ],
+)
+def test_collect_component_issues_proprietary_license_exception(licenses, exempt):
+    component = _valid_component()
+    if licenses is not _ABSENT:
+        component["licenses"] = licenses
+    del component["externalReferences"]
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    expected = (
+        []
+        if exempt
+        else [("component.missing_source_reference", "$.components[0]", "pkg")]
+    )
+    assert _issue_codes(issues) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "not-a-list",
+        {"components": [_valid_component(name="hidden")]},
+        42,
+        True,
+    ],
+)
+def test_collect_component_issues_invalid_subcomponents_does_not_recurse(value):
+    issues = []
+    _collect_component_issues(
+        [_valid_component(components=value)], "$.components", issues
+    )
+    assert _issue_codes(issues) == [
+        ("component.invalid_subcomponents", "$.components[0]", "pkg")
+    ]
+
+
+@pytest.mark.parametrize("value", [None, []])
+def test_collect_component_issues_null_or_empty_subcomponents_not_reported(value):
+    issues = []
+    _collect_component_issues(
+        [_valid_component(components=value)], "$.components", issues
+    )
+    assert issues == []
+
+
+def test_collect_component_issues_code_order_within_component():
+    component = {
+        "properties": "not-a-list",
+        "externalReferences": {},
+        "components": "not-a-list",
+    }
+    issues = []
+    _collect_component_issues([component], "$.components", issues)
+    assert _issue_codes(issues) == [
+        ("component.missing_type", "$.components[0]", None),
+        ("component.missing_name", "$.components[0]", None),
+        ("component.missing_version", "$.components[0]", None),
+        ("component.missing_purl", "$.components[0]", None),
+        ("component.invalid_properties", "$.components[0]", None),
+        ("component.invalid_external_references", "$.components[0]", None),
+        ("component.invalid_subcomponents", "$.components[0]", None),
+    ]
+    assert all(issue.details == {} for issue in issues)
+
+
+def test_collect_component_issues_pre_order_and_nested_paths():
+    a = _valid_component(name="a")
+    del a["version"]
+    b = _valid_component(name="b")
+    del b["purl"]
+    c = _valid_component(name="c")
+    del c["type"]
+    b["components"] = [c]
+    a["components"] = [b]
+    d = _valid_component(name="d")
+    del d["name"]
+    issues = []
+    _collect_component_issues([a, d], "$.components", issues)
+    assert _issue_codes(issues) == [
+        ("component.missing_version", "$.components[0]", "a"),
+        ("component.missing_purl", "$.components[0].components[0]", "b"),
+        (
+            "component.missing_type",
+            "$.components[0].components[0].components[0]",
+            "c",
+        ),
+        ("component.missing_name", "$.components[1]", None),
+    ]
+
+
+def test_collect_component_issues_unexpected_types_do_not_raise():
+    entries = [
+        None,
+        42,
+        "not-an-object",
+        [],
+        {},
+        {
+            "type": 5,
+            "name": ["x"],
+            "version": {},
+            "purl": 1,
+            "properties": 5,
+            "externalReferences": 5,
+            "components": 5,
+            "licenses": 5,
+        },
+        {
+            "type": "library",
+            "name": "weird",
+            "version": "1",
+            "purl": "pkg:generic/weird@1",
+            "properties": [
+                None,
+                1,
+                "not-an-object",
+                {"name": 5},
+                {"name": "GOST:provided_by", "value": 5},
+            ],
+            "externalReferences": [None, 1, {"type": 5}],
+            "licenses": 5,
+        },
+    ]
+    issues: list[FixIssue] = []
+    _collect_component_issues(entries, "$.components", issues)
+    assert [issue.code for issue in issues[:4]] == ["component.invalid_entry"] * 4
+    assert [issue.path for issue in issues[:4]] == [
+        "$.components[0]",
+        "$.components[1]",
+        "$.components[2]",
+        "$.components[3]",
+    ]
+    assert all(issue.component is None for issue in issues[:4])
+
+
+def test_collect_component_issues_ignores_non_list_input():
+    issues: list[FixIssue] = []
+    _collect_component_issues({}, "$.components", issues)
+    _collect_component_issues(None, "$.components", issues)
+    _collect_component_issues("not-a-list", "$.components", issues)
+    assert issues == []

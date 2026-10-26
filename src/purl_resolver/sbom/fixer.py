@@ -301,6 +301,146 @@ def _walk_components(root: dict, callback: Callable[[dict], None]) -> None:
         _walk_components(component, callback)
 
 
+def _is_non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _missing_gost_names(properties: list) -> list[str]:
+    present = {
+        prop["name"]
+        for prop in properties
+        if isinstance(prop, dict) and isinstance(prop.get("name"), str)
+    }
+    return [name for name, _ in REQUIRED_GOST_PROPERTIES if name not in present]
+
+
+def _has_source_reference(component: dict) -> bool:
+    references = component.get("externalReferences")
+    if not isinstance(references, list):
+        return False
+    return any(
+        isinstance(reference, dict)
+        and reference.get("type") in ALLOWED_EXTERNAL_REFERENCE_TYPES
+        for reference in references
+    )
+
+
+def _is_source_reference_exempt(component: dict) -> bool:
+    components = component.get("components")
+    if isinstance(components, list) and components:
+        return True
+
+    properties = component.get("properties")
+    if isinstance(properties, list):
+        for prop in properties:
+            if (
+                isinstance(prop, dict)
+                and prop.get("name") == "GOST:provided_by"
+                and _is_non_empty_string(prop.get("value"))
+            ):
+                return True
+
+    licenses = component.get("licenses")
+    if isinstance(licenses, list):
+        for entry in licenses:
+            if not isinstance(entry, dict):
+                continue
+            license_info = entry.get("license")
+            if (
+                isinstance(license_info, dict)
+                and license_info.get("name") == "Proprietary"
+            ):
+                return True
+
+    return False
+
+
+def _collect_component_issues(
+    components: list,
+    base_path: str,
+    issues: list[FixIssue],
+) -> None:
+    if not isinstance(components, list):
+        return
+    for index, component in enumerate(components):
+        path = f"{base_path}[{index}]"
+        if not isinstance(component, dict):
+            issues.append(FixIssue(code="component.invalid_entry", path=path))
+            continue
+
+        name = component.get("name")
+        component_name = name if _is_non_empty_string(name) else None
+        for field_name, code in (
+            ("type", "component.missing_type"),
+            ("name", "component.missing_name"),
+            ("version", "component.missing_version"),
+            ("purl", "component.missing_purl"),
+        ):
+            if not _is_non_empty_string(component.get(field_name)):
+                issues.append(
+                    FixIssue(code=code, path=path, component=component_name)
+                )
+
+        properties = component.get("properties")
+        if properties is not None and not isinstance(properties, list):
+            issues.append(
+                FixIssue(
+                    code="component.invalid_properties",
+                    path=path,
+                    component=component_name,
+                )
+            )
+        else:
+            missing = _missing_gost_names(
+                properties if isinstance(properties, list) else []
+            )
+            if missing:
+                issues.append(
+                    FixIssue(
+                        code="component.missing_gost_properties",
+                        path=path,
+                        component=component_name,
+                        details={"missing": missing},
+                    )
+                )
+
+        external_references = component.get("externalReferences")
+        if external_references is not None and not isinstance(
+            external_references, list
+        ):
+            issues.append(
+                FixIssue(
+                    code="component.invalid_external_references",
+                    path=path,
+                    component=component_name,
+                )
+            )
+        elif not _has_source_reference(component) and not _is_source_reference_exempt(
+            component
+        ):
+            issues.append(
+                FixIssue(
+                    code="component.missing_source_reference",
+                    path=path,
+                    component=component_name,
+                )
+            )
+
+        nested = component.get("components")
+        if nested is not None and not isinstance(nested, list):
+            issues.append(
+                FixIssue(
+                    code="component.invalid_subcomponents",
+                    path=path,
+                    component=component_name,
+                )
+            )
+            continue
+
+        if isinstance(nested, list):
+            _collect_component_issues(nested, f"{path}.components", issues)
+
+
 def _filter_external_references(refs: list) -> tuple[list, int]:
     kept = [
         ref
