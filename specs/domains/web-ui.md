@@ -266,7 +266,7 @@ User                   Browser (Vue SPA)             API Layer
 - API routes are registered before the SPA mount — API paths always take priority
 - Each `.vue` component uses `<style scoped>` for CSS isolation
 - Global CSS variables and resets are in `frontend/src/assets/main.css`
-- TypeScript interfaces in `frontend/src/types/api.ts` mirror backend `schemas.py` — any schema change must be reflected in both
+- Most TypeScript interfaces in `frontend/src/types/api.ts` mirror `src/purl_resolver/schemas.py` — any schema change must be reflected in both; the SBOM-fixer option types mirror `src/purl_resolver/sbom/fixer.py`, and `SbomFixResponse` mirrors the `src/purl_resolver/routes/sbom_fix.py` response payload
 - All user-facing strings are translated via `vue-i18n` (Composition API mode, `legacy: false`); locale files at `frontend/src/i18n/locales/{en,ru}.json` share identical key structure
 - Initial locale detection: `localStorage.getItem('locale')` → `navigator.language` (if starts with `ru`) → `'en'` (fallback); locale is persisted to `localStorage` on change and synced to backend via `PATCH /api/v1/settings` `language` field
 - All error responses from the API return machine-readable `error` codes (no `message` field); the frontend translates error codes via `t('errors.' + errorCode, errorData)`

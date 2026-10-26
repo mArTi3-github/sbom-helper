@@ -136,7 +136,7 @@ Rules mutate a deep copy and never create issues; all issues come from a separat
 | 3 | `root.remove_dependencies` | on | Remove root `dependencies` key | 1 if key existed |
 | 4 | `root.remove_services` | on | Remove root `services` key | 1 if key existed |
 | 5 | `root.increment_version` | on | Increment `version` by 1 when it is an integer (not `bool`) | 1 if incremented |
-| 6 | `metadata.add_timestamp` | on | Add `metadata.timestamp` (current UTC, `YYYY-MM-DDTHH:MM:SSZ`) only when it is absent, `null`, or `""`; an existing non-empty value is never overwritten (a non-string value is left in place and reported) | 1 if added |
+| 6 | `metadata.add_timestamp` | on | Add `metadata.timestamp` (current UTC, `YYYY-MM-DDTHH:MM:SSZ`) only when it is absent, `null`, or `""`; an existing non-empty value is never overwritten (a non-null, non-string value is left in place and reported) | 1 if added |
 | 7 | `metadata.reorder` | on | Order `timestamp`, `component`, then other keys | 1/0 |
 | 8 | `metadata.remove_properties` | on | Remove `metadata.properties` | 1/0 |
 | 9 | `metadata.remove_tools` | on | Remove `metadata.tools` (array or object) | 1/0 |
