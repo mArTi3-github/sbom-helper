@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -212,6 +212,72 @@ def _apply_root_rules(
             counts["root.increment_version"] = 0
 
 
+def _format_timestamp(now: datetime) -> str:
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _add_timestamp(metadata: dict, now: datetime) -> int:
+    value = metadata.get("timestamp")
+    if "timestamp" in metadata and value is not None and value != "":
+        return 0
+    metadata["timestamp"] = _format_timestamp(now)
+    return 1
+
+
+def _rename_supplier(component: dict) -> int:
+    if "supplier" not in component:
+        return 0
+    supplier = component.pop("supplier")
+    if ("manufacturer" not in component or component["manufacturer"] is None) and (
+        supplier is not None
+    ):
+        component["manufacturer"] = supplier
+    return 1
+
+
+def _apply_metadata_rules(
+    data: dict,
+    options: SbomFixOptions,
+    counts: dict[str, int],
+    now: datetime,
+) -> None:
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        return
+
+    if _rule_enabled("metadata.add_timestamp", options):
+        counts["metadata.add_timestamp"] = _add_timestamp(metadata, now)
+
+    for rule_id, key in (
+        ("metadata.remove_properties", "properties"),
+        ("metadata.remove_tools", "tools"),
+    ):
+        if _rule_enabled(rule_id, options):
+            counts[rule_id] = int(key in metadata)
+            metadata.pop(key, None)
+
+    component = metadata.get("component")
+    if not isinstance(component, dict):
+        return
+
+    for rule_id, key in (
+        ("metadata_component.remove_external_references", "externalReferences"),
+        ("metadata_component.remove_properties", "properties"),
+        ("metadata_component.remove_purl", "purl"),
+        ("metadata_component.remove_scope", "scope"),
+    ):
+        if _rule_enabled(rule_id, options):
+            counts[rule_id] = int(key in component)
+            component.pop(key, None)
+
+    if _rule_enabled("metadata_component.rename_supplier", options):
+        counts["metadata_component.rename_supplier"] = _rename_supplier(component)
+
+
 def _apply_reorders(
     data: dict,
     options: SbomFixOptions,
@@ -249,9 +315,12 @@ def fix_sbom(
     options: SbomFixOptions,
     now: datetime | None = None,
 ) -> SbomFixResult:
+    if now is None:
+        now = datetime.now(timezone.utc)
     fixed_sbom = copy.deepcopy(data)
     counts: dict[str, int] = {}
     _apply_root_rules(fixed_sbom, options, counts)
+    _apply_metadata_rules(fixed_sbom, options, counts, now)
     fixed_sbom = _apply_reorders(fixed_sbom, options, counts)
     stats = [
         FixStat(rule_id=rule_id, count=counts.get(rule_id, 0))
