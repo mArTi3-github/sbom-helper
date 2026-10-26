@@ -111,6 +111,14 @@ class TestFixSbom:
         assert response.status_code == 400
         assert response.json() == {"error": "invalid_json"}
 
+    def test_invalid_utf8_file_returns_invalid_json(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/sbom/fix",
+            files={"file": ("bom.json", b"\xff\xfe\x00", "application/json")},
+        )
+        assert response.status_code == 400
+        assert response.json() == {"error": "invalid_json"}
+
     def test_invalid_sbom_returns_error_with_detail(self, client: TestClient) -> None:
         response = upload(client, {"bomFormat": "SPDX"})
         assert response.status_code == 400

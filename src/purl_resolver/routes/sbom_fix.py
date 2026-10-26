@@ -40,7 +40,7 @@ async def fix_sbom_endpoint(
 
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JSONResponse(
             status_code=400,
             content={"error": "invalid_json"},
