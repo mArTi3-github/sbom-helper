@@ -191,3 +191,67 @@ export interface ImportResponse {
   skipped: number
   errors: ImportErrorItem[]
 }
+
+export interface RootFixOptions {
+  reorder: boolean
+  set_spec_version: boolean
+  spec_version: string
+  remove_dependencies: boolean
+  remove_services: boolean
+  increment_version: boolean
+}
+
+export interface MetadataComponentFixOptions {
+  reorder: boolean
+  remove_external_references: boolean
+  remove_properties: boolean
+  remove_purl: boolean
+  remove_scope: boolean
+  rename_supplier: boolean
+}
+
+export interface MetadataFixOptions {
+  add_timestamp: boolean
+  reorder: boolean
+  remove_properties: boolean
+  remove_tools: boolean
+  component: MetadataComponentFixOptions
+}
+
+export interface ComponentsFixOptions {
+  reorder: boolean
+  remove_hashes: boolean
+  remove_scope: boolean
+  filter_external_references: boolean
+  filter_properties: boolean
+  fill_missing_gost_properties: boolean
+}
+
+export interface SbomFixOptions {
+  root: RootFixOptions
+  metadata: MetadataFixOptions
+  components: ComponentsFixOptions
+}
+
+export interface SbomFixStat {
+  rule_id: string
+  count: number
+}
+
+export interface SbomFixIssue {
+  code: string
+  path: string
+  component: string | null
+  details: Record<string, unknown>
+}
+
+export interface SbomFixResponse {
+  changed: boolean
+  fixed_sbom: unknown
+  stats: SbomFixStat[]
+  issues: SbomFixIssue[]
+}
+
+export interface SbomFixOptionsResponse {
+  options: SbomFixOptions
+}
