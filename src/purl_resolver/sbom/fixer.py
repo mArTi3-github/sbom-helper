@@ -11,6 +11,35 @@ from pydantic import BaseModel, Field, field_validator
 SPEC_VERSION_PATTERN = re.compile(r"^\d+\.\d+$")
 ALLOWED_SPEC_VERSIONS = {"1.6", "1.7"}
 
+ROOT_PRIORITY: tuple[str, ...] = (
+    "bomFormat",
+    "specVersion",
+    "serialNumber",
+    "version",
+    "metadata",
+    "components",
+    "annotations",
+)
+
+METADATA_PRIORITY: tuple[str, ...] = ("timestamp", "component")
+
+METADATA_COMPONENT_PRIORITY: tuple[str, ...] = (
+    "type",
+    "name",
+    "version",
+    "manufacturer",
+)
+
+COMPONENT_PRIORITY: tuple[str, ...] = (
+    "type",
+    "name",
+    "version",
+    "purl",
+    "externalReferences",
+    "properties",
+    "components",
+)
+
 RULE_IDS: tuple[str, ...] = (
     "root.reorder",
     "root.set_spec_version",
@@ -127,15 +156,81 @@ def _enabled_rule_ids(options: SbomFixOptions) -> list[str]:
     return [rule_id for rule_id in RULE_IDS if _rule_enabled(rule_id, options)]
 
 
+def _reorder(obj: dict, priority: tuple[str, ...]) -> tuple[dict, bool]:
+    ordered: dict = {}
+    for key in priority:
+        if key in obj:
+            ordered[key] = obj[key]
+    for key, value in obj.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered, list(obj) != list(ordered)
+
+
+def _reorder_in_place(obj: dict, priority: tuple[str, ...]) -> bool:
+    ordered, changed = _reorder(obj, priority)
+    if changed:
+        obj.clear()
+        obj.update(ordered)
+    return changed
+
+
+def _reorder_component_tree(component: dict) -> int:
+    count = int(_reorder_in_place(component, COMPONENT_PRIORITY))
+    nested = component.get("components")
+    if isinstance(nested, list):
+        for child in nested:
+            if isinstance(child, dict):
+                count += _reorder_component_tree(child)
+    return count
+
+
+def _apply_reorders(
+    data: dict,
+    options: SbomFixOptions,
+    counts: dict[str, int],
+) -> dict:
+    if _rule_enabled("root.reorder", options):
+        counts["root.reorder"] = int(_reorder_in_place(data, ROOT_PRIORITY))
+
+    metadata = data.get("metadata")
+    if isinstance(metadata, dict):
+        if _rule_enabled("metadata.reorder", options):
+            counts["metadata.reorder"] = int(
+                _reorder_in_place(metadata, METADATA_PRIORITY)
+            )
+        metadata_component = metadata.get("component")
+        if isinstance(metadata_component, dict) and _rule_enabled(
+            "metadata_component.reorder", options
+        ):
+            counts["metadata_component.reorder"] = int(
+                _reorder_in_place(metadata_component, METADATA_COMPONENT_PRIORITY)
+            )
+
+    components = data.get("components")
+    if isinstance(components, list) and _rule_enabled("components.reorder", options):
+        counts["components.reorder"] = sum(
+            _reorder_component_tree(component)
+            for component in components
+            if isinstance(component, dict)
+        )
+    return data
+
+
 def fix_sbom(
     data: dict,
     options: SbomFixOptions,
     now: datetime | None = None,
 ) -> SbomFixResult:
     fixed_sbom = copy.deepcopy(data)
-    stats = [FixStat(rule_id=rule_id, count=0) for rule_id in _enabled_rule_ids(options)]
+    counts: dict[str, int] = {}
+    fixed_sbom = _apply_reorders(fixed_sbom, options, counts)
+    stats = [
+        FixStat(rule_id=rule_id, count=counts.get(rule_id, 0))
+        for rule_id in _enabled_rule_ids(options)
+    ]
     return SbomFixResult(
-        changed=False,
+        changed=any(stat.count > 0 for stat in stats),
         fixed_sbom=fixed_sbom,
         stats=stats,
         issues=[],
