@@ -185,6 +185,33 @@ def _reorder_component_tree(component: dict) -> int:
     return count
 
 
+def _apply_root_rules(
+    data: dict,
+    options: SbomFixOptions,
+    counts: dict[str, int],
+) -> None:
+    if _rule_enabled("root.set_spec_version", options):
+        target = options.root.spec_version.strip()
+        counts["root.set_spec_version"] = int(data.get("specVersion") != target)
+        data["specVersion"] = target
+
+    for rule_id, key in (
+        ("root.remove_dependencies", "dependencies"),
+        ("root.remove_services", "services"),
+    ):
+        if _rule_enabled(rule_id, options):
+            counts[rule_id] = int(key in data)
+            data.pop(key, None)
+
+    if _rule_enabled("root.increment_version", options):
+        version = data.get("version")
+        if isinstance(version, int) and not isinstance(version, bool):
+            data["version"] = version + 1
+            counts["root.increment_version"] = 1
+        else:
+            counts["root.increment_version"] = 0
+
+
 def _apply_reorders(
     data: dict,
     options: SbomFixOptions,
@@ -224,6 +251,7 @@ def fix_sbom(
 ) -> SbomFixResult:
     fixed_sbom = copy.deepcopy(data)
     counts: dict[str, int] = {}
+    _apply_root_rules(fixed_sbom, options, counts)
     fixed_sbom = _apply_reorders(fixed_sbom, options, counts)
     stats = [
         FixStat(rule_id=rule_id, count=counts.get(rule_id, 0))

@@ -91,7 +91,7 @@ def test_root_reorder_skips_missing_keys_and_preserves_other_relative_order():
         "extra_a": 1,
         "bomFormat": "CycloneDX",
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(data, SbomFixOptions(root={"set_spec_version": False}))
     assert list(result.fixed_sbom) == [
         "bomFormat", "components", "$schema", "extra_b", "extra_a",
     ]
@@ -215,3 +215,143 @@ def test_disabled_reorder_changes_nothing_and_is_absent_from_stats():
     assert "metadata_component.reorder" not in rule_ids
     assert "components.reorder" not in rule_ids
     assert all(stat.count == 0 for stat in result.stats)
+
+
+def _stats(result):
+    return {stat.rule_id: stat.count for stat in result.stats}
+
+
+def test_set_spec_version_replaces_value_and_counts_one():
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.6"}
+    result = fix_sbom(data, SbomFixOptions(root={"spec_version": "1.7"}))
+    assert result.fixed_sbom["specVersion"] == "1.7"
+    assert _stats(result)["root.set_spec_version"] == 1
+    assert result.changed is True
+
+
+def test_set_spec_version_adds_missing_key_and_counts_one():
+    data = {"bomFormat": "CycloneDX"}
+    result = fix_sbom(data, SbomFixOptions(root={"spec_version": "1.6"}))
+    assert result.fixed_sbom["specVersion"] == "1.6"
+    assert _stats(result)["root.set_spec_version"] == 1
+
+
+def test_set_spec_version_same_value_counts_zero():
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
+    result = fix_sbom(data, SbomFixOptions(root={"spec_version": "1.7"}))
+    assert result.fixed_sbom == data
+    assert _stats(result)["root.set_spec_version"] == 0
+
+
+def test_set_spec_version_strips_configured_value():
+    options = SbomFixOptions()
+    options.root.spec_version = " 1.7 "
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.6"}
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["specVersion"] == "1.7"
+    assert _stats(result)["root.set_spec_version"] == 1
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "key"),
+    [
+        ("root.remove_dependencies", "dependencies"),
+        ("root.remove_services", "services"),
+    ],
+)
+def test_remove_root_key_removes_even_empty_list_and_counts_one(rule_id, key):
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7", key: []}
+    result = fix_sbom(data, SbomFixOptions())
+    assert key not in result.fixed_sbom
+    assert _stats(result)[rule_id] == 1
+    assert result.changed is True
+
+
+@pytest.mark.parametrize(
+    ("rule_id", "key"),
+    [
+        ("root.remove_dependencies", "dependencies"),
+        ("root.remove_services", "services"),
+    ],
+)
+def test_remove_absent_root_key_counts_zero(rule_id, key):
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
+    result = fix_sbom(data, SbomFixOptions())
+    assert key not in result.fixed_sbom
+    assert _stats(result)[rule_id] == 0
+    assert result.changed is False
+
+
+@pytest.mark.parametrize("value", [0, 1, -3])
+def test_increment_version_increments_integers(value):
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": value}
+    result = fix_sbom(data, SbomFixOptions())
+    assert result.fixed_sbom["version"] == value + 1
+    assert _stats(result)["root.increment_version"] == 1
+
+
+@pytest.mark.parametrize("value", ["1", 1.5, True, False, None])
+def test_increment_version_leaves_missing_or_non_int_unchanged(value):
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": value}
+    result = fix_sbom(data, SbomFixOptions())
+    assert result.fixed_sbom["version"] == value
+    assert _stats(result)["root.increment_version"] == 0
+
+
+def test_increment_version_absent_counts_zero_and_does_not_add_key():
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
+    result = fix_sbom(data, SbomFixOptions())
+    assert "version" not in result.fixed_sbom
+    assert _stats(result)["root.increment_version"] == 0
+
+
+def test_disabled_root_rules_leave_fields_untouched_and_are_absent_from_stats():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "version": 1,
+        "dependencies": [],
+        "services": [],
+    }
+    options = SbomFixOptions(
+        root={
+            "set_spec_version": False,
+            "remove_dependencies": False,
+            "remove_services": False,
+            "increment_version": False,
+        }
+    )
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom == data
+    rule_ids = {stat.rule_id for stat in result.stats}
+    assert "root.set_spec_version" not in rule_ids
+    assert "root.remove_dependencies" not in rule_ids
+    assert "root.remove_services" not in rule_ids
+    assert "root.increment_version" not in rule_ids
+    assert result.changed is False
+
+
+def test_added_spec_version_goes_last_when_root_reorder_disabled():
+    data = {"bomFormat": "CycloneDX", "version": 5}
+    options = SbomFixOptions(root={"reorder": False})
+    result = fix_sbom(data, options)
+    assert list(result.fixed_sbom) == ["bomFormat", "version", "specVersion"]
+    stats = _stats(result)
+    assert stats["root.set_spec_version"] == 1
+    assert stats["root.increment_version"] == 1
+    assert "root.reorder" not in stats
+    assert result.changed is True
+
+
+def test_any_root_rule_with_positive_count_sets_changed():
+    options = SbomFixOptions(
+        root={
+            "set_spec_version": False,
+            "remove_dependencies": False,
+            "remove_services": False,
+        }
+    )
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}
+    result = fix_sbom(data, options)
+    assert _stats(result)["root.increment_version"] == 1
+    assert result.changed is True
