@@ -8,6 +8,7 @@ from .routes.ignore_patterns import router as ignore_patterns_router
 from .routes.images_list import router as images_list_router
 from .routes.jobs import router as jobs_router
 from .routes.resolve import router as resolve_router
+from .routes.sbom_fix import router as sbom_fix_router
 from .routes.settings import router as settings_router
 
 router = APIRouter()
@@ -18,6 +19,7 @@ router.include_router(db_admin_router)
 router.include_router(settings_router)
 router.include_router(images_list_router)
 router.include_router(ignore_patterns_router)
+router.include_router(sbom_fix_router)
 
 
 @router.get("/health")

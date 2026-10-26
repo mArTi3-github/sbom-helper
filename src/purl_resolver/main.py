@@ -17,6 +17,7 @@ from .ignore_patterns_store import IgnorePatternsStore
 from .job_manager import JobManager
 from .resolver.factory import build_resolvers
 from .router import router
+from .sbom_fix_options_store import SbomFixOptionsStore
 from .service import PurlResolutionService
 from .settings_store import SettingsStore
 from .storage.inmemory import InMemoryCache
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
         app.state.storage = InMemoryCache()
     app.state.settings_store = SettingsStore()
     app.state.ignore_patterns_store = IgnorePatternsStore()
+    app.state.sbom_fix_options_store = SbomFixOptionsStore()
 
     app_settings = app.state.settings_store.load()
     logging.basicConfig(level=app_settings.log_level_as_int(), force=True)
