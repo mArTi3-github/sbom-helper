@@ -97,7 +97,7 @@ Serve the Vue 3 SPA (home page).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns `index.html` from the built SPA (`frontend/dist/`). Vue Router handles client-side routing — all SPA routes (`/`, `/purl-resolver`, `/sbom-updater`, `/db-admin`, `/settings`, `/images-list-converter`) return the same `index.html`; the router mounts the corresponding view component. API routes are registered before the SPA mount and take priority.
+Content-Type: `text/html`. Returns `index.html` from the built SPA (`frontend/dist/`). Vue Router handles client-side routing — all SPA routes (`/`, `/purl-resolver`, `/sbom-updater`, `/fix-sbom`, `/db-admin`, `/settings`, `/images-list-converter`) return the same `index.html`; the router mounts the corresponding view component. API routes are registered before the SPA mount and take priority.
 
 ---
 
@@ -111,7 +111,165 @@ Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mount
 
 ---
 
+### `GET /fix-sbom`
 
+Serve the Fix SBOM web UI page (Vue SPA route).
+
+#### Response (200)
+
+Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, grouped fix options with master checkboxes, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
+
+---
+
+### `POST /api/v1/sbom/fix`
+
+Apply the selected normalization rules to a CycloneDX SBOM file. The operation is synchronous and requires no database or background queue.
+
+#### Request
+
+`multipart/form-data`:
+
+- `file` — required CycloneDX JSON file. Maximum size: `sbom_settings.max_file_size` (environment `SBOM_MAX_FILE_SIZE`, default 200 MB).
+- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all rules enabled except `metadata_component.remove_purl` and `components.fill_missing_gost_properties`; `spec_version: "1.7"`). The endpoint does not read the saved options file; the page always sends the current set explicitly.
+
+```json
+{
+  "root": {
+    "reorder": true,
+    "set_spec_version": true,
+    "spec_version": "1.7",
+    "remove_dependencies": true,
+    "remove_services": true,
+    "increment_version": true
+  },
+  "metadata": {
+    "add_timestamp": true,
+    "reorder": true,
+    "remove_properties": true,
+    "remove_tools": true,
+    "component": {
+      "reorder": true,
+      "remove_external_references": true,
+      "remove_properties": true,
+      "remove_purl": false,
+      "remove_scope": true,
+      "rename_supplier": true
+    }
+  },
+  "components": {
+    "reorder": true,
+    "remove_hashes": true,
+    "remove_scope": true,
+    "filter_external_references": true,
+    "filter_properties": true,
+    "fill_missing_gost_properties": false
+  }
+}
+```
+
+`spec_version` must match `^\d+\.\d+$`.
+
+#### Success Response (200)
+
+```json
+{
+  "changed": true,
+  "fixed_sbom": { "bomFormat": "CycloneDX", "specVersion": "1.7", "...": "..." },
+  "stats": [
+    { "rule_id": "root.reorder", "count": 1 },
+    { "rule_id": "components.remove_hashes", "count": 3 }
+  ],
+  "issues": [
+    {
+      "code": "component.missing_gost_properties",
+      "path": "$.components[0]",
+      "component": "openssl",
+      "details": { "missing": ["GOST:security_function"] }
+    }
+  ]
+}
+```
+
+- `changed` — `true` when at least one enabled rule reported a non-zero count.
+- `fixed_sbom` — the full fixed document; always returned, even when nothing changed.
+- `stats` — every enabled rule in canonical order, including rules with `count: 0`.
+- `issues` — defects remaining in the final document; empty array when none remain.
+
+#### Error Response (400) — invalid JSON
+
+```json
+{ "error": "invalid_json" }
+```
+
+#### Error Response (400) — invalid SBOM
+
+```json
+{ "error": "invalid_sbom", "detail": "..." }
+```
+
+#### Error Response (400) — invalid options
+
+```json
+{ "error": "invalid_options", "detail": "..." }
+```
+
+#### Error Response (413) — file too large
+
+```json
+{ "error": "file_too_large", "max_size_mb": 200 }
+```
+
+#### Validation Error (422) — missing file field
+
+Standard FastAPI/Pydantic 422 response.
+
+---
+
+### `GET /api/v1/sbom/fix/options`
+
+Return the saved default fix options.
+
+#### Response (200)
+
+```json
+{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." } } }
+```
+
+Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning.
+
+---
+
+### `POST /api/v1/sbom/fix/options`
+
+Persist the fix options for future visits.
+
+#### Request
+
+```json
+{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." } } }
+```
+
+#### Success Response (200)
+
+```json
+{ "status": "saved" }
+```
+
+#### Error Response (400) — invalid options
+
+```json
+{ "error": "invalid_options", "detail": "..." }
+```
+
+Returned for malformed JSON, a missing `options` key, or Pydantic validation failure.
+
+#### Error Response (500) — save failed
+
+```json
+{ "error": "options_save_failed" }
+```
+
+---
 
 ### `GET /api/v1/db/purls`
 
@@ -646,6 +804,12 @@ Standard FastAPI/Pydantic 422 response.
 | Images list conversion: invalid SBOM format | 400 | `invalid_sbom` |
 | Images list conversion: file too large | 413 | `file_too_large` |
 | Images list conversion: missing file field | 422 | (Pydantic validation) |
+| SBOM fix: invalid JSON | 400 | `invalid_json` |
+| SBOM fix: invalid SBOM format | 400 | `invalid_sbom` |
+| SBOM fix: invalid or malformed options | 400 | `invalid_options` |
+| SBOM fix: file too large | 413 | `file_too_large` |
+| SBOM fix: missing file field | 422 | (Pydantic validation) |
+| SBOM fix options: save failure | 500 | `options_save_failed` |
 | Network unavailable (GitHub connectivity check failed) | 503 | `network_unavailable` |
 | Job queue unavailable (no PostgreSQL) | 503 | `job_queue_unavailable` |
 | Job not found | 404 | `job_not_found` |

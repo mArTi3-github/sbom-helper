@@ -21,6 +21,7 @@
 | Add or modify storage layer | `architecture/layers.md` |
 | Add PURL validation or normalization | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Enrich CycloneDX SBOM files | `contracts/api-contract.md`, `architecture/layers.md`, `domains/purl-resolution.md`, `domains/web-ui.md` |
+| Fix SBOM normalization defects | `domains/sbom-fixing.md`, `contracts/api-contract.md`, `domains/web-ui.md`, `architecture/layers.md` |
 | Add batch PURL resolution | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
 | Manage database (view, edit, filter, import, export) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
@@ -75,7 +76,8 @@ specs/
 │   └── layers.md                    — Layer hierarchy, import rules, DbAdminService, JobManager, UrlValidationCache
 ├── domains/
 │   ├── purl-resolution.md           — Core resolution capability (sync + async batch)
-│   └── web-ui.md                    — Browser interface (home + five tool pages, Vue SPA, Pinia stores)
+│   ├── sbom-fixing.md               — SBOM normalization fixes, stats, issue report
+│   └── web-ui.md                    — Browser interface (home + six tool pages, Vue SPA, Pinia stores)
 ├── contracts/
 │   └── api-contract.md              — HTTP API contract (including db-admin, settings, and jobs endpoints)
 └── decisions/

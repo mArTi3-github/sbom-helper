@@ -13,6 +13,7 @@ specs/
 │   └── layers.md                    # Layer hierarchy, import rules, responsibilities
 ├── domains/
 │   ├── purl-resolution.md           # Core resolution capability
+│   ├── sbom-fixing.md               # SBOM normalization fixes, statistics, issue report
 │   └── web-ui.md                    # Browser-based web interface
 ├── contracts/
 │   └── api-contract.md              # HTTP API contract between client and service

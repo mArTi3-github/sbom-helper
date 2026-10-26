@@ -22,6 +22,7 @@
 |  |  GET /health               |                   |
 |  |  GET / (HTML page)         |                   |
 |  |  GET /sbom-updater         |                   |
+|  |  GET /fix-sbom             |                   |
 |  |  GET /db-admin             |                   |
 |  |  GET /images-list-converter |
 |  |  GET /settings             |                   |
@@ -33,6 +34,11 @@
 |  |  POST /api/v1/db/export    |                   |
 |  |  GET /api/v1/settings      |                   |
 |  |  PATCH /api/v1/settings    |                   |
+|  |  POST /api/v1/sbom/fix     |                   |
+|  |  GET /api/v1/sbom/fix/     |                   |
+|  |        options             |                   |
+|  |  POST /api/v1/sbom/fix/    |                   |
+|  |        options             |                   |
 |  +-------------+---------------+                   |
 |                |                                   |
 |                | Python call                       |
@@ -133,6 +139,15 @@
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
+|  |  SBOM Fix Options Store     |                   |
+|  |  sbom_fix_options_store.py  |                   |
+|  |                             |                   |
+|  |  SbomFixOptionsStore        |                   |
+|  |  load() / save()            |                   |
+|  |  JSON file persistence      |                   |
+|  +-----------------------------+                   |
+|                                                    |
+|  +-----------------------------+                   |
 |  |  SBOM Enrichment Pipeline   |                   |
 |  |  sbom_enrichment.py         |                   |
 |  |                             |                   |
@@ -159,6 +174,9 @@
 |  |  images_list_converter.py  |                   |
 |  |             — container     |                   |
 |  |               promotion     |                   |
+|  |  fixer.py — normalization   |                   |
+|  |             rules, stats,   |                   |
+|  |             issue report    |                   |
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
@@ -219,14 +237,16 @@
 
 ## Import Rules
 
-- **API Layer** (`router.py` includes sub-routers from `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`)
+- **API Layer** (`router.py` includes sub-routers from `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`, `routes/sbom_fix.py`)
 - **API Layer (routes/)** accesses **Service Layer** and **SBOM Enrichment Pipeline** through `request.app.state` — but not vice versa
 - **API Layer (routes/)** imports **csv_io** module for CSV parsing/rendering
 - **API Layer (routes/settings.py)** imports **Config Layer** (settings) and **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
 - **API Layer (routes/)** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
+- **API Layer (routes/sbom_fix.py)** imports **SBOM Module** (`sbom/fixer.py`, `sbom/parser.py`) and **Config Layer** (`sbom_settings`); accesses the **SBOM Fix Options Store** only through `request.app.state.sbom_fix_options_store` (never imports the store module directly)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), **Validation Service** (`validation_service.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`, `validation_service`); exposes `settings_store` and `validation_service` as read-only properties for downstream consumers; dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`); `resolve_batch()` uses `batch_semaphore_limit` from `AppSettings` for concurrency control
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`PurlResolutionService`), **SBOM Module** (`sbom/`), and **PURL Utils Layer** (`purl_utils/`); receives only `PurlResolutionService` via constructor injection, accessing `settings_store` and `validation_service` through its properties
-- **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly
+- **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly. `sbom/fixer.py` is a pure transformation module: it imports only the standard library and Pydantic, with no imports from Storage, Resolver, database, API schemas, or the parser
+- **SBOM Fix Options Store** (`sbom_fix_options_store.py`) imports `SbomFixOptions` from `sbom/fixer.py` and provides JSON-file persistence only; it is instantiated in `main.py` as `app.state.sbom_fix_options_store`
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
 - **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `DepsdevResolver` wraps the deps.dev v3 API (maven, npm, golang, pypi, nuget, cargo, gem; no API key). `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages. `LlmResolver` wraps an OpenAI-compatible chat API and is always added last.
@@ -242,7 +262,7 @@
 ## Layer Responsibilities
 
 ### API Layer (`routes/`)
-- Define HTTP endpoints (routes, methods, status codes) — split across `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`
+- Define HTTP endpoints (routes, methods, status codes) — split across `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`, `routes/sbom_fix.py`
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) via async jobs (routes/jobs.py) — handles parsing, collection, deduplication, batch resolution, and enrichment
@@ -250,6 +270,7 @@
 - Delegate DB admin operations to `DbAdminService` (`db_admin_service.list_purls()`, `db_admin_service.update_purl()`, `db_admin_service.list_resolvers()`, etc.) which wraps Storage Layer and CSV I/O
 - Delegate async SBOM enrichment to Job Manager via `routes/jobs.py` — creates background jobs (`POST /api/v1/jobs/sbom-enrich`), queries status (`GET /api/v1/jobs/{job_id}`), downloads results (`GET /api/v1/jobs/{job_id}/result`), cancels (`POST /api/v1/jobs/{job_id}/cancel`), deletes (`DELETE /api/v1/jobs/{job_id}`), lists (`GET /api/v1/jobs`)
 - Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, deduplicates by `purl`, returns conversion result with completeness flags and duplicate counts
+- Delegate SBOM fixing to `fix_sbom()` (`sbom/fixer.py`) in `routes/sbom_fix.py` — validates JSON and SBOM format, parses/validates options, returns `changed`/`fixed_sbom`/`stats`/`issues`; loads and saves default options via `request.app.state.sbom_fix_options_store`
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`; clear validation cache via `POST /api/v1/settings/clear-validation-cache`
 - Handle error responses from Service Layer and Pipeline
 - Serve the Vue 3 SPA via `SPAStaticFiles` mounted at `/` in `main.py` (after all API routes); `SPAStaticFiles` falls back to `index.html` for any unmatched path, enabling Vue Router client-side routing
@@ -318,7 +339,8 @@
 - **`remover.py`** — `remove_unresolved_components(sbom, components, resolved) → list[dict]` removes components that need enrichment, have no subcomponents, and were not resolved; returns list of removed component dicts
 - **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL; removed components are excluded from `not_found` counts
 - **`images_list_converter.py`** — `ImagesListConverter.convert(data) → ImagesListConversionResult` validates SBOM format via `CycloneDXParser`, checks if all top-level components are `type=container`, recursively collects container components from all nesting levels, promotes them to top-level, removes non-container components, deduplicates remaining containers by `purl` field (first-wins, components without `purl` treated as unique); returns `ImagesListConversionResult` with `was_transformed` flag, `images` list (with completeness flags and per-image duplicate count), and the resulting `images_list` dict
-- Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly
+- **`fixer.py`** — `SbomFixOptions` (root/metadata/metadata.component/components option models), `fix_sbom(data, options, now=None) → SbomFixResult`: deep-copies the input, applies the 21 enabled rules, runs the reorder pass last, builds `FixStat` entries for every enabled rule, sets `changed = any(count > 0)`, and collects `FixIssue` entries from the final document; exposes `FixStat`, `FixIssue`, `SbomFixResult`, `RULE_IDS`, and the ordering/GOST constants
+- Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly. `fixer.py` has no imports from Storage, Resolver, or API schemas
 
 ### Config Layer (`config.py`)
 - Provide typed access to all runtime configuration
@@ -340,6 +362,14 @@
 - File path default: `./data/sbom_components_ignore_patterns.json`
 - Graceful handling: missing file → return empty list; corrupt JSON → log warning, return empty list
 - Exposed via API endpoints `GET/POST /api/v1/sbom/ignore-patterns` in `routes/ignore_patterns.py`
+
+### SBOM Fix Options Store (`sbom_fix_options_store.py`)
+- JSON-based persistence for the Fix SBOM option set (all 21 rule toggles plus `root.spec_version`)
+- `SbomFixOptionsStore` class with `load() → SbomFixOptions` and `save(options)` methods; constructor accepts an optional path for tests
+- File path default: `./data/sbom_fix_options.json`
+- Graceful handling: missing file → built-in defaults; corrupt JSON, I/O error, or validation failure → log warning, return built-in defaults; partial JSON is completed by Pydantic defaults
+- `save()` writes `indent=2`, `ensure_ascii=False`, with a trailing newline
+- Instantiated in `main.py` as `app.state.sbom_fix_options_store`; exposed via `GET/POST /api/v1/sbom/fix/options` in `routes/sbom_fix.py`
 
 ### URL Validation Cache (`url_validation_cache.py`)
 - `UrlValidationCache` class wrapping `diskcache.Cache` for persistent URL validation result caching
@@ -366,14 +396,14 @@
 
 ### Web UI Layer (`frontend/`)
 - Vue 3 SPA built with Vite + TypeScript, source in `frontend/src/`
-- **Views** (`src/views/`): `HomePage.vue`, `PurlResolver.vue`, `SbomUpdater.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
+- **Views** (`src/views/`): `HomePage.vue`, `PurlResolver.vue`, `SbomUpdater.vue`, `SbomFixer.vue`, `DatabaseAdmin.vue`, `Settings.vue`, `ImagesListConverter.vue`, `NotFound.vue`
 - **Components** (`src/components/`): `AppNav.vue` (navigation bar), `FileUploadZone.vue` (drag-and-drop upload), `ModalDialog.vue` (reusable modal)
 - **Composables** (`src/composables/`): `useDownload.ts` (file download helper)
 - **Stores** (`src/stores/`): `useSettingsStore.ts` (Pinia store for settings), `useDbAdminStore.ts` (Pinia store for database admin state — includes pagination logic via `goToPage`, `changePageSize`, `totalPages`)
 - **i18n** (`src/i18n/`): `index.ts` (vue-i18n configuration with `legacy: false`), `locales/en.json` (English), `locales/ru.json` (Russian); `@intlify/unplugin-vue-i18n` Vite plugin for compile-time message compilation
-- **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts`, `db.ts`, `settings.ts`, `images.ts`
-- **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`
-- **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 6 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`
+- **API client** (`src/api/`): typed fetch wrappers per domain — `client.ts` (base `request<T>()` + `ApiError`), `purl.ts`, `sbom.ts` (enrichment, ignore patterns, SBOM fix), `db.ts`, `settings.ts`, `images.ts`
+- **Types** (`src/types/api.ts`): TypeScript interfaces mirroring backend `schemas.py`, including `SbomFixOptions`/`SbomFixStat`/`SbomFixIssue`/`SbomFixResponse`/`SbomFixOptionsResponse`
+- **Router** (`src/router/index.ts`): Vue Router with `createWebHistory()`, 7 page routes + catch-all `/:pathMatch(.*)*` → `NotFound.vue`
 - FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass) mounted at `/` in `main.py`; `SPAStaticFiles` falls back to `index.html` for unmatched paths, enabling client-side routing
 - Each `.vue` component uses `<style scoped>` for CSS isolation; global CSS variables in `src/assets/main.css`
 - No CSS framework — design system uses CSS custom properties
