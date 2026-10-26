@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -6,7 +7,11 @@ from pydantic import ValidationError
 from purl_resolver.sbom.fixer import (
     RULE_IDS,
     SbomFixOptions,
+    _fill_gost_properties,
+    _filter_external_references,
+    _filter_properties,
     _reorder,
+    _walk_components,
     fix_sbom,
 )
 
@@ -691,3 +696,418 @@ def test_timestamp_and_manufacturer_are_first_and_fourth_after_all_rules():
         "type", "name", "version", "manufacturer",
     ]
     assert result.fixed_sbom["metadata"]["component"]["group"] == "g"
+
+
+def test_walk_components_visits_pre_order_and_skips_metadata_and_non_objects():
+    visited = []
+    root = {
+        "components": [
+            {
+                "name": "a",
+                "components": [
+                    {"name": "b", "components": [{"name": "c"}]},
+                ],
+            },
+            {"name": "d"},
+            "not-an-object",
+            {"name": "e", "components": "not-a-list"},
+        ],
+        "metadata": {
+            "component": {
+                "name": "root",
+                "components": [{"name": "hidden"}],
+            }
+        },
+    }
+    _walk_components(root, lambda component: visited.append(component["name"]))
+    assert visited == ["a", "b", "c", "d", "e"]
+
+
+def test_walk_components_without_components_array_does_nothing():
+    visited = []
+    _walk_components({}, lambda component: visited.append(component))
+    _walk_components({"components": None}, lambda component: visited.append(component))
+    _walk_components({"components": {}}, lambda component: visited.append(component))
+    assert visited == []
+
+
+def test_remove_hashes_removes_direct_key_only_and_keeps_external_reference_hashes():
+    data = {
+        "components": [
+            {
+                "type": "library",
+                "name": "a",
+                "hashes": [{"alg": "SHA-256", "content": "x"}],
+                "externalReferences": [
+                    {
+                        "type": "vcs",
+                        "url": "https://example.com/repo",
+                        "hashes": [{"alg": "SHA-1", "content": "keep"}],
+                    }
+                ],
+                "components": [{"name": "b", "hashes": "unexpected-type"}],
+            }
+        ]
+    }
+    result = fix_sbom(data, SbomFixOptions())
+    component = result.fixed_sbom["components"][0]
+    assert "hashes" not in component
+    assert component["externalReferences"][0]["hashes"] == [
+        {"alg": "SHA-1", "content": "keep"}
+    ]
+    assert "hashes" not in component["components"][0]
+    assert _stats(result)["components.remove_hashes"] == 2
+
+
+def test_remove_scope_on_all_levels():
+    data = {
+        "components": [
+            {
+                "name": "a",
+                "scope": "required",
+                "components": [
+                    {
+                        "name": "b",
+                        "scope": "optional",
+                        "components": [{"name": "c", "scope": "excluded"}],
+                    }
+                ],
+            }
+        ]
+    }
+    result = fix_sbom(data, SbomFixOptions())
+    component = result.fixed_sbom["components"][0]
+    assert "scope" not in component
+    assert "scope" not in component["components"][0]
+    assert "scope" not in component["components"][0]["components"][0]
+    assert _stats(result)["components.remove_scope"] == 3
+
+
+def test_filter_external_references_keeps_only_allowed_types():
+    refs = [
+        {"type": "vcs", "url": "https://a"},
+        {"type": "source-distribution", "url": "https://b"},
+        {"type": "website", "url": "https://c"},
+        {"url": "https://no-type"},
+        "not-an-object",
+        None,
+        {"type": "VCS", "url": "https://upper"},
+    ]
+    kept, removed = _filter_external_references(refs)
+    assert kept == [
+        {"type": "vcs", "url": "https://a"},
+        {"type": "source-distribution", "url": "https://b"},
+    ]
+    assert removed == 5
+
+
+def test_filter_external_references_preserves_empty_list():
+    kept, removed = _filter_external_references([])
+    assert kept == []
+    assert removed == 0
+
+
+def test_filter_external_references_keeps_empty_array_in_component():
+    data = {"components": [{"name": "a", "externalReferences": []}]}
+    result = fix_sbom(data, SbomFixOptions())
+    assert result.fixed_sbom["components"][0]["externalReferences"] == []
+    assert _stats(result)["components.filter_external_references"] == 0
+
+
+def test_filter_external_references_counts_removed_elements_across_tree():
+    data = {
+        "components": [
+            {
+                "name": "a",
+                "externalReferences": [
+                    {"type": "vcs"},
+                    {"type": "website"},
+                ],
+            },
+            {
+                "name": "b",
+                "externalReferences": [
+                    {"type": "source-distribution"},
+                    {"type": "other"},
+                    {"type": "docs"},
+                ],
+            },
+        ]
+    }
+    result = fix_sbom(data, SbomFixOptions())
+    assert _stats(result)["components.filter_external_references"] == 3
+    assert result.fixed_sbom["components"][0]["externalReferences"] == [
+        {"type": "vcs"}
+    ]
+    assert result.fixed_sbom["components"][1]["externalReferences"] == [
+        {"type": "source-distribution"}
+    ]
+
+
+def test_filter_properties_keeps_only_gost_named_properties():
+    props = [
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:", "value": "x"},
+        {"name": "gost:attack_surface", "value": "no"},
+        {"name": "", "value": "empty"},
+        {"value": "no-name"},
+        {"name": 5, "value": "non-string"},
+        "not-an-object",
+    ]
+    kept, removed = _filter_properties(props)
+    assert kept == [
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:", "value": "x"},
+    ]
+    assert removed == 5
+
+
+def test_filter_properties_preserves_empty_list():
+    kept, removed = _filter_properties([])
+    assert kept == []
+    assert removed == 0
+
+
+def test_filter_properties_keeps_empty_array_in_component():
+    data = {"components": [{"name": "a", "properties": []}]}
+    result = fix_sbom(data, SbomFixOptions())
+    assert result.fixed_sbom["components"][0]["properties"] == []
+    assert _stats(result)["components.filter_properties"] == 0
+
+
+def test_filter_properties_counts_removed_elements_across_tree():
+    data = {
+        "components": [
+            {
+                "name": "a",
+                "properties": [
+                    {"name": "GOST:attack_surface", "value": "no"},
+                    {"name": "custom", "value": "1"},
+                ],
+            },
+            {
+                "name": "b",
+                "properties": [
+                    {"name": "GOST:security_function", "value": "no"},
+                    {"value": "no-name"},
+                ],
+                "components": [
+                    {"name": "c", "properties": [{"name": "other"}]},
+                ],
+            },
+        ]
+    }
+    result = fix_sbom(data, SbomFixOptions())
+    assert _stats(result)["components.filter_properties"] == 3
+
+
+def test_fill_gost_properties_creates_list_when_absent():
+    component = {"name": "a"}
+    assert _fill_gost_properties(component) == 2
+    assert component["properties"] == [
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+
+
+def test_fill_gost_properties_creates_list_when_null():
+    component = {"name": "a", "properties": None}
+    assert _fill_gost_properties(component) == 2
+    assert component["properties"] == [
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+
+
+def test_fill_gost_properties_adds_only_missing_and_preserves_values():
+    component = {
+        "properties": [{"name": "GOST:attack_surface", "value": "custom"}]
+    }
+    assert _fill_gost_properties(component) == 1
+    assert component["properties"] == [
+        {"name": "GOST:attack_surface", "value": "custom"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+
+
+def test_fill_gost_properties_adds_nothing_when_both_present():
+    component = {
+        "properties": [
+            {"name": "GOST:attack_surface", "value": "external"},
+            {"name": "GOST:security_function", "value": "internal"},
+        ]
+    }
+    assert _fill_gost_properties(component) == 0
+    assert component["properties"] == [
+        {"name": "GOST:attack_surface", "value": "external"},
+        {"name": "GOST:security_function", "value": "internal"},
+    ]
+
+
+def test_fill_gost_properties_skips_non_list():
+    component = {"properties": {"name": "GOST:attack_surface", "value": "no"}}
+    assert _fill_gost_properties(component) == 0
+    assert component["properties"] == {
+        "name": "GOST:attack_surface",
+        "value": "no",
+    }
+
+
+def test_fill_gost_properties_ignores_non_object_entries():
+    component = {"properties": ["not-an-object", {"name": "GOST:attack_surface"}]}
+    assert _fill_gost_properties(component) == 1
+    assert component["properties"] == [
+        "not-an-object",
+        {"name": "GOST:attack_surface"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+
+
+def test_filter_properties_runs_before_fill_gost_properties():
+    data = {
+        "components": [
+            {
+                "name": "a",
+                "properties": [
+                    {"name": "custom", "value": "1"},
+                    {"name": "GOST:attack_surface", "value": "custom"},
+                ],
+            }
+        ]
+    }
+    options = SbomFixOptions(components={"fill_missing_gost_properties": True})
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["components"][0]["properties"] == [
+        {"name": "GOST:attack_surface", "value": "custom"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+    stats = _stats(result)
+    assert stats["components.filter_properties"] == 1
+    assert stats["components.fill_missing_gost_properties"] == 1
+
+
+def test_fill_gost_properties_does_not_apply_to_metadata_component():
+    data = {
+        "metadata": {"component": {"type": "application", "name": "root"}},
+        "components": [{"name": "a"}],
+    }
+    options = SbomFixOptions(components={"fill_missing_gost_properties": True})
+    result = fix_sbom(data, options)
+    assert "properties" not in result.fixed_sbom["metadata"]["component"]
+    assert result.fixed_sbom["components"][0]["properties"] == [
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+    assert _stats(result)["components.fill_missing_gost_properties"] == 2
+
+
+def test_unexpected_types_do_not_raise_and_non_objects_are_preserved():
+    data = {
+        "components": [
+            {
+                "name": "a",
+                "properties": "not-a-list",
+                "externalReferences": {},
+                "components": "not-a-list",
+            },
+            "not-an-object",
+            {
+                "name": "b",
+                "properties": [{"name": None}, "not-an-object"],
+                "externalReferences": ["not-an-object", {"type": "website"}],
+            },
+        ]
+    }
+    options = SbomFixOptions(components={"fill_missing_gost_properties": True})
+    result = fix_sbom(data, options)
+    first = result.fixed_sbom["components"][0]
+    assert first["properties"] == "not-a-list"
+    assert first["externalReferences"] == {}
+    assert first["components"] == "not-a-list"
+    assert result.fixed_sbom["components"][1] == "not-an-object"
+    second = result.fixed_sbom["components"][2]
+    assert second["externalReferences"] == []
+    assert second["properties"] == [
+        {"name": "GOST:attack_surface", "value": "no"},
+        {"name": "GOST:security_function", "value": "no"},
+    ]
+
+
+def test_fix_sbom_does_not_mutate_input_including_external_reference_hashes():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "version": 1,
+        "metadata": {
+            "component": {
+                "type": "application",
+                "name": "root",
+                "properties": [{"name": "x"}],
+            }
+        },
+        "components": [
+            {
+                "type": "library",
+                "name": "a",
+                "scope": "required",
+                "hashes": [{"alg": "SHA-256", "content": "h"}],
+                "properties": [{"name": "custom", "value": "1"}],
+                "externalReferences": [
+                    {
+                        "type": "vcs",
+                        "url": "https://example.com/repo",
+                        "hashes": [{"alg": "SHA-1", "content": "keep"}],
+                    },
+                    {"type": "website", "url": "https://example.com"},
+                ],
+                "components": [
+                    {
+                        "name": "b",
+                        "hashes": {"unexpected": True},
+                        "scope": "optional",
+                    }
+                ],
+            }
+        ],
+    }
+    snapshot = copy.deepcopy(data)
+    options = SbomFixOptions(components={"fill_missing_gost_properties": True})
+    fix_sbom(data, options, now=NOW)
+    assert data == snapshot
+    assert data["components"][0]["externalReferences"][0]["hashes"] == [
+        {"alg": "SHA-1", "content": "keep"}
+    ]
+
+
+def test_disabled_components_rules_leave_fields_untouched():
+    data = {
+        "components": [
+            {
+                "name": "a",
+                "scope": "required",
+                "hashes": [{"alg": "SHA-256", "content": "h"}],
+                "properties": [{"name": "custom", "value": "1"}],
+                "externalReferences": [{"type": "website"}],
+            }
+        ]
+    }
+    options = SbomFixOptions(
+        root={"reorder": False, "set_spec_version": False},
+        metadata={
+            "add_timestamp": False,
+            "reorder": False,
+            "component": {"reorder": False},
+        },
+        components={
+            "reorder": False,
+            "remove_hashes": False,
+            "remove_scope": False,
+            "filter_external_references": False,
+            "filter_properties": False,
+            "fill_missing_gost_properties": False,
+        },
+    )
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom == data
+    assert result.changed is False
+    assert all(stat.count == 0 for stat in result.stats)
