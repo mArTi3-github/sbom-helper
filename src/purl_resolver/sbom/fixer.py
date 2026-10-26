@@ -441,6 +441,88 @@ def _collect_component_issues(
             _collect_component_issues(nested, f"{path}.components", issues)
 
 
+def _collect_root_issues(data: dict, issues: list[FixIssue]) -> None:
+    spec_version = data.get("specVersion")
+    if "specVersion" not in data or spec_version is None or spec_version == "":
+        issues.append(FixIssue(code="root.missing_spec_version", path="$"))
+    elif not isinstance(spec_version, str):
+        issues.append(FixIssue(code="root.invalid_spec_version", path="$"))
+    elif spec_version not in ALLOWED_SPEC_VERSIONS:
+        issues.append(FixIssue(code="root.spec_version_not_allowed", path="$"))
+
+    version = data.get("version")
+    if "version" not in data or version is None:
+        issues.append(FixIssue(code="root.missing_version", path="$"))
+    elif not isinstance(version, int) or isinstance(version, bool):
+        issues.append(FixIssue(code="root.invalid_version", path="$"))
+
+    metadata = data.get("metadata")
+    if "metadata" not in data or metadata is None:
+        issues.append(FixIssue(code="root.missing_metadata", path="$"))
+    elif not isinstance(metadata, dict):
+        issues.append(FixIssue(code="root.invalid_metadata", path="$"))
+
+    components = data.get("components")
+    if (
+        "components" in data
+        and components is not None
+        and not isinstance(components, list)
+    ):
+        issues.append(FixIssue(code="root.invalid_components", path="$"))
+
+
+def _collect_metadata_issues(data: dict, issues: list[FixIssue]) -> None:
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        return
+
+    timestamp = metadata.get("timestamp")
+    if "timestamp" not in metadata or not isinstance(timestamp, str) or timestamp == "":
+        issues.append(FixIssue(code="metadata.missing_timestamp", path="$.metadata"))
+
+    component = metadata.get("component")
+    if "component" not in metadata or component is None:
+        issues.append(FixIssue(code="metadata.missing_component", path="$.metadata"))
+        return
+    if not isinstance(component, dict):
+        issues.append(FixIssue(code="metadata.invalid_component", path="$.metadata"))
+        return
+
+    path = "$.metadata.component"
+    name = component.get("name")
+    component_name = name if _is_non_empty_string(name) else None
+    for field_name, code in (
+        ("type", "metadata_component.missing_type"),
+        ("name", "metadata_component.missing_name"),
+        ("version", "metadata_component.missing_version"),
+    ):
+        if not _is_non_empty_string(component.get(field_name)):
+            issues.append(FixIssue(code=code, path=path, component=component_name))
+
+    manufacturer = component.get("manufacturer")
+    if not isinstance(manufacturer, dict) or not _is_non_empty_string(
+        manufacturer.get("name")
+    ):
+        issues.append(
+            FixIssue(
+                code="metadata_component.missing_manufacturer",
+                path=path,
+                component=component_name,
+            )
+        )
+
+
+def _collect_issues(data: dict) -> list[FixIssue]:
+    issues: list[FixIssue] = []
+    _collect_root_issues(data, issues)
+    if isinstance(data.get("metadata"), dict):
+        _collect_metadata_issues(data, issues)
+    components = data.get("components")
+    if isinstance(components, list):
+        _collect_component_issues(components, "$.components", issues)
+    return issues
+
+
 def _filter_external_references(refs: list) -> tuple[list, int]:
     kept = [
         ref
@@ -587,5 +669,5 @@ def fix_sbom(
         changed=any(stat.count > 0 for stat in stats),
         fixed_sbom=fixed_sbom,
         stats=stats,
-        issues=[],
+        issues=_collect_issues(fixed_sbom),
     )

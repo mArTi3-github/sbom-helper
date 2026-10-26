@@ -1538,3 +1538,342 @@ def test_collect_component_issues_ignores_non_list_input():
     _collect_component_issues(None, "$.components", issues)
     _collect_component_issues("not-a-list", "$.components", issues)
     assert issues == []
+
+
+def _all_disabled_options():
+    return SbomFixOptions(
+        root={
+            "reorder": False,
+            "set_spec_version": False,
+            "remove_dependencies": False,
+            "remove_services": False,
+            "increment_version": False,
+        },
+        metadata={
+            "add_timestamp": False,
+            "reorder": False,
+            "remove_properties": False,
+            "remove_tools": False,
+            "component": {
+                "reorder": False,
+                "remove_external_references": False,
+                "remove_properties": False,
+                "remove_purl": False,
+                "remove_scope": False,
+                "rename_supplier": False,
+            },
+        },
+        components={
+            "reorder": False,
+            "remove_hashes": False,
+            "remove_scope": False,
+            "filter_external_references": False,
+            "filter_properties": False,
+            "fill_missing_gost_properties": False,
+        },
+    )
+
+
+def _valid_metadata_component():
+    return {
+        "type": "application",
+        "name": "app",
+        "version": "1.0.0",
+        "manufacturer": {"name": "Acme"},
+    }
+
+
+def _valid_metadata():
+    return {
+        "timestamp": "2026-01-01T00:00:00Z",
+        "component": _valid_metadata_component(),
+    }
+
+
+def _valid_sbom():
+    return {
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": _valid_metadata(),
+    }
+
+
+def _fix_sbom_issues(data):
+    return fix_sbom(data, _all_disabled_options()).issues
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param(_ABSENT, "root.missing_spec_version", id="absent"),
+        pytest.param(None, "root.missing_spec_version", id="null"),
+        pytest.param("", "root.missing_spec_version", id="empty"),
+        pytest.param(1.7, "root.invalid_spec_version", id="float"),
+        pytest.param(0, "root.invalid_spec_version", id="int"),
+        pytest.param(True, "root.invalid_spec_version", id="bool"),
+        pytest.param([], "root.invalid_spec_version", id="list"),
+        pytest.param({}, "root.invalid_spec_version", id="dict"),
+        pytest.param("1.5", "root.spec_version_not_allowed", id="not-allowed"),
+        pytest.param("2.0", "root.spec_version_not_allowed", id="unknown"),
+        pytest.param("1.7.0", "root.spec_version_not_allowed", id="patch"),
+    ],
+)
+def test_issue_root_spec_version_is_one_mutually_exclusive_code(value, expected):
+    data = _valid_sbom()
+    if value is _ABSENT:
+        del data["specVersion"]
+    else:
+        data["specVersion"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [(expected, "$", None)]
+
+
+@pytest.mark.parametrize("value", ["1.6", "1.7"])
+def test_issue_root_allowed_spec_version_has_no_issue(value):
+    data = _valid_sbom()
+    data["specVersion"] = value
+    assert _fix_sbom_issues(data) == []
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param(_ABSENT, "root.missing_version", id="absent"),
+        pytest.param(None, "root.missing_version", id="null"),
+        pytest.param("1", "root.invalid_version", id="string"),
+        pytest.param("", "root.invalid_version", id="empty"),
+        pytest.param(True, "root.invalid_version", id="bool-true"),
+        pytest.param(False, "root.invalid_version", id="bool-false"),
+        pytest.param(1.5, "root.invalid_version", id="float"),
+        pytest.param([], "root.invalid_version", id="list"),
+        pytest.param({}, "root.invalid_version", id="dict"),
+    ],
+)
+def test_issue_root_version(value, expected):
+    data = _valid_sbom()
+    if value is _ABSENT:
+        del data["version"]
+    else:
+        data["version"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [(expected, "$", None)]
+
+
+@pytest.mark.parametrize("value", [0, 1, -5])
+def test_issue_root_integer_version_has_no_issue(value):
+    data = _valid_sbom()
+    data["version"] = value
+    assert _fix_sbom_issues(data) == []
+
+
+@pytest.mark.parametrize("value", [_ABSENT, None])
+def test_issue_root_missing_metadata_suppresses_metadata_checks(value):
+    data = _valid_sbom()
+    if value is _ABSENT:
+        del data["metadata"]
+    else:
+        data["metadata"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [("root.missing_metadata", "$", None)]
+
+
+@pytest.mark.parametrize("value", [[], "metadata", 5, True])
+def test_issue_root_invalid_metadata_suppresses_metadata_checks(value):
+    data = _valid_sbom()
+    data["metadata"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [("root.invalid_metadata", "$", None)]
+
+
+@pytest.mark.parametrize("value", [_ABSENT, None, []])
+def test_issue_root_absent_null_or_empty_components_has_no_issue(value):
+    data = _valid_sbom()
+    if value is not _ABSENT:
+        data["components"] = value
+    assert _fix_sbom_issues(data) == []
+
+
+@pytest.mark.parametrize("value", [{}, "components", 5, True])
+def test_issue_root_invalid_components(value):
+    data = _valid_sbom()
+    data["components"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        ("root.invalid_components", "$", None)
+    ]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(_ABSENT, id="absent"),
+        pytest.param(None, id="null"),
+        pytest.param("", id="empty"),
+        pytest.param(5, id="int"),
+        pytest.param([], id="list"),
+        pytest.param({}, id="dict"),
+        pytest.param(True, id="bool"),
+    ],
+)
+def test_issue_metadata_missing_timestamp(value):
+    data = _valid_sbom()
+    if value is _ABSENT:
+        del data["metadata"]["timestamp"]
+    else:
+        data["metadata"]["timestamp"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        ("metadata.missing_timestamp", "$.metadata", None)
+    ]
+
+
+@pytest.mark.parametrize("value", ["not-a-date", "2020-01-01", "2026-01-01T00:00:00Z"])
+def test_issue_metadata_existing_timestamp_string_is_not_reported(value):
+    data = _valid_sbom()
+    data["metadata"]["timestamp"] = value
+    assert _fix_sbom_issues(data) == []
+
+
+@pytest.mark.parametrize("value", [_ABSENT, None])
+def test_issue_metadata_missing_component_suppresses_nested_checks(value):
+    data = _valid_sbom()
+    if value is _ABSENT:
+        del data["metadata"]["component"]
+    else:
+        data["metadata"]["component"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        ("metadata.missing_component", "$.metadata", None)
+    ]
+
+
+@pytest.mark.parametrize("value", [[], "component", 5, True])
+def test_issue_metadata_invalid_component_suppresses_nested_checks(value):
+    data = _valid_sbom()
+    data["metadata"]["component"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        ("metadata.invalid_component", "$.metadata", None)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("field", "code"),
+    [
+        ("type", "metadata_component.missing_type"),
+        ("name", "metadata_component.missing_name"),
+        ("version", "metadata_component.missing_version"),
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(_ABSENT, id="absent"),
+        pytest.param(None, id="null"),
+        pytest.param("", id="empty"),
+        pytest.param(5, id="int"),
+        pytest.param([], id="list"),
+        pytest.param({}, id="dict"),
+    ],
+)
+def test_issue_metadata_component_missing_field(field, code, value):
+    data = _valid_sbom()
+    component = data["metadata"]["component"]
+    if value is _ABSENT:
+        del component[field]
+    else:
+        component[field] = value
+    name = component.get("name")
+    expected_component = name if isinstance(name, str) and name else None
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        (code, "$.metadata.component", expected_component)
+    ]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(_ABSENT, id="absent"),
+        pytest.param(None, id="null"),
+        pytest.param("Acme", id="string"),
+        pytest.param(5, id="int"),
+        pytest.param([], id="list"),
+        pytest.param({}, id="empty-object"),
+        pytest.param({"name": ""}, id="empty-name"),
+        pytest.param({"name": None}, id="null-name"),
+        pytest.param({"name": 5}, id="non-string-name"),
+    ],
+)
+def test_issue_metadata_component_missing_manufacturer(value):
+    data = _valid_sbom()
+    component = data["metadata"]["component"]
+    if value is _ABSENT:
+        del component["manufacturer"]
+    else:
+        component["manufacturer"] = value
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        ("metadata_component.missing_manufacturer", "$.metadata.component", "app")
+    ]
+
+
+def test_issue_metadata_component_optional_fields_are_not_checked():
+    data = _valid_sbom()
+    data["metadata"]["component"] = {
+        "type": "application",
+        "name": "app",
+        "version": "1.0.0",
+        "manufacturer": {"name": "Acme"},
+        "purl": 5,
+        "externalReferences": 5,
+        "properties": 5,
+        "scope": 5,
+    }
+    assert _fix_sbom_issues(data) == []
+
+
+@pytest.mark.parametrize("serial_number", [_ABSENT, None, "urn:uuid:123"])
+def test_issue_never_reported_for_bom_format_or_serial_number(serial_number):
+    data = _valid_sbom()
+    data["bomFormat"] = "CycloneDX"
+    if serial_number is not _ABSENT:
+        data["serialNumber"] = serial_number
+    assert _fix_sbom_issues(data) == []
+
+
+def test_issue_valid_component_has_no_issues():
+    data = _valid_sbom()
+    data["components"] = [_valid_component()]
+    assert _fix_sbom_issues(data) == []
+
+
+def test_issue_integration_order_root_metadata_component_then_components():
+    data = _valid_sbom()
+    data["specVersion"] = "1.5"
+    del data["metadata"]["timestamp"]
+    del data["metadata"]["component"]["type"]
+    component = _valid_component(name="a")
+    del component["properties"]
+    data["components"] = [component]
+    issues = _fix_sbom_issues(data)
+    assert _issue_codes(issues) == [
+        ("root.spec_version_not_allowed", "$", None),
+        ("metadata.missing_timestamp", "$.metadata", None),
+        ("metadata_component.missing_type", "$.metadata.component", "app"),
+        ("component.missing_gost_properties", "$.components[0]", "a"),
+    ]
+    assert issues[3].details == {
+        "missing": ["GOST:attack_surface", "GOST:security_function"]
+    }
+
+
+def test_issue_metadata_invalid_component_is_not_duplicated_by_other_checks():
+    data = _valid_sbom()
+    data["metadata"] = {
+        "timestamp": "2026-01-01T00:00:00Z",
+        "component": "bad",
+    }
+    assert _issue_codes(_fix_sbom_issues(data)) == [
+        ("metadata.invalid_component", "$.metadata", None)
+    ]
+
+
+def test_issue_collected_from_final_document_after_rules():
+    data = _valid_sbom()
+    del data["specVersion"]
+    del data["metadata"]["timestamp"]
+    result = fix_sbom(data, SbomFixOptions())
+    assert result.issues == []
+    assert result.fixed_sbom["specVersion"] == "1.7"
+    assert result.fixed_sbom["metadata"]["timestamp"]
