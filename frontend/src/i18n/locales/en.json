@@ -147,6 +147,39 @@
         "fill_missing_gost_properties": "Add missing GOST properties"
       }
     },
+    "exampleBefore": "Before",
+    "exampleAfter": "After",
+    "help": {
+      "root": {
+        "reorder": "Reorders the root object keys to bomFormat, specVersion, serialNumber, version, metadata, components, annotations; any other keys follow them in their original relative order. Nested objects are not changed.",
+        "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
+        "remove_dependencies": "Removes the root dependencies array entirely. The components themselves and their nested fields are not changed.",
+        "remove_services": "Removes the root services array entirely. Components are not changed.",
+        "increment_version": "Increments the integer version field by 1. If version is missing or is not an integer, the rule leaves it untouched and reports 0 changes."
+      },
+      "metadata": {
+        "reorder": "Puts timestamp and component first; the remaining metadata keys follow in their original order. The content is not changed.",
+        "add_timestamp": "Writes metadata.timestamp with the current UTC time in YYYY-MM-DDTHH:MM:SSZ format, only if the field is missing, null, or an empty string. An existing non-empty value is not overwritten.",
+        "remove_properties": "Removes the document's own properties (metadata.properties). Component properties are not affected by this rule.",
+        "remove_tools": "Removes metadata.tools in any form — both an array and an object."
+      },
+      "metadata_component": {
+        "reorder": "Puts type, name, version, manufacturer first, then the remaining keys in their original order.",
+        "remove_external_references": "Removes metadata.component.externalReferences entirely. Component external references in components[] are not affected by this rule.",
+        "remove_properties": "Removes metadata.component.properties. Component properties in components[] are not affected by this rule.",
+        "remove_purl": "Removes purl only from metadata.component. purl values of components in components[] are preserved. The rule is disabled by default.",
+        "remove_scope": "Removes scope only from metadata.component. The scope of components in components[] is handled by a separate rule.",
+        "rename_supplier": "Removes supplier and moves its value to manufacturer, only if manufacturer is missing or null. If manufacturer is already set, supplier is simply removed."
+      },
+      "components": {
+        "reorder": "Sets each component's keys to the order type, name, version, purl, externalReferences, properties, components, then the remaining keys in their original order. Applied recursively to nested components. metadata.component is not affected.",
+        "remove_hashes": "Removes the component's own hashes field. Hashes inside externalReferences (for example, on a distribution link) are preserved.",
+        "remove_scope": "Removes the scope field from every component in components[], recursively. metadata.component.scope is handled by a separate rule.",
+        "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
+        "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
+        "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with no in value to the component. Creates the array if properties is missing; existing properties are not changed. The rule is disabled by default; metadata.component is not affected."
+      }
+    },
     "issues": {
       "root": {
         "missing_spec_version": "Missing specVersion",
