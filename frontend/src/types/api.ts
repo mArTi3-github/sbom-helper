@@ -196,46 +196,62 @@ export interface RootFixOptions {
   reorder: boolean
   set_spec_version: boolean
   spec_version: string
-  remove_dependencies: boolean
-  remove_services: boolean
   increment_version: boolean
 }
 
 export interface MetadataComponentFixOptions {
   reorder: boolean
-  remove_external_references: boolean
-  remove_properties: boolean
-  remove_purl: boolean
-  remove_scope: boolean
-  rename_supplier: boolean
+  add_manufacturer: boolean
+  manufacturer: string
 }
 
 export interface MetadataFixOptions {
   add_timestamp: boolean
   reorder: boolean
-  remove_properties: boolean
-  remove_tools: boolean
   component: MetadataComponentFixOptions
 }
 
 export interface ComponentsFixOptions {
   reorder: boolean
-  remove_hashes: boolean
-  remove_scope: boolean
   filter_external_references: boolean
   filter_properties: boolean
   fill_missing_gost_properties: boolean
+}
+
+export interface OptionalFieldsFixOptions {
+  keep: string[]
 }
 
 export interface SbomFixOptions {
   root: RootFixOptions
   metadata: MetadataFixOptions
   components: ComponentsFixOptions
+  optional_fields: OptionalFieldsFixOptions
+}
+
+export type OptionalFieldStatus = 'mandatory' | 'optional' | 'additional'
+
+export interface FstecField {
+  path: string
+  status: OptionalFieldStatus
+  condition_key?: string
+}
+
+export interface OptionalFieldInfo {
+  path: string
+  status: OptionalFieldStatus
+  count: number
+}
+
+export interface FieldCatalogResponse {
+  fstec_fields: FstecField[]
+  default_keep: string[]
 }
 
 export interface SbomFixStat {
   rule_id: string
   count: number
+  field?: string | null
 }
 
 export interface SbomFixIssue {

@@ -115,32 +115,23 @@
     "issuesComponent": "Компонент",
     "issuesDetails": "Детали",
     "download": "Скачать исправленный SBOM",
+    "manufacturer": "Производитель",
     "rules": {
       "root": {
         "reorder": "Упорядочить поля корня",
         "set_spec_version": "Установить specVersion",
-        "remove_dependencies": "Удалить dependencies",
-        "remove_services": "Удалить services",
         "increment_version": "Увеличить version"
       },
       "metadata": {
         "add_timestamp": "Добавить timestamp, если отсутствует",
-        "reorder": "Упорядочить поля metadata",
-        "remove_properties": "Удалить metadata.properties",
-        "remove_tools": "Удалить metadata.tools"
+        "reorder": "Упорядочить поля metadata"
       },
       "metadata_component": {
         "reorder": "Упорядочить поля metadata.component",
-        "remove_external_references": "Удалить externalReferences",
-        "remove_properties": "Удалить properties",
-        "remove_purl": "Удалить purl",
-        "remove_scope": "Удалить scope",
-        "rename_supplier": "Переименовать supplier в manufacturer"
+        "add_manufacturer": "Добавить manufacturer, если отсутствует"
       },
       "components": {
         "reorder": "Упорядочить поля компонентов",
-        "remove_hashes": "Удалить hashes",
-        "remove_scope": "Удалить scope",
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
         "filter_properties": "Оставить только GOST-свойства",
         "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
@@ -152,32 +143,42 @@
       "root": {
         "reorder": "Приводит ключи корневого объекта к порядку bomFormat, specVersion, serialNumber, version, metadata, components, annotations; остальные ключи остаются после них в исходном относительном порядке. Вложенные объекты не меняет.",
         "set_spec_version": "Записывает в specVersion значение из поля «Версия спецификации» (по умолчанию 1.7), обрезая пробелы; если поля не было — добавляет его. Значение вне 1.6/1.7 установить можно, но итоговый документ получит несоответствие.",
-        "remove_dependencies": "Удаляет корневой массив dependencies целиком. Сами компоненты и их вложенные поля не меняются.",
-        "remove_services": "Удаляет корневой массив services целиком. Компоненты не меняются.",
         "increment_version": "Увеличивает целочисленное поле version на 1. Если version отсутствует или не является целым числом, правило его не трогает и сообщает 0 изменений."
       },
       "metadata": {
         "reorder": "Ставит timestamp и component в начало, остальные ключи metadata идут после них в исходном порядке. Содержимое не меняется.",
-        "add_timestamp": "Записывает metadata.timestamp с текущим временем UTC в формате YYYY-MM-DDTHH:MM:SSZ, только если поле отсутствует, равно null или пустой строке. Существующее непустое значение не перезаписывается.",
-        "remove_properties": "Удаляет свойства самого документа (metadata.properties). Свойства компонентов этим правилом не затрагиваются.",
-        "remove_tools": "Удаляет metadata.tools в любой форме — и массив, и объект."
+        "add_timestamp": "Записывает metadata.timestamp с текущим временем UTC в формате YYYY-MM-DDTHH:MM:SSZ, только если поле отсутствует, равно null или пустой строке. Существующее непустое значение не перезаписывается."
       },
       "metadata_component": {
         "reorder": "Ставит type, name, version, manufacturer, затем остальные ключи в исходном порядке.",
-        "remove_external_references": "Удаляет metadata.component.externalReferences целиком. Внешние ссылки компонентов в components[] этим правилом не затрагиваются.",
-        "remove_properties": "Удаляет metadata.component.properties. Свойства компонентов в components[] этим правилом не затрагиваются.",
-        "remove_purl": "Удаляет purl только у metadata.component. purl компонентов в components[] сохраняются.",
-        "remove_scope": "Удаляет scope только у metadata.component. scope компонентов в components[] обрабатывается отдельным правилом.",
-        "rename_supplier": "Удаляет supplier и переносит его значение в manufacturer, только если manufacturer отсутствует или равен null. Если manufacturer уже задан, supplier просто удаляется."
+        "add_manufacturer": "Считает manufacturer отсутствующим, если это не объект или его name не является непустой строкой, и записывает объект с единственным полем name, равным значению из поля «Производитель». Существующий корректный manufacturer не меняется. Поле supplier не читается и не изменяется."
       },
       "components": {
         "reorder": "У каждого компонента ставит ключи в порядок type, name, version, purl, externalReferences, properties, components, затем остальные в исходном порядке. Применяется рекурсивно ко вложенным components. metadata.component не затрагивается.",
-        "remove_hashes": "Удаляет у компонента его собственное поле hashes. Хеши внутри externalReferences (например, у ссылки на дистрибутив) сохраняются.",
-        "remove_scope": "Удаляет поле scope у каждого компонента в components[], рекурсивно. metadata.component.scope обрабатывается отдельным правилом.",
         "filter_external_references": "Оставляет в externalReferences только элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные типы (website, distribution, issue-tracker и т. п.) удаляются; если не осталось ничего, массив остаётся пустым. metadata.component не затрагивается.",
         "filter_properties": "Оставляет в properties только элементы, имя которых начинается ровно с GOST: (с учётом регистра). Остальные удаляются; пустой массив остаётся пустым. metadata.component не затрагивается.",
         "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается."
       }
+    },
+    "optionalFields": {
+      "title": "Удаление необязательных полей по «белому списку»",
+      "description": "Косметическая чистка: дополнительные поля CycloneDX допускаются методикой. Здесь можно удалить поля, не описанные в требованиях ФСТЭК и не входящие в список «не рекомендуется удалять».",
+      "analyze": "Проанализировать",
+      "analyzing": "Анализ...",
+      "needFile": "Загрузите файл, чтобы запустить анализ.",
+      "needAnalysis": "Загрузите файл и нажмите «Проанализировать», чтобы увидеть необязательные поля.",
+      "empty": "Необязательных полей не найдено.",
+      "path": "Путь",
+      "occurrences": "Вхождений",
+      "fstecTitle": "Поля из требований ФСТЭК (справочник)",
+      "keepTitle": "Не рекомендуется удалять",
+      "keepHint": "По одному пути на строку. Поля из этого списка не предлагаются к удалению.",
+      "fstecStatusMandatory": "Обязательно",
+      "fstecStatusOptional": "Опционально",
+      "conditionComponentsPresent": "обязательно при наличии компонентов",
+      "conditionSourceDistributionHashes": "обязательно для source-distribution",
+      "remove": "Удалить необязательное поле",
+      "catalogLoadFailed": "Не удалось загрузить справочник полей ФСТЭК."
     },
     "issues": {
       "root": {
@@ -439,6 +440,7 @@
     "invalid_csv": "Неверный CSV файл",
     "invalid_purl": "Неверный PURL",
     "invalid_options": "Неверные параметры исправлений",
+    "invalid_remove_fields": "Неверный список полей для удаления",
     "options_save_failed": "Не удалось сохранить параметры исправлений",
     "upstream_error": "Ошибка вышестоящего сервиса",
     "batch_too_large": "Слишком много PURL в одном запросе",

@@ -143,6 +143,16 @@
                 <input v-model="options.metadata.component[rule.key]" type="checkbox" :data-rule="rule.id" />
                 <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
               </label>
+              <template v-if="rule.id === 'metadata_component.add_manufacturer'">
+                <span class="spec-version-label">{{ t('sbomFixer.manufacturer') }}</span>
+                <input
+                  v-model="options.metadata.component.manufacturer"
+                  type="text"
+                  class="spec-version-input manufacturer-input"
+                  :aria-label="t('sbomFixer.manufacturer')"
+                  :disabled="!options.metadata.component.add_manufacturer"
+                />
+              </template>
               <RuleHelp
                 :rule-id="rule.id"
                 :description="t(`sbomFixer.help.${rule.id}`)"
@@ -315,31 +325,25 @@ function defaultFixOptions(): SbomFixOptions {
       reorder: true,
       set_spec_version: true,
       spec_version: '1.7',
-      remove_dependencies: true,
-      remove_services: true,
       increment_version: true,
     },
     metadata: {
       add_timestamp: true,
       reorder: true,
-      remove_properties: true,
-      remove_tools: true,
       component: {
         reorder: true,
-        remove_external_references: true,
-        remove_properties: true,
-        remove_purl: false,
-        remove_scope: true,
-        rename_supplier: true,
+        add_manufacturer: true,
+        manufacturer: 'Positive Technologies',
       },
     },
     components: {
       reorder: true,
-      remove_hashes: true,
-      remove_scope: true,
       filter_external_references: true,
       filter_properties: true,
       fill_missing_gost_properties: false,
+    },
+    optional_fields: {
+      keep: [],
     },
   }
 }
@@ -351,6 +355,7 @@ function applyOptions(next: SbomFixOptions): void {
   options.metadata = { ...options.metadata, ...next.metadata }
   options.metadata.component = { ...options.metadata.component, ...(next.metadata?.component ?? {}) }
   options.components = { ...options.components, ...next.components }
+  options.optional_fields = { ...options.optional_fields, ...(next.optional_fields ?? {}) }
 }
 
 function plainOptions(): SbomFixOptions {
@@ -650,6 +655,10 @@ h1 {
 .spec-version-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.manufacturer-input {
+  width: 12rem;
 }
 
 .btn-small {

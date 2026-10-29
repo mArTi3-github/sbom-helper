@@ -18,7 +18,7 @@ export interface FixRule<K extends string> {
 
 export type RootRuleKey = Exclude<keyof RootFixOptions, 'spec_version'>
 export type MetadataRuleKey = Exclude<keyof MetadataFixOptions, 'component'>
-export type MetadataComponentRuleKey = keyof MetadataComponentFixOptions
+export type MetadataComponentRuleKey = Exclude<keyof MetadataComponentFixOptions, 'manufacturer'>
 export type ComponentsRuleKey = keyof ComponentsFixOptions
 
 export const ROOT_RULES: readonly FixRule<RootRuleKey>[] = [
@@ -51,36 +51,6 @@ export const ROOT_RULES: readonly FixRule<RootRuleKey>[] = [
       after: `{
   "bomFormat": "CycloneDX",
   "specVersion": "1.7"
-}`,
-    },
-  },
-  {
-    id: 'root.remove_dependencies',
-    key: 'remove_dependencies',
-    example: {
-      before: `{
-  "bomFormat": "CycloneDX",
-  "dependencies": [
-    { "ref": "pkg:npm/left-pad@1.3.0" }
-  ]
-}`,
-      after: `{
-  "bomFormat": "CycloneDX"
-}`,
-    },
-  },
-  {
-    id: 'root.remove_services',
-    key: 'remove_services',
-    example: {
-      before: `{
-  "bomFormat": "CycloneDX",
-  "services": [
-    { "name": "auth-api", "version": "1.0.0" }
-  ]
-}`,
-      after: `{
-  "bomFormat": "CycloneDX"
 }`,
     },
   },
@@ -136,44 +106,6 @@ export const METADATA_RULES: readonly FixRule<MetadataRuleKey>[] = [
 }`,
     },
   },
-  {
-    id: 'metadata.remove_properties',
-    key: 'remove_properties',
-    example: {
-      before: `{
-  "metadata": {
-    "timestamp": "2026-10-29T12:00:00Z",
-    "properties": [
-      { "name": "GOST:attack_surface", "value": "no" }
-    ]
-  }
-}`,
-      after: `{
-  "metadata": {
-    "timestamp": "2026-10-29T12:00:00Z"
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata.remove_tools',
-    key: 'remove_tools',
-    example: {
-      before: `{
-  "metadata": {
-    "timestamp": "2026-10-29T12:00:00Z",
-    "tools": [
-      { "vendor": "Acme", "name": "sbom-generator" }
-    ]
-  }
-}`,
-      after: `{
-  "metadata": {
-    "timestamp": "2026-10-29T12:00:00Z"
-  }
-}`,
-    },
-  },
 ]
 
 export const METADATA_COMPONENT_RULES: readonly FixRule<MetadataComponentRuleKey>[] = [
@@ -204,105 +136,15 @@ export const METADATA_COMPONENT_RULES: readonly FixRule<MetadataComponentRuleKey
     },
   },
   {
-    id: 'metadata_component.remove_external_references',
-    key: 'remove_external_references',
-    example: {
-      before: `{
-  "metadata": {
-    "component": {
-      "name": "app",
-      "externalReferences": [
-        { "type": "vcs", "url": "https://github.com/acme/app" }
-      ]
-    }
-  }
-}`,
-      after: `{
-  "metadata": {
-    "component": {
-      "name": "app"
-    }
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata_component.remove_properties',
-    key: 'remove_properties',
-    example: {
-      before: `{
-  "metadata": {
-    "component": {
-      "name": "app",
-      "properties": [
-        { "name": "GOST:security_function", "value": "no" }
-      ]
-    }
-  }
-}`,
-      after: `{
-  "metadata": {
-    "component": {
-      "name": "app"
-    }
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata_component.remove_purl',
-    key: 'remove_purl',
+    id: 'metadata_component.add_manufacturer',
+    key: 'add_manufacturer',
     example: {
       before: `{
   "metadata": {
     "component": {
       "type": "application",
       "name": "app",
-      "purl": "pkg:generic/app@1.0.0"
-    }
-  }
-}`,
-      after: `{
-  "metadata": {
-    "component": {
-      "type": "application",
-      "name": "app"
-    }
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata_component.remove_scope',
-    key: 'remove_scope',
-    example: {
-      before: `{
-  "metadata": {
-    "component": {
-      "name": "app",
-      "scope": "required"
-    }
-  }
-}`,
-      after: `{
-  "metadata": {
-    "component": {
-      "name": "app"
-    }
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata_component.rename_supplier',
-    key: 'rename_supplier',
-    example: {
-      before: `{
-  "metadata": {
-    "component": {
-      "type": "application",
-      "name": "app",
-      "supplier": { "name": "ООО Ромашка" }
+      "version": "1.0.0"
     }
   }
 }`,
@@ -311,7 +153,8 @@ export const METADATA_COMPONENT_RULES: readonly FixRule<MetadataComponentRuleKey
     "component": {
       "type": "application",
       "name": "app",
-      "manufacturer": { "name": "ООО Ромашка" }
+      "version": "1.0.0",
+      "manufacturer": { "name": "Positive Technologies" }
     }
   }
 }`,
@@ -343,58 +186,6 @@ export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
       "version": "1.3.0",
       "purl": "pkg:npm/left-pad@1.3.0",
       "properties": []
-    }
-  ]
-}`,
-    },
-  },
-  {
-    id: 'components.remove_hashes',
-    key: 'remove_hashes',
-    example: {
-      before: `{
-  "components": [
-    {
-      "type": "library",
-      "name": "openssl",
-      "version": "3.0.0",
-      "hashes": [
-        { "alg": "SHA-256", "content": "9f86d081884c7d659a2feaa0c55ad015" }
-      ]
-    }
-  ]
-}`,
-      after: `{
-  "components": [
-    {
-      "type": "library",
-      "name": "openssl",
-      "version": "3.0.0"
-    }
-  ]
-}`,
-    },
-  },
-  {
-    id: 'components.remove_scope',
-    key: 'remove_scope',
-    example: {
-      before: `{
-  "components": [
-    {
-      "type": "library",
-      "name": "openssl",
-      "version": "3.0.0",
-      "scope": "required"
-    }
-  ]
-}`,
-      after: `{
-  "components": [
-    {
-      "type": "library",
-      "name": "openssl",
-      "version": "3.0.0"
     }
   ]
 }`,

@@ -14,31 +14,36 @@ const defaultOptions: SbomFixOptions = {
     reorder: true,
     set_spec_version: true,
     spec_version: '1.7',
-    remove_dependencies: true,
-    remove_services: true,
     increment_version: true,
   },
   metadata: {
     add_timestamp: true,
     reorder: true,
-    remove_properties: true,
-    remove_tools: true,
     component: {
       reorder: true,
-      remove_external_references: true,
-      remove_properties: true,
-      remove_purl: false,
-      remove_scope: true,
-      rename_supplier: true,
+      add_manufacturer: true,
+      manufacturer: 'Positive Technologies',
     },
   },
   components: {
     reorder: true,
-    remove_hashes: true,
-    remove_scope: true,
     filter_external_references: true,
     filter_properties: true,
     fill_missing_gost_properties: false,
+  },
+  optional_fields: {
+    keep: [
+      'metadata.tools',
+      'metadata.component.properties',
+      'metadata.component.group',
+      'metadata.component.purl',
+      'metadata.component.externalReferences',
+      'metadata.component.bom-ref',
+      'components[].group',
+      'components[].licenses',
+      'components[].description',
+      'components[].bom-ref',
+    ],
   },
 }
 
@@ -89,7 +94,7 @@ const statsResponse: SbomFixResponse = {
   fixed_sbom: { bomFormat: 'CycloneDX' },
   stats: [
     { rule_id: 'root.reorder', count: 2 },
-    { rule_id: 'components.remove_hashes', count: 0 },
+    { rule_id: 'components.filter_properties', count: 0 },
   ],
   issues: [],
 }
@@ -177,7 +182,7 @@ describe('SbomFixer.vue', () => {
   it('renders help for every rule and no warning banner', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('.warning-banner').exists()).toBe(false)
-    expect(wrapper.findAll('.rule-help-button')).toHaveLength(21)
+    expect(wrapper.findAll('.rule-help-button')).toHaveLength(11)
     for (const rule of ALL_FIX_RULES) {
       expect(wrapper.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
     }
@@ -185,10 +190,10 @@ describe('SbomFixer.vue', () => {
 
   it('opens rule help with description and both examples', async () => {
     const wrapper = await mountFixer()
-    await wrapper.find('[data-help-for="components.remove_hashes"]').trigger('click')
-    const panel = wrapper.find('[data-rule-row="components.remove_hashes"] .rule-help-panel')
+    await wrapper.find('[data-help-for="components.filter_properties"]').trigger('click')
+    const panel = wrapper.find('[data-rule-row="components.filter_properties"] .rule-help-panel')
     expect(panel.exists()).toBe(true)
-    expect(panel.text()).toContain('externalReferences')
+    expect(panel.text()).toContain('GOST')
     expect(panel.findAll('pre')).toHaveLength(2)
   })
 
@@ -198,11 +203,11 @@ describe('SbomFixer.vue', () => {
     await first.trigger('click')
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(1)
 
-    await wrapper.find('[data-help-for="root.remove_services"]').trigger('click')
+    await wrapper.find('[data-help-for="root.increment_version"]').trigger('click')
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(1)
-    expect(wrapper.find('[data-rule-row="root.remove_services"] .rule-help-panel').exists()).toBe(true)
+    expect(wrapper.find('[data-rule-row="root.increment_version"] .rule-help-panel').exists()).toBe(true)
 
-    await wrapper.find('[data-help-for="root.remove_services"]').trigger('click')
+    await wrapper.find('[data-help-for="root.increment_version"]').trigger('click')
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(0)
   })
 
@@ -215,9 +220,9 @@ describe('SbomFixer.vue', () => {
 
   it('does not change the checkbox when its help is opened', async () => {
     const wrapper = await mountFixer()
-    const checkbox = wrapper.find(rule('components.remove_hashes'))
+    const checkbox = wrapper.find(rule('components.filter_properties'))
     expect((checkbox.element as HTMLInputElement).checked).toBe(true)
-    await wrapper.find('[data-help-for="components.remove_hashes"]').trigger('click')
+    await wrapper.find('[data-help-for="components.filter_properties"]').trigger('click')
     expect((checkbox.element as HTMLInputElement).checked).toBe(true)
   })
 
@@ -282,8 +287,6 @@ describe('SbomFixer.vue', () => {
     for (const id of [
       'root.reorder',
       'root.set_spec_version',
-      'root.remove_dependencies',
-      'root.remove_services',
       'root.increment_version',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(false)
@@ -293,8 +296,6 @@ describe('SbomFixer.vue', () => {
     for (const id of [
       'root.reorder',
       'root.set_spec_version',
-      'root.remove_dependencies',
-      'root.remove_services',
       'root.increment_version',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(true)
@@ -309,14 +310,8 @@ describe('SbomFixer.vue', () => {
     for (const id of [
       'metadata.add_timestamp',
       'metadata.reorder',
-      'metadata.remove_properties',
-      'metadata.remove_tools',
       'metadata_component.reorder',
-      'metadata_component.remove_external_references',
-      'metadata_component.remove_properties',
-      'metadata_component.remove_purl',
-      'metadata_component.remove_scope',
-      'metadata_component.rename_supplier',
+      'metadata_component.add_manufacturer',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(true)
     }
@@ -325,14 +320,8 @@ describe('SbomFixer.vue', () => {
     for (const id of [
       'metadata.add_timestamp',
       'metadata.reorder',
-      'metadata.remove_properties',
-      'metadata.remove_tools',
       'metadata_component.reorder',
-      'metadata_component.remove_external_references',
-      'metadata_component.remove_properties',
-      'metadata_component.remove_purl',
-      'metadata_component.remove_scope',
-      'metadata_component.rename_supplier',
+      'metadata_component.add_manufacturer',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(false)
     }
@@ -347,21 +336,20 @@ describe('SbomFixer.vue', () => {
 
     expect((wrapper.find(rule('metadata.reorder')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('metadata.add_timestamp')).element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.find(rule('metadata.remove_properties')).element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.find(rule('metadata.remove_tools')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('metadata_component.reorder')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(false)
   })
 
   it('marks partially selected masters as indeterminate', async () => {
     const wrapper = await mountFixer()
 
     expect((masterFor(wrapper, 'root').element as HTMLInputElement).indeterminate).toBe(false)
-    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(true)
+    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(false)
     expect((masterFor(wrapper, 'components').element as HTMLInputElement).indeterminate).toBe(true)
 
-    await wrapper.find(rule('metadata_component.remove_purl')).setValue(true)
-    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(false)
-    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find(rule('metadata_component.add_manufacturer')).setValue(false)
+    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(true)
+    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).checked).toBe(false)
   })
 
   it('select all and clear all operate within their own group', async () => {
@@ -375,11 +363,11 @@ describe('SbomFixer.vue', () => {
     expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
 
     await wrapper.find('[data-group="metadata-component"] .clear-all').trigger('click')
-    expect((wrapper.find(rule('metadata_component.remove_purl')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(false)
     expect((wrapper.find(rule('metadata.reorder')).element as HTMLInputElement).checked).toBe(true)
 
     await wrapper.find('[data-group="metadata-component"] .select-all').trigger('click')
-    expect((wrapper.find(rule('metadata_component.remove_purl')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(true)
   })
 
   it('restores defaults without saving them', async () => {
@@ -391,7 +379,7 @@ describe('SbomFixer.vue', () => {
 
     expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('components.fill_missing_gost_properties')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('metadata_component.remove_purl')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).value).toBe('1.7')
     expect(saveFixOptionsMock).not.toHaveBeenCalled()
   })
@@ -460,6 +448,24 @@ describe('SbomFixer.vue', () => {
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).disabled).toBe(false)
     await wrapper.find(rule('root.set_spec_version')).setValue(false)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('disables the manufacturer input when add_manufacturer is off and saves its value', async () => {
+    const wrapper = await mountFixer()
+
+    const input = () => wrapper.find('.manufacturer-input')
+    expect((input().element as HTMLInputElement).value).toBe('Positive Technologies')
+    expect((input().element as HTMLInputElement).disabled).toBe(false)
+
+    await input().setValue('ООО Ромашка')
+    await wrapper.find(rule('metadata_component.add_manufacturer')).setValue(false)
+    expect((input().element as HTMLInputElement).disabled).toBe(true)
+
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.metadata.component.manufacturer).toBe('ООО Ромашка')
   })
 
   it('disables the fix button until a file is selected', async () => {
@@ -585,7 +591,7 @@ describe('SbomFixer.vue', () => {
     expect(rows).toHaveLength(2)
     expect(rows[0].text()).toContain('Reorder root fields')
     expect(rows[0].text()).toContain('2')
-    expect(rows[1].text()).toContain('Remove hashes')
+    expect(rows[1].text()).toContain('Keep only GOST properties')
     expect(rows[1].text()).toContain('0')
   })
 

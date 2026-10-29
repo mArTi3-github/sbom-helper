@@ -115,32 +115,23 @@
     "issuesComponent": "Component",
     "issuesDetails": "Details",
     "download": "Download fixed SBOM",
+    "manufacturer": "Manufacturer",
     "rules": {
       "root": {
         "reorder": "Reorder root fields",
         "set_spec_version": "Set specVersion",
-        "remove_dependencies": "Remove dependencies",
-        "remove_services": "Remove services",
         "increment_version": "Increment version"
       },
       "metadata": {
         "add_timestamp": "Add timestamp if missing",
-        "reorder": "Reorder metadata fields",
-        "remove_properties": "Remove metadata properties",
-        "remove_tools": "Remove metadata tools"
+        "reorder": "Reorder metadata fields"
       },
       "metadata_component": {
         "reorder": "Reorder metadata.component fields",
-        "remove_external_references": "Remove external references",
-        "remove_properties": "Remove properties",
-        "remove_purl": "Remove purl",
-        "remove_scope": "Remove scope",
-        "rename_supplier": "Rename supplier to manufacturer"
+        "add_manufacturer": "Add manufacturer if missing"
       },
       "components": {
         "reorder": "Reorder component fields",
-        "remove_hashes": "Remove hashes",
-        "remove_scope": "Remove scope",
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
         "fill_missing_gost_properties": "Add missing GOST properties"
@@ -152,32 +143,42 @@
       "root": {
         "reorder": "Reorders the root object keys to bomFormat, specVersion, serialNumber, version, metadata, components, annotations; any other keys follow them in their original relative order. Nested objects are not changed.",
         "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
-        "remove_dependencies": "Removes the root dependencies array entirely. The components themselves and their nested fields are not changed.",
-        "remove_services": "Removes the root services array entirely. Components are not changed.",
         "increment_version": "Increments the integer version field by 1. If version is missing or is not an integer, the rule leaves it untouched and reports 0 changes."
       },
       "metadata": {
         "reorder": "Puts timestamp and component first; the remaining metadata keys follow in their original order. The content is not changed.",
-        "add_timestamp": "Writes metadata.timestamp with the current UTC time in YYYY-MM-DDTHH:MM:SSZ format, only if the field is missing, null, or an empty string. An existing non-empty value is not overwritten.",
-        "remove_properties": "Removes the document's own properties (metadata.properties). Component properties are not affected by this rule.",
-        "remove_tools": "Removes metadata.tools in any form — both an array and an object."
+        "add_timestamp": "Writes metadata.timestamp with the current UTC time in YYYY-MM-DDTHH:MM:SSZ format, only if the field is missing, null, or an empty string. An existing non-empty value is not overwritten."
       },
       "metadata_component": {
         "reorder": "Puts type, name, version, manufacturer first, then the remaining keys in their original order.",
-        "remove_external_references": "Removes metadata.component.externalReferences entirely. Component external references in components[] are not affected by this rule.",
-        "remove_properties": "Removes metadata.component.properties. Component properties in components[] are not affected by this rule.",
-        "remove_purl": "Removes purl only from metadata.component. purl values of components in components[] are preserved.",
-        "remove_scope": "Removes scope only from metadata.component. The scope of components in components[] is handled by a separate rule.",
-        "rename_supplier": "Removes supplier and moves its value to manufacturer, only if manufacturer is missing or null. If manufacturer is already set, supplier is simply removed."
+        "add_manufacturer": "Treats manufacturer as missing when it is not an object or its name is not a non-empty string, and writes an object whose only field is name, set to the value from the \"Manufacturer\" field. An existing valid manufacturer is not changed. The supplier field is neither read nor changed."
       },
       "components": {
         "reorder": "Sets each component's keys to the order type, name, version, purl, externalReferences, properties, components, then the remaining keys in their original order. Applied recursively to nested components. metadata.component is not affected.",
-        "remove_hashes": "Removes the component's own hashes field. Hashes inside externalReferences (for example, on a distribution link) are preserved.",
-        "remove_scope": "Removes the scope field from every component in components[], recursively. metadata.component.scope is handled by a separate rule.",
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
         "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected."
       }
+    },
+    "optionalFields": {
+      "title": "Remove optional fields by whitelist",
+      "description": "Cosmetic cleanup: extra CycloneDX fields are allowed by the methodology. Here you can remove fields that are not described in the FSTEC requirements and are not on the \"not recommended to remove\" list.",
+      "analyze": "Analyze",
+      "analyzing": "Analyzing...",
+      "needFile": "Upload a file to run the analysis.",
+      "needAnalysis": "Upload a file and press \"Analyze\" to see the optional fields.",
+      "empty": "No optional fields found.",
+      "path": "Path",
+      "occurrences": "Occurrences",
+      "fstecTitle": "FSTEC requirement fields (reference)",
+      "keepTitle": "Not recommended to remove",
+      "keepHint": "One path per line. Fields on this list are never offered for removal.",
+      "fstecStatusMandatory": "Mandatory",
+      "fstecStatusOptional": "Optional",
+      "conditionComponentsPresent": "mandatory when components are present",
+      "conditionSourceDistributionHashes": "mandatory for source-distribution",
+      "remove": "Remove optional field",
+      "catalogLoadFailed": "Could not load the FSTEC field reference."
     },
     "issues": {
       "root": {
@@ -439,6 +440,7 @@
     "invalid_csv": "Invalid CSV file",
     "invalid_purl": "Invalid PURL",
     "invalid_options": "Invalid fix options",
+    "invalid_remove_fields": "Invalid list of fields to remove",
     "options_save_failed": "Could not save fix options",
     "upstream_error": "Upstream resolution error",
     "batch_too_large": "Too many PURLs in one request",

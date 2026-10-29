@@ -17,18 +17,32 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 }
 
 const GROUPS = [
-  { rules: ROOT_RULES, prefix: 'root.', size: 5 },
-  { rules: METADATA_RULES, prefix: 'metadata.', size: 4 },
-  { rules: METADATA_COMPONENT_RULES, prefix: 'metadata_component.', size: 6 },
-  { rules: COMPONENTS_RULES, prefix: 'components.', size: 6 },
+  { rules: ROOT_RULES, prefix: 'root.', size: 3 },
+  { rules: METADATA_RULES, prefix: 'metadata.', size: 2 },
+  { rules: METADATA_COMPONENT_RULES, prefix: 'metadata_component.', size: 2 },
+  { rules: COMPONENTS_RULES, prefix: 'components.', size: 4 },
 ]
 
 describe('sbomFixerRules catalog', () => {
-  it('covers all 21 rules with unique ids', () => {
-    expect(ALL_FIX_RULES).toHaveLength(21)
-    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(21)
+  it('covers all 11 rules with unique ids', () => {
+    expect(ALL_FIX_RULES).toHaveLength(11)
+    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(11)
     for (const rule of ALL_FIX_RULES) {
       expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
+    }
+  })
+
+  it('replaces rename_supplier with add_manufacturer and drops removal rules', () => {
+    const ids = ALL_FIX_RULES.map((rule) => rule.id)
+    expect(ids).toContain('metadata_component.add_manufacturer')
+    for (const id of [
+      'root.remove_dependencies', 'root.remove_services',
+      'metadata.remove_properties', 'metadata.remove_tools',
+      'metadata_component.remove_external_references', 'metadata_component.remove_purl',
+      'metadata_component.remove_scope', 'metadata_component.rename_supplier',
+      'components.remove_hashes', 'components.remove_scope',
+    ]) {
+      expect(ids).not.toContain(id)
     }
   })
 
