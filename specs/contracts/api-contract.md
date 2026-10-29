@@ -172,6 +172,7 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
   "fixed_sbom": { "bomFormat": "CycloneDX", "specVersion": "1.7", "...": "..." },
   "stats": [
     { "rule_id": "root.reorder", "count": 1 },
+    "...",
     { "rule_id": "optional_fields.remove", "field": "components[].hashes", "count": 3 }
   ],
   "issues": [
