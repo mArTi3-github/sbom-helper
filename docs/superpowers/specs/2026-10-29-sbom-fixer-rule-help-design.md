@@ -433,7 +433,7 @@ Backend не меняется; pytest не требуется.
 
 ### metadata_component.remove_purl
 
-**Удалить purl.** Удаляет `purl` только у `metadata.component`. `purl` компонентов в `components[]` сохраняются. По умолчанию правило выключено.
+**Удалить purl.** Удаляет `purl` только у `metadata.component`. `purl` компонентов в `components[]` сохраняются.
 
 До:
 ```json
@@ -685,7 +685,7 @@ Backend не меняется; pytest не требуется.
 
 ### components.fill_missing_gost_properties
 
-**Добавить недостающие ГОСТ-свойства.** Добавляет компоненту недостающие `GOST:attack_surface` и `GOST:security_function` со значением `no` в `value`. Если `properties` нет, создаёт массив; существующие свойства не меняет. По умолчанию правило выключено; `metadata.component` не затрагивается.
+**Добавить недостающие ГОСТ-свойства.** Добавляет компоненту недостающие `GOST:attack_surface` и `GOST:security_function` со значением `no` в `value`. Если `properties` нет, создаёт массив; существующие свойства не меняет. `metadata.component` не затрагивается.
 
 До:
 ```json

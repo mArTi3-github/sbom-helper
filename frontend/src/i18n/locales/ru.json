@@ -166,7 +166,7 @@
         "reorder": "Ставит type, name, version, manufacturer, затем остальные ключи в исходном порядке.",
         "remove_external_references": "Удаляет metadata.component.externalReferences целиком. Внешние ссылки компонентов в components[] этим правилом не затрагиваются.",
         "remove_properties": "Удаляет metadata.component.properties. Свойства компонентов в components[] этим правилом не затрагиваются.",
-        "remove_purl": "Удаляет purl только у metadata.component. purl компонентов в components[] сохраняются. По умолчанию правило выключено.",
+        "remove_purl": "Удаляет purl только у metadata.component. purl компонентов в components[] сохраняются.",
         "remove_scope": "Удаляет scope только у metadata.component. scope компонентов в components[] обрабатывается отдельным правилом.",
         "rename_supplier": "Удаляет supplier и переносит его значение в manufacturer, только если manufacturer отсутствует или равен null. Если manufacturer уже задан, supplier просто удаляется."
       },
@@ -176,7 +176,7 @@
         "remove_scope": "Удаляет поле scope у каждого компонента в components[], рекурсивно. metadata.component.scope обрабатывается отдельным правилом.",
         "filter_external_references": "Оставляет в externalReferences только элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные типы (website, distribution, issue-tracker и т. п.) удаляются; если не осталось ничего, массив остаётся пустым. metadata.component не затрагивается.",
         "filter_properties": "Оставляет в properties только элементы, имя которых начинается ровно с GOST: (с учётом регистра). Остальные удаляются; пустой массив остаётся пустым. metadata.component не затрагивается.",
-        "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. По умолчанию правило выключено; metadata.component не затрагивается."
+        "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается."
       }
     },
     "issues": {
