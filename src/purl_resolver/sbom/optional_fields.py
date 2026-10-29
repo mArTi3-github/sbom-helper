@@ -67,6 +67,7 @@ FIELD_PATH_PATTERN = re.compile(
 CONTEXT_ORDER = {"root": 0, "metadata": 1, "metadata.component": 2, "components[]": 3}
 
 _CONTEXT_PREFIXES = tuple(sorted(CONTEXT_ORDER, key=len, reverse=True))
+_MISSING = object()
 
 
 def normalize_keep(entries: list[str]) -> list[str]:
@@ -100,3 +101,112 @@ def canonical_sort_key(path: str) -> tuple[int, str]:
         if path.startswith(marker):
             return (CONTEXT_ORDER[prefix], path[len(marker) :])
     return (len(CONTEXT_ORDER), path)
+
+
+_FSTEC_STATUS: dict[str, str] = {field.path: field.status for field in FSTEC_FIELDS}
+
+
+@dataclass(frozen=True)
+class FieldInfo:
+    path: str
+    status: str
+    count: int
+
+
+def _split_path(path: str) -> tuple[str, str] | None:
+    for prefix in _CONTEXT_PREFIXES:
+        marker = prefix + "."
+        if path.startswith(marker):
+            return prefix, path[len(marker) :]
+    return None
+
+
+def _iter_components(value: object):
+    if not isinstance(value, list):
+        return
+    for item in value:
+        if isinstance(item, dict):
+            yield item
+            yield from _iter_components(item.get("components"))
+
+
+def analyze_fields(data: dict) -> list[FieldInfo]:
+    counts: dict[str, int] = {}
+
+    def collect(prefix: str, obj: dict) -> None:
+        for key in obj:
+            path = f"{prefix}.{key}"
+            if FIELD_PATH_PATTERN.fullmatch(path) is not None:
+                counts[path] = counts.get(path, 0) + 1
+
+    if isinstance(data, dict):
+        collect("root", data)
+
+    metadata = data.get("metadata") if isinstance(data, dict) else None
+    if isinstance(metadata, dict):
+        collect("metadata", metadata)
+        component = metadata.get("component")
+        if isinstance(component, dict):
+            collect("metadata.component", component)
+
+    if isinstance(data, dict):
+        for item in _iter_components(data.get("components")):
+            collect("components[]", item)
+
+    return [
+        FieldInfo(path=path, status=_FSTEC_STATUS.get(path, "additional"), count=count)
+        for path, count in sorted(counts.items(), key=lambda item: canonical_sort_key(item[0]))
+    ]
+
+
+def remove_optional_fields(
+    data: dict, paths: list[str], keep: list[str]
+) -> dict[str, int]:
+    keep_set = set(normalize_keep(keep))
+    accepted: list[str] = []
+    seen: set[str] = set()
+    for entry in paths:
+        path = entry.strip()
+        if not path or path in seen:
+            continue
+        if FIELD_PATH_PATTERN.fullmatch(path) is None or path in FSTEC_PATHS:
+            continue
+        if path in keep_set:
+            continue
+        seen.add(path)
+        accepted.append(path)
+    accepted.sort(key=canonical_sort_key)
+
+    counts: dict[str, int] = {}
+    for path in accepted:
+        split = _split_path(path)
+        if split is None:
+            continue
+        context, field = split
+        if context == "root":
+            counts[path] = 0
+            if isinstance(data, dict) and data.pop(field, _MISSING) is not _MISSING:
+                counts[path] = 1
+        elif context == "metadata":
+            metadata = data.get("metadata") if isinstance(data, dict) else None
+            counts[path] = (
+                1
+                if isinstance(metadata, dict) and metadata.pop(field, _MISSING) is not _MISSING
+                else 0
+            )
+        elif context == "metadata.component":
+            metadata = data.get("metadata") if isinstance(data, dict) else None
+            component = metadata.get("component") if isinstance(metadata, dict) else None
+            counts[path] = (
+                1
+                if isinstance(component, dict) and component.pop(field, _MISSING) is not _MISSING
+                else 0
+            )
+        else:
+            removed = 0
+            root_components = data.get("components") if isinstance(data, dict) else None
+            for item in _iter_components(root_components):
+                if item.pop(field, _MISSING) is not _MISSING:
+                    removed += 1
+            counts[path] = removed
+    return counts
