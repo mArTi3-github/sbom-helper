@@ -70,10 +70,12 @@ _CONTEXT_PREFIXES = tuple(sorted(CONTEXT_ORDER, key=len, reverse=True))
 _MISSING = object()
 
 
-def normalize_keep(entries: list[str]) -> list[str]:
+def normalize_keep(entries: list[object]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
     for entry in entries:
+        if not isinstance(entry, str):
+            continue
         path = entry.strip()
         if not path or path in seen:
             continue
@@ -84,9 +86,12 @@ def normalize_keep(entries: list[str]) -> list[str]:
     return result
 
 
-def invalid_keep_entries(entries: list[str]) -> list[str]:
+def invalid_keep_entries(entries: list[object]) -> list[str]:
     result: list[str] = []
     for entry in entries:
+        if not isinstance(entry, str):
+            result.append(str(entry))
+            continue
         path = entry.strip()
         if not path:
             continue

@@ -78,6 +78,16 @@ def test_invalid_keep_entries_reports_bad_and_fstec_paths():
     assert invalid_keep_entries(entries) == ["bad path", "root.bomFormat"]
 
 
+def test_normalize_keep_skips_non_string_entries():
+    assert normalize_keep(["components[].group", 123, None]) == [
+        "components[].group"
+    ]
+
+
+def test_invalid_keep_entries_stringifies_non_string_entries():
+    assert invalid_keep_entries(["components[].group", 123]) == ["123"]
+
+
 def test_canonical_sort_key_orders_contexts_then_paths():
     paths = [
         "components[].scope",
