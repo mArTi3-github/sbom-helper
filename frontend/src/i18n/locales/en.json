@@ -87,7 +87,6 @@
   "sbomFixer": {
     "title": "Fix SBOM",
     "subtitle": "Upload a CycloneDX SBOM (JSON) and apply selected formal fixes",
-    "warning": "Almost all fixes are enabled by default, including field removals. Review the set before running.",
     "saveSettings": "Save settings",
     "saved": "Saved",
     "saveFailed": "Could not save settings",

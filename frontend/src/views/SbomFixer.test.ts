@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
 import SbomFixer from './SbomFixer.vue'
+import { ALL_FIX_RULES } from './sbomFixerRules'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
@@ -173,11 +174,70 @@ describe('SbomFixer.vue', () => {
     updateSettingsMock.mockResolvedValue(settingsResponse)
   })
 
-  it('renders the warning banner about almost all fixes being enabled', async () => {
+  it('renders help for every rule and no warning banner', async () => {
     const wrapper = await mountFixer()
-    const banner = wrapper.find('.warning-banner')
-    expect(banner.exists()).toBe(true)
-    expect(banner.text()).toContain('Almost all fixes are enabled by default')
+    expect(wrapper.find('.warning-banner').exists()).toBe(false)
+    expect(wrapper.findAll('.rule-help-button')).toHaveLength(21)
+    for (const rule of ALL_FIX_RULES) {
+      expect(wrapper.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
+    }
+  })
+
+  it('opens rule help with description and both examples', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-help-for="components.remove_hashes"]').trigger('click')
+    const panel = wrapper.find('[data-rule-row="components.remove_hashes"] .rule-help-panel')
+    expect(panel.exists()).toBe(true)
+    expect(panel.text()).toContain('externalReferences')
+    expect(panel.findAll('pre')).toHaveLength(2)
+  })
+
+  it('closes the same help on a second click and keeps only one panel open', async () => {
+    const wrapper = await mountFixer()
+    const first = wrapper.find('[data-help-for="root.reorder"]')
+    await first.trigger('click')
+    expect(wrapper.findAll('.rule-help-panel')).toHaveLength(1)
+
+    await wrapper.find('[data-help-for="root.remove_services"]').trigger('click')
+    expect(wrapper.findAll('.rule-help-panel')).toHaveLength(1)
+    expect(wrapper.find('[data-rule-row="root.remove_services"] .rule-help-panel').exists()).toBe(true)
+
+    await wrapper.find('[data-help-for="root.remove_services"]').trigger('click')
+    expect(wrapper.findAll('.rule-help-panel')).toHaveLength(0)
+  })
+
+  it('closes help on Escape', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-help-for="root.reorder"]').trigger('click')
+    await wrapper.find('[data-rule-row="root.reorder"] .rule-help').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.findAll('.rule-help-panel')).toHaveLength(0)
+  })
+
+  it('does not change the checkbox when its help is opened', async () => {
+    const wrapper = await mountFixer()
+    const checkbox = wrapper.find(rule('components.remove_hashes'))
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find('[data-help-for="components.remove_hashes"]').trigger('click')
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('does not toggle the spec version rule when the text input is clicked', async () => {
+    const wrapper = await mountFixer()
+    const checkbox = wrapper.find(rule('root.set_spec_version'))
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find('.spec-version-input').trigger('click')
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('saves the option bound to the row that was toggled', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find(rule('components.fill_missing_gost_properties')).setValue(true)
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    expect(saveFixOptionsMock).toHaveBeenCalledTimes(1)
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.components.fill_missing_gost_properties).toBe(true)
+    expect(saved.root.reorder).toBe(true)
   })
 
   it('loads options and settings on mount and fills the form', async () => {
@@ -210,7 +270,7 @@ describe('SbomFixer.vue', () => {
     getSettingsMock.mockRejectedValueOnce(new Error('settings down'))
     const wrapper = await mountFixer()
 
-    expect(wrapper.find('.warning-banner').exists()).toBe(true)
+    expect(wrapper.find('.group-card').exists()).toBe(true)
     expect(useSettingsStore().jsonIndent).toBe(4)
   })
 

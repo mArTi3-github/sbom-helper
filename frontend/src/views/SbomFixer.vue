@@ -3,8 +3,6 @@
     <h1>{{ t('sbomFixer.title') }}</h1>
     <p class="subtitle">{{ t('sbomFixer.subtitle') }}</p>
 
-    <div class="warning-banner">&#9888; {{ t('sbomFixer.warning') }}</div>
-
     <FileUploadZone accept=".json" :max-size="200" @file-selected="onFileSelected" />
 
     <div class="options-panel">
@@ -40,33 +38,38 @@
           </div>
         </div>
         <div class="group-options">
-          <label class="rule-row">
-            <input v-model="options.root.reorder" type="checkbox" :data-rule="'root.reorder'" />
-            <span>{{ t('sbomFixer.rules.root.reorder') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.root.set_spec_version" type="checkbox" :data-rule="'root.set_spec_version'" />
-            <span>{{ t('sbomFixer.rules.root.set_spec_version') }}</span>
-            <span class="spec-version-label">{{ t('sbomFixer.specVersion') }}</span>
-            <input
-              v-model="options.root.spec_version"
-              type="text"
-              class="spec-version-input"
-              :disabled="!options.root.set_spec_version"
+          <div
+            v-for="rule in ROOT_RULES"
+            :key="rule.id"
+            class="rule-row"
+            :data-rule-row="rule.id"
+          >
+            <label class="rule-label">
+              <input v-model="options.root[rule.key]" type="checkbox" :data-rule="rule.id" />
+              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+            </label>
+            <template v-if="rule.id === 'root.set_spec_version'">
+              <span class="spec-version-label">{{ t('sbomFixer.specVersion') }}</span>
+              <input
+                v-model="options.root.spec_version"
+                type="text"
+                class="spec-version-input"
+                :disabled="!options.root.set_spec_version"
+              />
+            </template>
+            <RuleHelp
+              :rule-id="rule.id"
+              :description="t(`sbomFixer.help.${rule.id}`)"
+              :before="rule.example.before"
+              :after="rule.example.after"
+              :before-label="t('sbomFixer.exampleBefore')"
+              :after-label="t('sbomFixer.exampleAfter')"
+              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+              :open="openHelpId === rule.id"
+              @toggle="toggleHelp(rule.id)"
+              @close="openHelpId = null"
             />
-          </label>
-          <label class="rule-row">
-            <input v-model="options.root.remove_dependencies" type="checkbox" :data-rule="'root.remove_dependencies'" />
-            <span>{{ t('sbomFixer.rules.root.remove_dependencies') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.root.remove_services" type="checkbox" :data-rule="'root.remove_services'" />
-            <span>{{ t('sbomFixer.rules.root.remove_services') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.root.increment_version" type="checkbox" :data-rule="'root.increment_version'" />
-            <span>{{ t('sbomFixer.rules.root.increment_version') }}</span>
-          </label>
+          </div>
         </div>
       </div>
 
@@ -87,22 +90,29 @@
           </div>
         </div>
         <div class="group-options">
-          <label class="rule-row">
-            <input v-model="options.metadata.add_timestamp" type="checkbox" :data-rule="'metadata.add_timestamp'" />
-            <span>{{ t('sbomFixer.rules.metadata.add_timestamp') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.metadata.reorder" type="checkbox" :data-rule="'metadata.reorder'" />
-            <span>{{ t('sbomFixer.rules.metadata.reorder') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.metadata.remove_properties" type="checkbox" :data-rule="'metadata.remove_properties'" />
-            <span>{{ t('sbomFixer.rules.metadata.remove_properties') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.metadata.remove_tools" type="checkbox" :data-rule="'metadata.remove_tools'" />
-            <span>{{ t('sbomFixer.rules.metadata.remove_tools') }}</span>
-          </label>
+          <div
+            v-for="rule in METADATA_RULES"
+            :key="rule.id"
+            class="rule-row"
+            :data-rule-row="rule.id"
+          >
+            <label class="rule-label">
+              <input v-model="options.metadata[rule.key]" type="checkbox" :data-rule="rule.id" />
+              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+            </label>
+            <RuleHelp
+              :rule-id="rule.id"
+              :description="t(`sbomFixer.help.${rule.id}`)"
+              :before="rule.example.before"
+              :after="rule.example.after"
+              :before-label="t('sbomFixer.exampleBefore')"
+              :after-label="t('sbomFixer.exampleAfter')"
+              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+              :open="openHelpId === rule.id"
+              @toggle="toggleHelp(rule.id)"
+              @close="openHelpId = null"
+            />
+          </div>
         </div>
 
         <div class="subblock" data-group="metadata-component">
@@ -122,34 +132,29 @@
             </div>
           </div>
           <div class="group-options">
-            <label class="rule-row">
-              <input v-model="options.metadata.component.reorder" type="checkbox" :data-rule="'metadata_component.reorder'" />
-              <span>{{ t('sbomFixer.rules.metadata_component.reorder') }}</span>
-            </label>
-            <label class="rule-row">
-              <input
-                v-model="options.metadata.component.remove_external_references"
-                type="checkbox"
-                :data-rule="'metadata_component.remove_external_references'"
+            <div
+              v-for="rule in METADATA_COMPONENT_RULES"
+              :key="rule.id"
+              class="rule-row"
+              :data-rule-row="rule.id"
+            >
+              <label class="rule-label">
+                <input v-model="options.metadata.component[rule.key]" type="checkbox" :data-rule="rule.id" />
+                <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+              </label>
+              <RuleHelp
+                :rule-id="rule.id"
+                :description="t(`sbomFixer.help.${rule.id}`)"
+                :before="rule.example.before"
+                :after="rule.example.after"
+                :before-label="t('sbomFixer.exampleBefore')"
+                :after-label="t('sbomFixer.exampleAfter')"
+                :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+                :open="openHelpId === rule.id"
+                @toggle="toggleHelp(rule.id)"
+                @close="openHelpId = null"
               />
-              <span>{{ t('sbomFixer.rules.metadata_component.remove_external_references') }}</span>
-            </label>
-            <label class="rule-row">
-              <input v-model="options.metadata.component.remove_properties" type="checkbox" :data-rule="'metadata_component.remove_properties'" />
-              <span>{{ t('sbomFixer.rules.metadata_component.remove_properties') }}</span>
-            </label>
-            <label class="rule-row">
-              <input v-model="options.metadata.component.remove_purl" type="checkbox" :data-rule="'metadata_component.remove_purl'" />
-              <span>{{ t('sbomFixer.rules.metadata_component.remove_purl') }}</span>
-            </label>
-            <label class="rule-row">
-              <input v-model="options.metadata.component.remove_scope" type="checkbox" :data-rule="'metadata_component.remove_scope'" />
-              <span>{{ t('sbomFixer.rules.metadata_component.remove_scope') }}</span>
-            </label>
-            <label class="rule-row">
-              <input v-model="options.metadata.component.rename_supplier" type="checkbox" :data-rule="'metadata_component.rename_supplier'" />
-              <span>{{ t('sbomFixer.rules.metadata_component.rename_supplier') }}</span>
-            </label>
+            </div>
           </div>
         </div>
       </div>
@@ -171,34 +176,29 @@
           </div>
         </div>
         <div class="group-options">
-          <label class="rule-row">
-            <input v-model="options.components.reorder" type="checkbox" :data-rule="'components.reorder'" />
-            <span>{{ t('sbomFixer.rules.components.reorder') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.components.remove_hashes" type="checkbox" :data-rule="'components.remove_hashes'" />
-            <span>{{ t('sbomFixer.rules.components.remove_hashes') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.components.remove_scope" type="checkbox" :data-rule="'components.remove_scope'" />
-            <span>{{ t('sbomFixer.rules.components.remove_scope') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.components.filter_external_references" type="checkbox" :data-rule="'components.filter_external_references'" />
-            <span>{{ t('sbomFixer.rules.components.filter_external_references') }}</span>
-          </label>
-          <label class="rule-row">
-            <input v-model="options.components.filter_properties" type="checkbox" :data-rule="'components.filter_properties'" />
-            <span>{{ t('sbomFixer.rules.components.filter_properties') }}</span>
-          </label>
-          <label class="rule-row">
-            <input
-              v-model="options.components.fill_missing_gost_properties"
-              type="checkbox"
-              :data-rule="'components.fill_missing_gost_properties'"
+          <div
+            v-for="rule in COMPONENTS_RULES"
+            :key="rule.id"
+            class="rule-row"
+            :data-rule-row="rule.id"
+          >
+            <label class="rule-label">
+              <input v-model="options.components[rule.key]" type="checkbox" :data-rule="rule.id" />
+              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+            </label>
+            <RuleHelp
+              :rule-id="rule.id"
+              :description="t(`sbomFixer.help.${rule.id}`)"
+              :before="rule.example.before"
+              :after="rule.example.after"
+              :before-label="t('sbomFixer.exampleBefore')"
+              :after-label="t('sbomFixer.exampleAfter')"
+              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+              :open="openHelpId === rule.id"
+              @toggle="toggleHelp(rule.id)"
+              @close="openHelpId = null"
             />
-            <span>{{ t('sbomFixer.rules.components.fill_missing_gost_properties') }}</span>
-          </label>
+          </div>
         </div>
       </div>
     </div>
@@ -279,6 +279,13 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
+import RuleHelp from '../components/RuleHelp.vue'
+import {
+  COMPONENTS_RULES,
+  METADATA_COMPONENT_RULES,
+  METADATA_RULES,
+  ROOT_RULES,
+} from './sbomFixerRules'
 import { fixSbom, getFixOptions, saveFixOptions } from '../api/sbom'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
@@ -349,43 +356,24 @@ function plainOptions(): SbomFixOptions {
   return JSON.parse(JSON.stringify(options)) as SbomFixOptions
 }
 
-const rootKeys = [
-  'reorder',
-  'set_spec_version',
-  'remove_dependencies',
-  'remove_services',
-  'increment_version',
-] as const
-const metadataKeys = ['add_timestamp', 'reorder', 'remove_properties', 'remove_tools'] as const
-const metadataComponentKeys = [
-  'reorder',
-  'remove_external_references',
-  'remove_properties',
-  'remove_purl',
-  'remove_scope',
-  'rename_supplier',
-] as const
-const componentKeys = [
-  'reorder',
-  'remove_hashes',
-  'remove_scope',
-  'filter_external_references',
-  'filter_properties',
-  'fill_missing_gost_properties',
-] as const
+const openHelpId = ref<string | null>(null)
 
-const rootValues = () => rootKeys.map((key) => options.root[key])
+function toggleHelp(id: string): void {
+  openHelpId.value = openHelpId.value === id ? null : id
+}
+
+const rootValues = () => ROOT_RULES.map((rule) => options.root[rule.key])
 const metadataValues = () => [
-  ...metadataKeys.map((key) => options.metadata[key]),
-  ...metadataComponentKeys.map((key) => options.metadata.component[key]),
+  ...METADATA_RULES.map((rule) => options.metadata[rule.key]),
+  ...METADATA_COMPONENT_RULES.map((rule) => options.metadata.component[rule.key]),
 ]
-const metadataComponentValues = () => metadataComponentKeys.map((key) => options.metadata.component[key])
-const componentValues = () => componentKeys.map((key) => options.components[key])
+const metadataComponentValues = () => METADATA_COMPONENT_RULES.map((rule) => options.metadata.component[rule.key])
+const componentValues = () => COMPONENTS_RULES.map((rule) => options.components[rule.key])
 
 const rootMaster = computed({
   get: () => rootValues().every(Boolean),
   set: (value: boolean) => {
-    for (const key of rootKeys) options.root[key] = value
+    for (const rule of ROOT_RULES) options.root[rule.key] = value
   },
 })
 const rootIndeterminate = computed(() => !rootMaster.value && rootValues().some(Boolean))
@@ -393,8 +381,8 @@ const rootIndeterminate = computed(() => !rootMaster.value && rootValues().some(
 const metadataMaster = computed({
   get: () => metadataValues().every(Boolean),
   set: (value: boolean) => {
-    for (const key of metadataKeys) options.metadata[key] = value
-    for (const key of metadataComponentKeys) options.metadata.component[key] = value
+    for (const rule of METADATA_RULES) options.metadata[rule.key] = value
+    for (const rule of METADATA_COMPONENT_RULES) options.metadata.component[rule.key] = value
   },
 })
 const metadataIndeterminate = computed(() => !metadataMaster.value && metadataValues().some(Boolean))
@@ -402,7 +390,7 @@ const metadataIndeterminate = computed(() => !metadataMaster.value && metadataVa
 const metadataComponentMaster = computed({
   get: () => metadataComponentValues().every(Boolean),
   set: (value: boolean) => {
-    for (const key of metadataComponentKeys) options.metadata.component[key] = value
+    for (const rule of METADATA_COMPONENT_RULES) options.metadata.component[rule.key] = value
   },
 })
 const metadataComponentIndeterminate = computed(
@@ -412,7 +400,7 @@ const metadataComponentIndeterminate = computed(
 const componentsMaster = computed({
   get: () => componentValues().every(Boolean),
   set: (value: boolean) => {
-    for (const key of componentKeys) options.components[key] = value
+    for (const rule of COMPONENTS_RULES) options.components[rule.key] = value
   },
 })
 const componentsIndeterminate = computed(() => !componentsMaster.value && componentValues().some(Boolean))
@@ -551,15 +539,6 @@ h1 {
   margin-bottom: 1.5rem;
 }
 
-.warning-banner {
-  background: var(--color-warning-bg, rgba(245, 158, 11, 0.12));
-  border: 1px solid var(--color-warning, #f59e0b);
-  border-radius: var(--border-radius);
-  padding: 0.75rem 1rem;
-  color: var(--color-warning, #b45309);
-  margin-bottom: 1.5rem;
-}
-
 .options-panel {
   margin-top: 1.5rem;
 }
@@ -642,12 +621,18 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.rule-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.9rem;
   cursor: pointer;
 }
 
 .spec-version-label {
-  margin-left: auto;
   color: var(--color-muted);
   font-size: 0.85rem;
 }

@@ -66,4 +66,9 @@ describe('sbomFixerRules catalog', () => {
       expect(lookup(locale, 'sbomFixer.exampleAfter')).toBeTruthy()
     }
   })
+
+  it('removes the obsolete warning message from both locales', () => {
+    expect(lookup(ru, 'sbomFixer.warning')).toBeUndefined()
+    expect(lookup(en, 'sbomFixer.warning')).toBeUndefined()
+  })
 })
