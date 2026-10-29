@@ -176,7 +176,7 @@
         "remove_scope": "Removes the scope field from every component in components[], recursively. metadata.component.scope is handled by a separate rule.",
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
-        "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with no in value to the component. Creates the array if properties is missing; existing properties are not changed. The rule is disabled by default; metadata.component is not affected."
+        "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. The rule is disabled by default; metadata.component is not affected."
       }
     },
     "issues": {

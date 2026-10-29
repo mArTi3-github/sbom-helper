@@ -27,6 +27,9 @@ describe('sbomFixerRules catalog', () => {
   it('covers all 21 rules with unique ids', () => {
     expect(ALL_FIX_RULES).toHaveLength(21)
     expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(21)
+    for (const rule of ALL_FIX_RULES) {
+      expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
+    }
   })
 
   it('keeps each group complete and starts it with the reorder rule', () => {

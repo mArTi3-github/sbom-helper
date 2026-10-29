@@ -54,6 +54,7 @@
                 v-model="options.root.spec_version"
                 type="text"
                 class="spec-version-input"
+                :aria-label="t('sbomFixer.specVersion')"
                 :disabled="!options.root.set_spec_version"
               />
             </template>
