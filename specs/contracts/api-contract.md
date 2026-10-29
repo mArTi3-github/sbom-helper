@@ -130,7 +130,8 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
 `multipart/form-data`:
 
 - `file` — required CycloneDX JSON file. Maximum size: `sbom_settings.max_file_size` (environment `SBOM_MAX_FILE_SIZE`, default 200 MB).
-- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all rules enabled except `metadata_component.remove_purl` and `components.fill_missing_gost_properties`; `spec_version: "1.7"`). The endpoint does not read the saved options file; the page always sends the current set explicitly.
+- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all rules enabled except `components.fill_missing_gost_properties`; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly.
+- `remove_fields` — optional JSON string holding an array of path strings (e.g. `["root.dependencies", "components[].hashes"]`). Absent means an empty list. It is not persisted; the selection is per-request and derived from the analysis result. Non-list values or invalid JSON → `400 invalid_remove_fields`; strings outside the path grammar, list-1 paths, and list-2 (`keep`) paths are ignored silently.
 
 ```json
 {
@@ -138,36 +139,30 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
     "reorder": true,
     "set_spec_version": true,
     "spec_version": "1.7",
-    "remove_dependencies": true,
-    "remove_services": true,
     "increment_version": true
   },
   "metadata": {
     "add_timestamp": true,
     "reorder": true,
-    "remove_properties": true,
-    "remove_tools": true,
     "component": {
       "reorder": true,
-      "remove_external_references": true,
-      "remove_properties": true,
-      "remove_purl": false,
-      "remove_scope": true,
-      "rename_supplier": true
+      "add_manufacturer": true,
+      "manufacturer": "Positive Technologies"
     }
   },
   "components": {
     "reorder": true,
-    "remove_hashes": true,
-    "remove_scope": true,
     "filter_external_references": true,
     "filter_properties": true,
     "fill_missing_gost_properties": false
+  },
+  "optional_fields": {
+    "keep": ["metadata.tools", "metadata.component.purl", "components[].group", "..."]
   }
 }
 ```
 
-`spec_version` must match `^\d+\.\d+$`.
+`spec_version` must match `^\d+\.\d+$`; `manufacturer` is trimmed and must be a non-empty string.
 
 #### Success Response (200)
 
@@ -177,7 +172,7 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
   "fixed_sbom": { "bomFormat": "CycloneDX", "specVersion": "1.7", "...": "..." },
   "stats": [
     { "rule_id": "root.reorder", "count": 1 },
-    { "rule_id": "components.remove_hashes", "count": 3 }
+    { "rule_id": "optional_fields.remove", "field": "components[].hashes", "count": 3 }
   ],
   "issues": [
     {
@@ -192,7 +187,7 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
 
 - `changed` — `true` when at least one enabled rule reported a non-zero count.
 - `fixed_sbom` — the full fixed document; always returned, even when nothing changed.
-- `stats` — every enabled rule in canonical order, including rules with `count: 0`.
+- `stats` — every enabled static rule in canonical order (including `count: 0`), followed by one `optional_fields.remove` row per accepted removal path. `field` is present only on removal rows.
 - `issues` — defects remaining in the final document; empty array when none remain.
 
 #### Error Response (400) — invalid JSON
@@ -213,6 +208,14 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
 { "error": "invalid_options", "detail": "..." }
 ```
 
+#### Error Response (400) — invalid remove fields
+
+```json
+{ "error": "invalid_remove_fields" }
+```
+
+Returned when `remove_fields` is present but is not valid JSON or not an array of strings.
+
 #### Error Response (413) — file too large
 
 ```json
@@ -225,6 +228,58 @@ Standard FastAPI/Pydantic 422 response.
 
 ---
 
+### `GET /api/v1/sbom/fix/field-catalog`
+
+Return the read-only FSTEC field reference (list 1) and the default "not recommended to remove" paths (list 2 defaults).
+
+#### Response (200)
+
+```json
+{
+  "fstec_fields": [
+    { "path": "root.bomFormat", "status": "mandatory" },
+    { "path": "root.serialNumber", "status": "optional" },
+    { "path": "components[].externalReferences[].hashes", "status": "optional",
+      "condition_key": "sourceDistributionHashes" }
+  ],
+  "default_keep": ["metadata.tools", "metadata.component.purl", "components[].group", "..."]
+}
+```
+
+- `fstec_fields` — 29 entries; each has `path` and `status` (`mandatory`/`optional`); `condition_key` is present only for conditionally-required fields (`componentsPresent`, `sourceDistributionHashes`).
+- `default_keep` — the 10 default list-2 paths. This is the single source of truth for "Reset defaults" on the page.
+
+---
+
+### `POST /api/v1/sbom/fix/analyze`
+
+Analyze a CycloneDX SBOM file and return the compact inventory of present fields with their status and occurrence counts. The document is not modified.
+
+#### Request
+
+`multipart/form-data`:
+
+- `file` — required CycloneDX JSON file (same size/format validation as `/fix`).
+
+#### Success Response (200)
+
+```json
+{
+  "fields": [
+    { "path": "root.version", "status": "mandatory", "count": 1 },
+    { "path": "components[].scope", "status": "additional", "count": 21931 }
+  ]
+}
+```
+
+- `fields` — direct keys of the root, `metadata`, `metadata.component`, and the root `components` tree (recursively), sorted canonically. `status` is `mandatory`/`optional` for list-1 paths and `additional` otherwise. `count` is 1 for object keys and the number of matching component objects for `components[]` paths.
+
+#### Error Responses
+
+Same as `/fix` for input validation: `413 file_too_large`, `400 invalid_json`, `400 invalid_sbom`; `422` when `file` is missing.
+
+---
+
 ### `GET /api/v1/sbom/fix/options`
 
 Return the saved default fix options.
@@ -232,10 +287,10 @@ Return the saved default fix options.
 #### Response (200)
 
 ```json
-{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." } } }
+{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." }, "optional_fields": { "keep": ["..."] } } }
 ```
 
-Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning.
+Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning. The response includes `optional_fields.keep`.
 
 ---
 
@@ -246,7 +301,7 @@ Persist the fix options for future visits.
 #### Request
 
 ```json
-{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." } } }
+{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
 ```
 
 #### Success Response (200)
@@ -261,7 +316,7 @@ Persist the fix options for future visits.
 { "error": "invalid_options", "detail": "..." }
 ```
 
-Returned for malformed JSON, a missing `options` key, or Pydantic validation failure.
+Returned for malformed JSON, a missing `options` key, or Pydantic validation failure. When `optional_fields.keep` is a list, it is validated strictly before model validation: any non-empty entry outside the path grammar or equal to a list-1 path yields `400 invalid_options` whose `detail` names the offending entries. (In `/fix` and on settings load, invalid `keep` entries are dropped tolerantly without error.)
 
 #### Error Response (500) — save failed
 
@@ -807,6 +862,7 @@ Standard FastAPI/Pydantic 422 response.
 | SBOM fix: invalid JSON | 400 | `invalid_json` |
 | SBOM fix: invalid SBOM format | 400 | `invalid_sbom` |
 | SBOM fix: invalid or malformed options | 400 | `invalid_options` |
+| SBOM fix: invalid `remove_fields` (not JSON or not a string array) | 400 | `invalid_remove_fields` |
 | SBOM fix: file too large | 413 | `file_too_large` |
 | SBOM fix: missing file field | 422 | (Pydantic validation) |
 | SBOM fix options: save failure | 500 | `options_save_failed` |

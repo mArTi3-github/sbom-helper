@@ -39,6 +39,10 @@
 |  |        options             |                   |
 |  |  POST /api/v1/sbom/fix/    |                   |
 |  |        options             |                   |
+|  |  GET /api/v1/sbom/fix/     |                   |
+|  |        field-catalog       |                   |
+|  |  POST /api/v1/sbom/fix/    |                   |
+|  |        analyze             |                   |
 |  +-------------+---------------+                   |
 |                |                                   |
 |                | Python call                       |
@@ -177,6 +181,11 @@
 |  |  fixer.py — normalization   |                   |
 |  |             rules, stats,   |                   |
 |  |             issue report    |                   |
+|  |  optional_fields.py — FSTEC |                   |
+|  |             catalog, path   |                   |
+|  |             grammar,        |                   |
+|  |             analysis,       |                   |
+|  |             removal         |                   |
 |  +-----------------------------+                   |
 |                                                    |
 |  +-----------------------------+                   |
@@ -242,10 +251,10 @@
 - **API Layer (routes/)** imports **csv_io** module for CSV parsing/rendering
 - **API Layer (routes/settings.py)** imports **Config Layer** (settings) and **Resolver Layer** for `_rebuild_resolvers()` helper (uses `resolver.factory.build_resolvers()` to reconstruct resolver list on settings change)
 - **API Layer (routes/)** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
-- **API Layer (routes/sbom_fix.py)** imports **SBOM Module** (`sbom/fixer.py`, `sbom/parser.py`) and **Config Layer** (`sbom_settings`); accesses the **SBOM Fix Options Store** only through `request.app.state.sbom_fix_options_store` (never imports the store module directly)
+- **API Layer (routes/sbom_fix.py)** imports **SBOM Module** (`sbom/fixer.py`, `sbom/optional_fields.py`, `sbom/parser.py`) and **Config Layer** (`sbom_settings`); accesses the **SBOM Fix Options Store** only through `request.app.state.sbom_fix_options_store` (never imports the store module directly)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), **Validation Service** (`validation_service.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`, `validation_service`); exposes `settings_store` and `validation_service` as read-only properties for downstream consumers; dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`); `resolve_batch()` uses `batch_semaphore_limit` from `AppSettings` for concurrency control
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`PurlResolutionService`), **SBOM Module** (`sbom/`), and **PURL Utils Layer** (`purl_utils/`); receives only `PurlResolutionService` via constructor injection, accessing `settings_store` and `validation_service` through its properties
-- **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly. `sbom/fixer.py` is a pure transformation module: it imports only the standard library and Pydantic, with no imports from Storage, Resolver, database, API schemas, or the parser
+- **SBOM Module** imports **PURL Utils Layer** for normalization; does not import Storage or Resolver directly. `sbom/fixer.py` is a pure transformation module: it imports only the standard library and Pydantic, with no imports from Storage, Resolver, database, API schemas, or the parser. `sbom/optional_fields.py` imports only the standard library (`re`, `dataclasses`, `typing`) and has no dependency on `fixer.py`, Storage, Resolver, or the parser; `fixer.py` imports `optional_fields` (catalog/grammar/analysis/removal) but `optional_fields` never imports `fixer`
 - **SBOM Fix Options Store** (`sbom_fix_options_store.py`) imports `SbomFixOptions` from `sbom/fixer.py` and provides JSON-file persistence only; it is instantiated in `main.py` as `app.state.sbom_fix_options_store`
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
@@ -270,7 +279,8 @@
 - Delegate DB admin operations to `DbAdminService` (`db_admin_service.list_purls()`, `db_admin_service.update_purl()`, `db_admin_service.list_resolvers()`, etc.) which wraps Storage Layer and CSV I/O
 - Delegate async SBOM enrichment to Job Manager via `routes/jobs.py` — creates background jobs (`POST /api/v1/jobs/sbom-enrich`), queries status (`GET /api/v1/jobs/{job_id}`), downloads results (`GET /api/v1/jobs/{job_id}/result`), cancels (`POST /api/v1/jobs/{job_id}/cancel`), deletes (`DELETE /api/v1/jobs/{job_id}`), lists (`GET /api/v1/jobs`)
 - Delegate SBOM-to-images-list conversion to `ImagesListConverter` (`sbom/images_list_converter.py`) — validates SBOM format, promotes container components, deduplicates by `purl`, returns conversion result with completeness flags and duplicate counts
-- Delegate SBOM fixing to `fix_sbom()` (`sbom/fixer.py`) in `routes/sbom_fix.py` — validates JSON and SBOM format, parses/validates options, returns `changed`/`fixed_sbom`/`stats`/`issues`; loads and saves default options via `request.app.state.sbom_fix_options_store`
+- Delegate SBOM fixing to `fix_sbom()` (`sbom/fixer.py`) in `routes/sbom_fix.py` — validates JSON and SBOM format, parses/validates options and `remove_fields`, returns `changed`/`fixed_sbom`/`stats`/`issues`; loads and saves default options via `request.app.state.sbom_fix_options_store`
+- Serve the optional-fields catalog and analysis: `GET /api/v1/sbom/fix/field-catalog` returns `FSTEC_FIELDS` + `DEFAULT_KEEP_FIELDS`; `POST /api/v1/sbom/fix/analyze` reuses the shared `_load_sbom` validation and returns `analyze_fields(data)`; both live in `routes/sbom_fix.py`
 - Manage application settings via Settings Store (`GET/PATCH /api/v1/settings`); validates libraries.io API key via async `validate_librariesio_key()`; rebuilds resolver list on settings change via `_rebuild_resolvers()` using `resolver.factory.build_resolvers()`; clear validation cache via `POST /api/v1/settings/clear-validation-cache`
 - Handle error responses from Service Layer and Pipeline
 - Serve the Vue 3 SPA via `SPAStaticFiles` mounted at `/` in `main.py` (after all API routes); `SPAStaticFiles` falls back to `index.html` for any unmatched path, enabling Vue Router client-side routing
@@ -339,8 +349,9 @@
 - **`remover.py`** — `remove_unresolved_components(sbom, components, resolved) → list[dict]` removes components that need enrichment, have no subcomponents, and were not resolved; returns list of removed component dicts
 - **`reporter.py`** — `build_report(components, resolved, skipped)` returns `{summary, results}`; only includes components with `needs_enrichment=True`; deduplicates by normalized PURL; removed components are excluded from `not_found` counts
 - **`images_list_converter.py`** — `ImagesListConverter.convert(data) → ImagesListConversionResult` validates SBOM format via `CycloneDXParser`, checks if all top-level components are `type=container`, recursively collects container components from all nesting levels, promotes them to top-level, removes non-container components, deduplicates remaining containers by `purl` field (first-wins, components without `purl` treated as unique); returns `ImagesListConversionResult` with `was_transformed` flag, `images` list (with completeness flags and per-image duplicate count), and the resulting `images_list` dict
-- **`fixer.py`** — `SbomFixOptions` (root/metadata/metadata.component/components option models), `fix_sbom(data, options, now=None) → SbomFixResult`: deep-copies the input, applies the 21 enabled rules, runs the reorder pass last, builds `FixStat` entries for every enabled rule, sets `changed = any(count > 0)`, and collects `FixIssue` entries from the final document; exposes `FixStat`, `FixIssue`, `SbomFixResult`, `RULE_IDS`, and the ordering/GOST constants
-- Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly. `fixer.py` has no imports from Storage, Resolver, or API schemas
+- **`fixer.py`** — `SbomFixOptions` (root/metadata/metadata.component/components/optional_fields option models), `fix_sbom(data, options, now=None, remove_fields=()) → SbomFixResult`: deep-copies the input, removes the selected optional fields via `remove_optional_fields`, applies the 11 enabled static rules, runs the reorder pass last, builds `FixStat` entries for every enabled rule plus the removal rows, sets `changed = any(count > 0)`, and collects `FixIssue` entries from the final document; exposes `FixStat`, `FixIssue`, `SbomFixResult`, `RULE_IDS`, and the ordering/GOST constants
+- **`optional_fields.py`** — `FstecField`/`FieldInfo` frozen dataclasses; `FSTEC_FIELDS` (29-entry FSTEC catalogue) and `FSTEC_PATHS`; `DEFAULT_KEEP_FIELDS` (10 default keep paths); `FIELD_PATH_PATTERN` (path grammar) and `CONTEXT_ORDER`; `normalize_keep`/`invalid_keep_entries`/`canonical_sort_key`; `analyze_fields(data)` (direct-key inventory with status and counts, canonical order) and `remove_optional_fields(data, paths, keep)` (filters, applies, and counts removals). stdlib-only: imports `re`, `dataclasses`, `typing`; no import of `fixer`, Storage, Resolver, or the parser
+- Imports `purl_utils` for PURL normalization; does not import storage or resolver modules directly. `fixer.py` has no imports from Storage, Resolver, or API schemas; `optional_fields.py` imports only the standard library
 
 ### Config Layer (`config.py`)
 - Provide typed access to all runtime configuration
@@ -364,7 +375,7 @@
 - Exposed via API endpoints `GET/POST /api/v1/sbom/ignore-patterns` in `routes/ignore_patterns.py`
 
 ### SBOM Fix Options Store (`sbom_fix_options_store.py`)
-- JSON-based persistence for the Fix SBOM option set (all 21 rule toggles plus `root.spec_version`)
+- JSON-based persistence for the Fix SBOM option set (the 11 static rule toggles plus `root.spec_version`, `metadata.component.manufacturer`, and `optional_fields.keep`)
 - `SbomFixOptionsStore` class with `load() → SbomFixOptions` and `save(options)` methods; constructor accepts an optional path for tests
 - File path default: `./data/sbom_fix_options.json`
 - Graceful handling: missing file → built-in defaults; corrupt JSON, I/O error, or validation failure → log warning, return built-in defaults; partial JSON is completed by Pydantic defaults
