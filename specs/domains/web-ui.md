@@ -10,6 +10,8 @@ A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepti
 - `frontend/src/views/PurlResolver.vue` — PURL resolver page: textarea input (one PURL per line, batch supported), resolve button, results table with per-PURL status, warnings, and resolver metadata
 - `frontend/src/views/SbomUpdater.vue` — SBOM-updater page: file upload, options, ignore patterns editor, results summary and table
 - `frontend/src/views/SbomFixer.vue` — Fix SBOM page: file upload, grouped fix options with master checkboxes, save/reset options, status card, statistics and issues spoilers, fixed-SBOM download
+- `frontend/src/views/sbomFixerRules.ts` — single catalog of the 21 fix rules (rule id, option key, before/after JSON examples) that drives the rule rows of the Fix SBOM page
+- `frontend/src/components/RuleHelp.vue` — presentational rule help: round "(i)" button and an inline panel with a description and "Before"/"After" snippets
 - `frontend/src/views/SbomFixer.test.ts` — Vitest unit tests for the Fix SBOM page
 - `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete
 - `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, deps.dev, ecosyste.ms, Libraries.io, and LLM resolver cards
@@ -197,7 +199,9 @@ User                   Browser (Vue SPA)             API Layer
 - On mount the page loads saved options via `GET /api/v1/sbom/fix/options` and application settings (`useSettingsStore().load()` for `jsonIndent`) in parallel; the page is available at `/fix-sbom` and the nav/home entry uses the `sbomFixer` i18n namespace
 - If loading saved options fails (network/500), the built-in defaults are used and a non-blocking warning is shown; if loading settings fails, the page still works and downloads use `jsonIndent = 4`
 - Defaults: every option enabled except `metadata_component.remove_purl` and `components.fill_missing_gost_properties`; `specVersion = "1.7"`
-- A warning banner above the form states that almost all fixes (including field removals) are enabled by default and the set must be reviewed before running
+- Every rule row has a round "(i)" help button; clicking it expands an inline panel under the row inside the group card with a description of the rule and "Before"/"After" snippets of a CycloneDX JSON fragment
+- At most one help panel is open at a time; clicking the same button again or pressing Escape closes it; the button sits outside the rule's `<label>`, so opening help never toggles the rule's checkbox
+- Rule rows are rendered from the `sbomFixerRules.ts` catalog in catalog order; in the `metadata` card `metadata.reorder` is the first row, matching the reorder-first order of the other blocks; the order of entries in the statistics spoiler is still defined by the backend (`RULE_IDS`), not by the catalog
 - Options are grouped into `root`, `metadata` (with a `metadata.component` sub-block), and `components` cards
 - Each group and the `metadata.component` sub-block has a master checkbox: checked when all its child options are on, indeterminate when only some are; toggling it sets all its children; the `metadata` master also covers `metadata.component.*`, while the sub-block master changes only `metadata_component.*`; "select all"/"clear all" buttons operate on their own group only
 - The `specVersion` text input is enabled only while `root.set_spec_version` is checked

@@ -14,6 +14,8 @@ Synchronous normalization of a CycloneDX SBOM JSON document. The domain applies 
 - `src/purl_resolver/router.py` — includes the `sbom_fix` sub-router
 - `src/purl_resolver/main.py` — creates `app.state.sbom_fix_options_store = SbomFixOptionsStore()` in the lifespan
 - `frontend/src/views/SbomFixer.vue` — Fix SBOM page
+- `frontend/src/views/sbomFixerRules.ts` — catalog of the 21 rules (rule id, option key, before/after JSON examples) that drives the rule rows of the page
+- `frontend/src/components/RuleHelp.vue` — inline rule help: "(i)" button and a panel with the rule description and before/after snippets
 - `frontend/src/api/sbom.ts` — `fixSbom()`, `getFixOptions()`, `saveFixOptions()`
 - `frontend/src/types/api.ts` — `SbomFixOptions`, `SbomFixStat`, `SbomFixIssue`, `SbomFixResponse`, `SbomFixOptionsResponse`
 - `tests/test_sbom_fixer.py` — rule, statistics, and issue unit tests
@@ -159,6 +161,8 @@ Notes:
 - `components.filter_properties` runs before `components.fill_missing_gost_properties`, so non-GOST properties are removed and then missing GOST properties are appended.
 - The reorder pass (rules 1, 7, 10, 16) runs after every mutation so the final key order reflects the final set of fields.
 - The `group` field is never modified anywhere.
+
+Every rule is documented in the UI by an inline help panel that shows the rule's behaviour and a before/after SBOM fragment; the examples reflect the rule boundaries stated in the table above.
 
 ## Statistics (`stats`)
 
