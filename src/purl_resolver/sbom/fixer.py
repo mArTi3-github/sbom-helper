@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
 from pydantic import BaseModel, Field, field_validator
+
+from .optional_fields import DEFAULT_KEEP_FIELDS, normalize_keep, remove_optional_fields
 
 SPEC_VERSION_PATTERN = re.compile(r"^\d+\.\d+$")
 ALLOWED_SPEC_VERSIONS = {"1.6", "1.7"}
@@ -55,22 +58,12 @@ REQUIRED_GOST_PROPERTIES: tuple[tuple[str, str], ...] = (
 RULE_IDS: tuple[str, ...] = (
     "root.reorder",
     "root.set_spec_version",
-    "root.remove_dependencies",
-    "root.remove_services",
     "root.increment_version",
     "metadata.add_timestamp",
     "metadata.reorder",
-    "metadata.remove_properties",
-    "metadata.remove_tools",
     "metadata_component.reorder",
-    "metadata_component.remove_external_references",
-    "metadata_component.remove_properties",
-    "metadata_component.remove_purl",
-    "metadata_component.remove_scope",
-    "metadata_component.rename_supplier",
+    "metadata_component.add_manufacturer",
     "components.reorder",
-    "components.remove_hashes",
-    "components.remove_scope",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
@@ -81,8 +74,6 @@ class RootFixOptions(BaseModel):
     reorder: bool = True
     set_spec_version: bool = True
     spec_version: str = "1.7"
-    remove_dependencies: bool = True
-    remove_services: bool = True
     increment_version: bool = True
 
     @field_validator("spec_version", mode="before")
@@ -97,18 +88,22 @@ class RootFixOptions(BaseModel):
 
 class MetadataComponentFixOptions(BaseModel):
     reorder: bool = True
-    remove_external_references: bool = True
-    remove_properties: bool = True
-    remove_purl: bool = False
-    remove_scope: bool = True
-    rename_supplier: bool = True
+    add_manufacturer: bool = True
+    manufacturer: str = "Positive Technologies"
+
+    @field_validator("manufacturer", mode="before")
+    @classmethod
+    def _validate_manufacturer(cls, value: object) -> str:
+        if isinstance(value, str):
+            value = value.strip()
+        if not isinstance(value, str) or not value:
+            raise ValueError("manufacturer must be a non-empty string")
+        return value
 
 
 class MetadataFixOptions(BaseModel):
     add_timestamp: bool = True
     reorder: bool = True
-    remove_properties: bool = True
-    remove_tools: bool = True
     component: MetadataComponentFixOptions = Field(
         default_factory=MetadataComponentFixOptions
     )
@@ -116,23 +111,36 @@ class MetadataFixOptions(BaseModel):
 
 class ComponentsFixOptions(BaseModel):
     reorder: bool = True
-    remove_hashes: bool = True
-    remove_scope: bool = True
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False
+
+
+class OptionalFieldsFixOptions(BaseModel):
+    keep: list[str] = Field(default_factory=lambda: list(DEFAULT_KEEP_FIELDS))
+
+    @field_validator("keep", mode="before")
+    @classmethod
+    def _validate_keep(cls, value: object) -> list[str]:
+        if not isinstance(value, list):
+            raise ValueError("keep must be a list of field paths")
+        return normalize_keep(value)
 
 
 class SbomFixOptions(BaseModel):
     root: RootFixOptions = Field(default_factory=RootFixOptions)
     metadata: MetadataFixOptions = Field(default_factory=MetadataFixOptions)
     components: ComponentsFixOptions = Field(default_factory=ComponentsFixOptions)
+    optional_fields: OptionalFieldsFixOptions = Field(
+        default_factory=OptionalFieldsFixOptions
+    )
 
 
 @dataclass
 class FixStat:
     rule_id: str
     count: int
+    field: str | None = None
 
 
 @dataclass
@@ -209,14 +217,6 @@ def _apply_root_rules(
         counts["root.set_spec_version"] = int(data.get("specVersion") != target)
         data["specVersion"] = target
 
-    for rule_id, key in (
-        ("root.remove_dependencies", "dependencies"),
-        ("root.remove_services", "services"),
-    ):
-        if _rule_enabled(rule_id, options):
-            counts[rule_id] = int(key in data)
-            data.pop(key, None)
-
     if _rule_enabled("root.increment_version", options):
         version = data.get("version")
         if isinstance(version, int) and not isinstance(version, bool):
@@ -242,14 +242,13 @@ def _add_timestamp(metadata: dict, now: datetime) -> int:
     return 1
 
 
-def _rename_supplier(component: dict) -> int:
-    if "supplier" not in component:
-        return 0
-    supplier = component.pop("supplier")
-    if ("manufacturer" not in component or component["manufacturer"] is None) and (
-        supplier is not None
-    ):
-        component["manufacturer"] = supplier
+def _add_manufacturer(component: dict, value: str) -> int:
+    manufacturer = component.get("manufacturer")
+    if isinstance(manufacturer, dict):
+        name = manufacturer.get("name")
+        if isinstance(name, str) and name.strip():
+            return 0
+    component["manufacturer"] = {"name": value}
     return 1
 
 
@@ -266,30 +265,14 @@ def _apply_metadata_rules(
     if _rule_enabled("metadata.add_timestamp", options):
         counts["metadata.add_timestamp"] = _add_timestamp(metadata, now)
 
-    for rule_id, key in (
-        ("metadata.remove_properties", "properties"),
-        ("metadata.remove_tools", "tools"),
-    ):
-        if _rule_enabled(rule_id, options):
-            counts[rule_id] = int(key in metadata)
-            metadata.pop(key, None)
-
     component = metadata.get("component")
     if not isinstance(component, dict):
         return
 
-    for rule_id, key in (
-        ("metadata_component.remove_external_references", "externalReferences"),
-        ("metadata_component.remove_properties", "properties"),
-        ("metadata_component.remove_purl", "purl"),
-        ("metadata_component.remove_scope", "scope"),
-    ):
-        if _rule_enabled(rule_id, options):
-            counts[rule_id] = int(key in component)
-            component.pop(key, None)
-
-    if _rule_enabled("metadata_component.rename_supplier", options):
-        counts["metadata_component.rename_supplier"] = _rename_supplier(component)
+    if _rule_enabled("metadata_component.add_manufacturer", options):
+        counts["metadata_component.add_manufacturer"] = _add_manufacturer(
+            component, options.metadata.component.manufacturer
+        )
 
 
 def _walk_components(root: dict, callback: Callable[[dict], None]) -> None:
@@ -572,8 +555,6 @@ def _apply_components_rules(
     options: SbomFixOptions,
     counts: dict[str, int],
 ) -> None:
-    remove_hashes = _rule_enabled("components.remove_hashes", options)
-    remove_scope = _rule_enabled("components.remove_scope", options)
     filter_external_references = _rule_enabled(
         "components.filter_external_references", options
     )
@@ -581,18 +562,6 @@ def _apply_components_rules(
     fill_gost = _rule_enabled("components.fill_missing_gost_properties", options)
 
     def apply(component: dict) -> None:
-        if remove_hashes and "hashes" in component:
-            component.pop("hashes")
-            counts["components.remove_hashes"] = (
-                counts.get("components.remove_hashes", 0) + 1
-            )
-
-        if remove_scope and "scope" in component:
-            component.pop("scope")
-            counts["components.remove_scope"] = (
-                counts.get("components.remove_scope", 0) + 1
-            )
-
         external_references = component.get("externalReferences")
         if filter_external_references and isinstance(external_references, list):
             kept, removed = _filter_external_references(external_references)
@@ -654,11 +623,15 @@ def fix_sbom(
     data: dict,
     options: SbomFixOptions,
     now: datetime | None = None,
+    remove_fields: Sequence[str] = (),
 ) -> SbomFixResult:
     if now is None:
         now = datetime.now(timezone.utc)
     fixed_sbom = copy.deepcopy(data)
     counts: dict[str, int] = {}
+    removal_counts = remove_optional_fields(
+        fixed_sbom, list(remove_fields), options.optional_fields.keep
+    )
     _apply_root_rules(fixed_sbom, options, counts)
     _apply_metadata_rules(fixed_sbom, options, counts, now)
     _apply_components_rules(fixed_sbom, options, counts)
@@ -667,6 +640,10 @@ def fix_sbom(
         FixStat(rule_id=rule_id, count=counts.get(rule_id, 0))
         for rule_id in _enabled_rule_ids(options)
     ]
+    stats.extend(
+        FixStat(rule_id="optional_fields.remove", count=count, field=path)
+        for path, count in removal_counts.items()
+    )
     return SbomFixResult(
         changed=any(stat.count > 0 for stat in stats),
         fixed_sbom=fixed_sbom,

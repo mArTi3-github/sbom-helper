@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from purl_resolver.sbom.fixer import (
     RULE_IDS,
     FixIssue,
+    OptionalFieldsFixOptions,
     SbomFixOptions,
     _collect_component_issues,
     _fill_gost_properties,
@@ -16,16 +17,65 @@ from purl_resolver.sbom.fixer import (
     _walk_components,
     fix_sbom,
 )
+from purl_resolver.sbom.optional_fields import DEFAULT_KEEP_FIELDS
+
+NEW_RULE_IDS = (
+    "root.reorder",
+    "root.set_spec_version",
+    "root.increment_version",
+    "metadata.add_timestamp",
+    "metadata.reorder",
+    "metadata_component.reorder",
+    "metadata_component.add_manufacturer",
+    "components.reorder",
+    "components.filter_external_references",
+    "components.filter_properties",
+    "components.fill_missing_gost_properties",
+)
 
 
-def test_defaults_all_on_except_two_rules():
+def test_defaults_expose_new_options_and_keep_list():
     o = SbomFixOptions()
-    assert o.root.set_spec_version is True
-    assert o.root.spec_version == "1.7"
-    assert o.metadata.add_timestamp is True
-    assert o.metadata.component.remove_purl is False
+    assert o.metadata.component.add_manufacturer is True
+    assert o.metadata.component.manufacturer == "Positive Technologies"
     assert o.components.fill_missing_gost_properties is False
-    assert o.components.filter_properties is True
+    assert o.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)
+    for removed in ("remove_dependencies", "remove_services"):
+        assert not hasattr(o.root, removed)
+    assert not hasattr(o.metadata, "remove_properties")
+    assert not hasattr(o.metadata.component, "remove_purl")
+    assert not hasattr(o.components, "remove_hashes")
+
+
+def test_default_stats_contain_only_enabled_rules():
+    result = fix_sbom(
+        {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1},
+        SbomFixOptions(),
+    )
+    assert [stat.rule_id for stat in result.stats] == [
+        rule for rule in NEW_RULE_IDS if rule != "components.fill_missing_gost_properties"
+    ]
+
+
+def test_all_enabled_rules_yield_eleven_stats_in_canonical_order():
+    options = SbomFixOptions(components={"fill_missing_gost_properties": True})
+    result = fix_sbom(
+        {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}, options
+    )
+    assert [stat.rule_id for stat in result.stats] == list(NEW_RULE_IDS)
+
+
+def test_keep_list_normalizes_entries_and_rejects_non_list():
+    options = OptionalFieldsFixOptions(
+        keep=[" components[].scope ", "root.dependencies", "root.dependencies", "bad"]
+    )
+    assert options.keep == ["components[].scope", "root.dependencies"]
+
+    with pytest.raises(ValidationError):
+        OptionalFieldsFixOptions(keep="components[].scope")
+
+    with pytest.raises(ValidationError):
+        OptionalFieldsFixOptions(keep=None)
 
 
 @pytest.mark.parametrize("value", ["", " ", "   ", "1", "1.7.0", "v1.7", "1,7", 1.7])
@@ -39,16 +89,8 @@ def test_spec_version_is_trimmed_before_validation():
     assert options.root.spec_version == "1.7"
 
 
-def test_all_enabled_rules_yield_21_stats_in_canonical_order():
-    options = SbomFixOptions(
-        metadata={"component": {"remove_purl": True}},
-        components={"fill_missing_gost_properties": True},
-    )
-    result = fix_sbom(
-        {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}, options
-    )
-    assert [stat.rule_id for stat in result.stats] == list(RULE_IDS)
-    assert len(result.stats) == 21
+def test_rule_ids_match_canonical_order():
+    assert RULE_IDS == NEW_RULE_IDS
 
 
 def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
@@ -57,18 +99,204 @@ def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
     assert result.fixed_sbom == data
     assert result.fixed_sbom is not data
     assert result.changed is False
-    assert len(result.stats) == 19
+    assert len(result.stats) == 10
     assert all(stat.count == 0 for stat in result.stats)
     assert [stat.rule_id for stat in result.stats] == [
-        "root.reorder", "root.set_spec_version", "root.remove_dependencies",
-        "root.remove_services", "root.increment_version", "metadata.add_timestamp",
-        "metadata.reorder", "metadata.remove_properties", "metadata.remove_tools",
-        "metadata_component.reorder", "metadata_component.remove_external_references",
-        "metadata_component.remove_properties", "metadata_component.remove_scope",
-        "metadata_component.rename_supplier", "components.reorder",
-        "components.remove_hashes", "components.remove_scope",
-        "components.filter_external_references", "components.filter_properties",
+        rule for rule in NEW_RULE_IDS if rule != "components.fill_missing_gost_properties"
     ]
+
+
+@pytest.mark.parametrize(
+    "component",
+    [
+        {"type": "application", "name": "app", "version": "1.0"},
+        {"type": "application", "name": "app", "version": "1.0", "manufacturer": None},
+        {"type": "application", "name": "app", "version": "1.0", "manufacturer": {}},
+        {
+            "type": "application",
+            "name": "app",
+            "version": "1.0",
+            "manufacturer": {"name": "  "},
+        },
+    ],
+)
+def test_add_manufacturer_fills_missing_or_empty(component):
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {"component": component},
+    }
+    options = SbomFixOptions(metadata={"component": {"manufacturer": "  Acme  "}})
+    result = fix_sbom(data, options)
+    assert data["metadata"]["component"].get("manufacturer") in (None, {}, {"name": "  "})
+    assert result.fixed_sbom["metadata"]["component"]["manufacturer"] == {"name": "Acme"}
+    stats = {stat.rule_id: stat.count for stat in result.stats}
+    assert stats["metadata_component.add_manufacturer"] == 1
+
+
+def test_add_manufacturer_keeps_existing_value_and_ignores_supplier():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {
+            "component": {
+                "type": "application",
+                "name": "app",
+                "version": "1.0",
+                "manufacturer": {"name": "Existing"},
+                "supplier": {"name": "Supplier"},
+            }
+        },
+    }
+    result = fix_sbom(data, SbomFixOptions())
+    assert result.fixed_sbom["metadata"]["component"]["manufacturer"] == {"name": "Existing"}
+    assert result.fixed_sbom["metadata"]["component"]["supplier"] == {"name": "Supplier"}
+
+
+def test_add_manufacturer_disabled_leaves_component_untouched():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {
+            "component": {"type": "application", "name": "app", "version": "1.0"}
+        },
+    }
+    options = SbomFixOptions(metadata={"component": {"add_manufacturer": False}})
+    result = fix_sbom(data, options)
+    assert "manufacturer" not in result.fixed_sbom["metadata"]["component"]
+    assert "metadata_component.add_manufacturer" not in _stats(result)
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_empty_manufacturer_value_is_rejected(value):
+    with pytest.raises(ValidationError):
+        SbomFixOptions(metadata={"component": {"manufacturer": value}})
+
+
+def test_remove_fields_runs_before_add_manufacturer_and_appears_in_stats():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {
+            "component": {"type": "application", "name": "app", "version": "1.0"}
+        },
+        "components": [
+            {
+                "type": "library",
+                "name": "openssl",
+                "version": "3.0",
+                "purl": "pkg:generic/openssl@3.0",
+                "scope": "required",
+            }
+        ],
+        "dependencies": [{"ref": "openssl"}],
+    }
+    result = fix_sbom(
+        data,
+        SbomFixOptions(),
+        remove_fields=["root.dependencies", "components[].scope"],
+    )
+    removal_stats = [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+    assert [(s.field, s.count) for s in removal_stats] == [
+        ("root.dependencies", 1),
+        ("components[].scope", 1),
+    ]
+    assert "dependencies" not in result.fixed_sbom
+    assert "scope" not in result.fixed_sbom["components"][0]
+    assert result.fixed_sbom["metadata"]["component"]["manufacturer"] == {
+        "name": "Positive Technologies"
+    }
+    assert result.changed is True
+
+
+def test_protected_paths_are_ignored_by_fix():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [
+            {
+                "type": "library",
+                "name": "openssl",
+                "version": "3.0",
+                "purl": "pkg:generic/openssl@3.0",
+                "bom-ref": "openssl",
+            }
+        ],
+    }
+    result = fix_sbom(data, SbomFixOptions(), remove_fields=["components[].bom-ref"])
+    assert result.fixed_sbom["components"][0]["bom-ref"] == "openssl"
+    assert not [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+
+
+def test_removing_keep_listed_path_is_ignored():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [
+            {"type": "library", "name": "a", "version": "1.0", "description": "x"}
+        ],
+    }
+    options = SbomFixOptions(optional_fields={"keep": ["components[].description"]})
+    result = fix_sbom(data, options, remove_fields=["components[].description"])
+    assert result.fixed_sbom["components"][0]["description"] == "x"
+    assert not [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+
+
+def test_removal_stats_include_zero_counts_and_canonical_order():
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
+    result = fix_sbom(
+        data,
+        SbomFixOptions(),
+        remove_fields=["components[].scope", "root.dependencies", "components[].hashes"],
+    )
+    removal_stats = [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+    assert [(s.field, s.count) for s in removal_stats] == [
+        ("root.dependencies", 0),
+        ("components[].hashes", 0),
+        ("components[].scope", 0),
+    ]
+    assert result.changed is False
+
+
+def test_removing_licenses_can_surface_missing_source_reference():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [
+            {
+                "type": "library",
+                "name": "proprietary",
+                "version": "1.0",
+                "purl": "pkg:generic/proprietary@1.0",
+                "licenses": [{"license": {"name": "Proprietary"}}],
+            }
+        ],
+    }
+    options = SbomFixOptions(
+        optional_fields={
+            "keep": [p for p in DEFAULT_KEEP_FIELDS if p != "components[].licenses"]
+        }
+    )
+    result = fix_sbom(data, options, remove_fields=["components[].licenses"])
+    codes = [issue.code for issue in result.issues]
+    assert "component.missing_source_reference" in codes
+
+
+def test_ignored_remove_fields_are_absent_from_stats():
+    data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}
+    result = fix_sbom(
+        data,
+        SbomFixOptions(),
+        remove_fields=["bad", "root.specVersion", "", "bad"],
+    )
+    assert not [s for s in result.stats if s.rule_id == "optional_fields.remove"]
 
 
 def test_reorder_returns_new_dict_and_changed_flag():
@@ -211,7 +439,10 @@ def test_disabled_reorder_changes_nothing_and_is_absent_from_stats():
     }
     options = SbomFixOptions(
         root={"reorder": False},
-        metadata={"reorder": False, "component": {"reorder": False}},
+        metadata={
+            "reorder": False,
+            "component": {"reorder": False, "add_manufacturer": False},
+        },
         components={"reorder": False},
     )
     result = fix_sbom(data, options)
@@ -266,36 +497,6 @@ def test_set_spec_version_strips_configured_value():
     assert _stats(result)["root.set_spec_version"] == 1
 
 
-@pytest.mark.parametrize(
-    ("rule_id", "key"),
-    [
-        ("root.remove_dependencies", "dependencies"),
-        ("root.remove_services", "services"),
-    ],
-)
-def test_remove_root_key_removes_even_empty_list_and_counts_one(rule_id, key):
-    data = {"bomFormat": "CycloneDX", "specVersion": "1.7", key: []}
-    result = fix_sbom(data, SbomFixOptions())
-    assert key not in result.fixed_sbom
-    assert _stats(result)[rule_id] == 1
-    assert result.changed is True
-
-
-@pytest.mark.parametrize(
-    ("rule_id", "key"),
-    [
-        ("root.remove_dependencies", "dependencies"),
-        ("root.remove_services", "services"),
-    ],
-)
-def test_remove_absent_root_key_counts_zero(rule_id, key):
-    data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
-    result = fix_sbom(data, SbomFixOptions())
-    assert key not in result.fixed_sbom
-    assert _stats(result)[rule_id] == 0
-    assert result.changed is False
-
-
 @pytest.mark.parametrize("value", [0, 1, -3])
 def test_increment_version_increments_integers(value):
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": value}
@@ -330,8 +531,6 @@ def test_disabled_root_rules_leave_fields_untouched_and_are_absent_from_stats():
     options = SbomFixOptions(
         root={
             "set_spec_version": False,
-            "remove_dependencies": False,
-            "remove_services": False,
             "increment_version": False,
         }
     )
@@ -339,8 +538,6 @@ def test_disabled_root_rules_leave_fields_untouched_and_are_absent_from_stats():
     assert result.fixed_sbom == data
     rule_ids = {stat.rule_id for stat in result.stats}
     assert "root.set_spec_version" not in rule_ids
-    assert "root.remove_dependencies" not in rule_ids
-    assert "root.remove_services" not in rule_ids
     assert "root.increment_version" not in rule_ids
     assert result.changed is False
 
@@ -361,8 +558,6 @@ def test_any_root_rule_with_positive_count_sets_changed():
     options = SbomFixOptions(
         root={
             "set_spec_version": False,
-            "remove_dependencies": False,
-            "remove_services": False,
         }
     )
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}
@@ -439,180 +634,38 @@ def test_add_timestamp_is_idempotent_with_same_now():
     assert second.changed is False
 
 
-@pytest.mark.parametrize("tools", [[], {"components": []}], ids=["array", "object"])
-def test_metadata_remove_properties_and_tools(tools):
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {"timestamp": NOW_TEXT, "properties": [{"name": "x"}], "tools": tools},
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    metadata = result.fixed_sbom["metadata"]
-    assert "properties" not in metadata
-    assert "tools" not in metadata
-    stats = _stats(result)
-    assert stats["metadata.remove_properties"] == 1
-    assert stats["metadata.remove_tools"] == 1
-
-
-def test_metadata_remove_absent_properties_and_tools_counts_zero():
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {"timestamp": NOW_TEXT},
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    stats = _stats(result)
-    assert stats["metadata.remove_properties"] == 0
-    assert stats["metadata.remove_tools"] == 0
-
-
-def test_metadata_component_removes_fields_but_keeps_purl_and_group_by_default():
+@pytest.mark.parametrize(
+    ("path", "key"),
+    [
+        ("metadata.properties", "properties"),
+        ("metadata.tools", "tools"),
+        ("metadata.component.externalReferences", "externalReferences"),
+    ],
+)
+def test_metadata_removal_via_remove_fields_counts_one(path, key):
     data = {
         "bomFormat": "CycloneDX",
         "specVersion": "1.7",
         "metadata": {
             "timestamp": NOW_TEXT,
+            "properties": [{"name": "x"}],
+            "tools": [],
             "component": {
                 "type": "application",
                 "name": "root",
-                "group": "g",
-                "purl": "pkg:x/y@1",
-                "scope": "required",
-                "properties": [{"name": "x"}],
                 "externalReferences": [{"type": "vcs"}],
             },
         },
     }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    component = result.fixed_sbom["metadata"]["component"]
-    assert component["purl"] == "pkg:x/y@1"
-    assert component["group"] == "g"
-    assert "scope" not in component
-    assert "properties" not in component
-    assert "externalReferences" not in component
-    stats = _stats(result)
-    assert stats["metadata_component.remove_external_references"] == 1
-    assert stats["metadata_component.remove_properties"] == 1
-    assert "metadata_component.remove_purl" not in stats
-    assert stats["metadata_component.remove_scope"] == 1
-
-
-def test_metadata_component_remove_purl_when_enabled():
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {
-            "timestamp": NOW_TEXT,
-            "component": {"type": "application", "name": "root", "purl": "pkg:x/y@1"},
-        },
-    }
-    options = SbomFixOptions(metadata={"component": {"remove_purl": True}})
-    result = fix_sbom(data, options, now=NOW)
-    assert "purl" not in result.fixed_sbom["metadata"]["component"]
-    assert _stats(result)["metadata_component.remove_purl"] == 1
-
-
-def test_rename_supplier_transfers_when_manufacturer_missing():
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {
-            "timestamp": NOW_TEXT,
-            "component": {
-                "type": "application",
-                "name": "root",
-                "supplier": {"name": "Vendor"},
-            },
-        },
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    component = result.fixed_sbom["metadata"]["component"]
-    assert component["manufacturer"] == {"name": "Vendor"}
-    assert "supplier" not in component
-    assert _stats(result)["metadata_component.rename_supplier"] == 1
-
-
-def test_rename_supplier_transfers_when_manufacturer_is_null():
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {
-            "timestamp": NOW_TEXT,
-            "component": {
-                "type": "application",
-                "name": "root",
-                "manufacturer": None,
-                "supplier": {"name": "Vendor"},
-            },
-        },
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    component = result.fixed_sbom["metadata"]["component"]
-    assert component["manufacturer"] == {"name": "Vendor"}
-    assert "supplier" not in component
-    assert _stats(result)["metadata_component.rename_supplier"] == 1
-
-
-@pytest.mark.parametrize(
-    "manufacturer",
-    [{"name": "Existing"}, {}, {"name": ""}],
-    ids=["object", "empty-object", "empty-name"],
-)
-def test_rename_supplier_keeps_existing_manufacturer_and_deletes_supplier(manufacturer):
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {
-            "timestamp": NOW_TEXT,
-            "component": {
-                "type": "application",
-                "name": "root",
-                "manufacturer": manufacturer,
-                "supplier": {"name": "Vendor"},
-            },
-        },
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    component = result.fixed_sbom["metadata"]["component"]
-    assert component["manufacturer"] == manufacturer
-    assert "supplier" not in component
-    assert _stats(result)["metadata_component.rename_supplier"] == 1
-
-
-def test_rename_supplier_null_is_deleted_without_creating_manufacturer():
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {
-            "timestamp": NOW_TEXT,
-            "component": {
-                "type": "application",
-                "name": "root",
-                "supplier": None,
-            },
-        },
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    component = result.fixed_sbom["metadata"]["component"]
-    assert "manufacturer" not in component
-    assert "supplier" not in component
-    assert _stats(result)["metadata_component.rename_supplier"] == 1
-
-
-def test_rename_supplier_absent_counts_zero_and_does_not_add_manufacturer():
-    data = {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "metadata": {
-            "timestamp": NOW_TEXT,
-            "component": {"type": "application", "name": "root"},
-        },
-    }
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    component = result.fixed_sbom["metadata"]["component"]
-    assert "manufacturer" not in component
-    assert _stats(result)["metadata_component.rename_supplier"] == 0
+    options = SbomFixOptions(optional_fields={"keep": []})
+    result = fix_sbom(data, options, now=NOW, remove_fields=[path])
+    target = result.fixed_sbom["metadata"]
+    if path.startswith("metadata.component."):
+        target = target["component"]
+    assert key not in target
+    removal_stats = [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+    assert [(s.field, s.count) for s in removal_stats] == [(path, 1)]
+    assert result.changed is True
 
 
 @pytest.mark.parametrize(
@@ -620,14 +673,14 @@ def test_rename_supplier_absent_counts_zero_and_does_not_add_manufacturer():
     [{}, {"timestamp": NOW_TEXT}, {"timestamp": NOW_TEXT, "component": None}],
     ids=["no-component", "no-component-key", "null-component"],
 )
-def test_metadata_component_rules_skip_when_component_missing_or_null(metadata):
+def test_metadata_component_add_manufacturer_skips_when_component_missing_or_null(
+    metadata,
+):
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "metadata": metadata}
-    result = fix_sbom(data, SbomFixOptions(), now=NOW)
-    stats = _stats(result)
-    assert stats["metadata_component.remove_external_references"] == 0
-    assert stats["metadata_component.remove_properties"] == 0
-    assert stats["metadata_component.remove_scope"] == 0
-    assert stats["metadata_component.rename_supplier"] == 0
+    options = SbomFixOptions(metadata={"add_timestamp": False})
+    result = fix_sbom(data, options, now=NOW)
+    assert result.fixed_sbom["metadata"] == metadata
+    assert _stats(result)["metadata_component.add_manufacturer"] == 0
 
 
 @pytest.mark.parametrize("metadata", [None, [], "text"], ids=["null", "list", "string"])
@@ -637,8 +690,7 @@ def test_metadata_rules_skip_when_metadata_is_not_object(metadata):
     assert result.fixed_sbom["metadata"] == metadata
     stats = _stats(result)
     assert stats["metadata.add_timestamp"] == 0
-    assert stats["metadata.remove_properties"] == 0
-    assert stats["metadata.remove_tools"] == 0
+    assert stats["metadata_component.add_manufacturer"] == 0
 
 
 def test_disabled_metadata_rules_leave_fields_untouched_and_are_absent_from_stats():
@@ -662,15 +714,9 @@ def test_disabled_metadata_rules_leave_fields_untouched_and_are_absent_from_stat
         metadata={
             "add_timestamp": False,
             "reorder": False,
-            "remove_properties": False,
-            "remove_tools": False,
             "component": {
                 "reorder": False,
-                "remove_external_references": False,
-                "remove_properties": False,
-                "remove_purl": False,
-                "remove_scope": False,
-                "rename_supplier": False,
+                "add_manufacturer": False,
             },
         },
     )
@@ -678,9 +724,7 @@ def test_disabled_metadata_rules_leave_fields_untouched_and_are_absent_from_stat
     assert result.fixed_sbom == data
     rule_ids = {stat.rule_id for stat in result.stats}
     assert "metadata.add_timestamp" not in rule_ids
-    assert "metadata.remove_properties" not in rule_ids
-    assert "metadata.remove_tools" not in rule_ids
-    assert "metadata_component.rename_supplier" not in rule_ids
+    assert "metadata_component.add_manufacturer" not in rule_ids
     assert result.changed is False
 
 
@@ -738,7 +782,7 @@ def test_walk_components_without_components_array_does_nothing():
     assert visited == []
 
 
-def test_remove_hashes_removes_direct_key_only_and_keeps_external_reference_hashes():
+def test_remove_fields_removes_direct_key_only_and_keeps_nested_containers():
     data = {
         "components": [
             {
@@ -756,17 +800,24 @@ def test_remove_hashes_removes_direct_key_only_and_keeps_external_reference_hash
             }
         ]
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(
+        data,
+        SbomFixOptions(optional_fields={"keep": []}),
+        remove_fields=["components[].hashes"],
+    )
     component = result.fixed_sbom["components"][0]
     assert "hashes" not in component
     assert component["externalReferences"][0]["hashes"] == [
         {"alg": "SHA-1", "content": "keep"}
     ]
     assert "hashes" not in component["components"][0]
-    assert _stats(result)["components.remove_hashes"] == 2
+    removal_stats = [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+    assert [(s.field, s.count) for s in removal_stats] == [
+        ("components[].hashes", 2)
+    ]
 
 
-def test_remove_scope_on_all_levels():
+def test_remove_fields_removes_key_on_all_component_levels():
     data = {
         "components": [
             {
@@ -782,12 +833,19 @@ def test_remove_scope_on_all_levels():
             }
         ]
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(
+        data,
+        SbomFixOptions(optional_fields={"keep": []}),
+        remove_fields=["components[].scope"],
+    )
     component = result.fixed_sbom["components"][0]
     assert "scope" not in component
     assert "scope" not in component["components"][0]
     assert "scope" not in component["components"][0]["components"][0]
-    assert _stats(result)["components.remove_scope"] == 3
+    removal_stats = [s for s in result.stats if s.rule_id == "optional_fields.remove"]
+    assert [(s.field, s.count) for s in removal_stats] == [
+        ("components[].scope", 3)
+    ]
 
 
 def test_filter_external_references_keeps_only_allowed_types():
@@ -1107,8 +1165,6 @@ def test_disabled_components_rules_leave_fields_untouched():
         },
         components={
             "reorder": False,
-            "remove_hashes": False,
-            "remove_scope": False,
             "filter_external_references": False,
             "filter_properties": False,
             "fill_missing_gost_properties": False,
@@ -1550,28 +1606,18 @@ def _all_disabled_options():
         root={
             "reorder": False,
             "set_spec_version": False,
-            "remove_dependencies": False,
-            "remove_services": False,
             "increment_version": False,
         },
         metadata={
             "add_timestamp": False,
             "reorder": False,
-            "remove_properties": False,
-            "remove_tools": False,
             "component": {
                 "reorder": False,
-                "remove_external_references": False,
-                "remove_properties": False,
-                "remove_purl": False,
-                "remove_scope": False,
-                "rename_supplier": False,
+                "add_manufacturer": False,
             },
         },
         components={
             "reorder": False,
-            "remove_hashes": False,
-            "remove_scope": False,
             "filter_external_references": False,
             "filter_properties": False,
             "fill_missing_gost_properties": False,

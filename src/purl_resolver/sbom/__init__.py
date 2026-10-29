@@ -1,6 +1,13 @@
 from .collector import SOURCE_REF_TYPES, SbomComponent, collect_components
 from .enricher import enrich_sbom
-from .fixer import FixIssue, FixStat, SbomFixOptions, SbomFixResult, fix_sbom
+from .fixer import (
+    FixIssue,
+    FixStat,
+    OptionalFieldsFixOptions,
+    SbomFixOptions,
+    SbomFixResult,
+    fix_sbom,
+)
 from .parser import CycloneDXParser, SbomParseError
 from .reporter import build_report
 
@@ -11,6 +18,7 @@ __all__ = [
     "CycloneDXParser",
     "FixIssue",
     "FixStat",
+    "OptionalFieldsFixOptions",
     "SbomFixOptions",
     "SbomFixResult",
     "build_report",
