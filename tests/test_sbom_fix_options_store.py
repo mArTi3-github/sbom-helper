@@ -6,6 +6,7 @@ import logging
 import pytest
 
 from purl_resolver.sbom.fixer import RootFixOptions, SbomFixOptions
+from purl_resolver.sbom.optional_fields import DEFAULT_KEEP_FIELDS
 from purl_resolver.sbom_fix_options_store import SbomFixOptionsStore
 
 
@@ -90,3 +91,20 @@ def test_save_propagates_write_errors(tmp_path):
     store = SbomFixOptionsStore(parent_file / "options.json")
     with pytest.raises(OSError):
         store.save(SbomFixOptions())
+
+
+def test_load_ignores_legacy_remove_keys(tmp_path):
+    path = tmp_path / "legacy.json"
+    path.write_text(
+        json.dumps({
+            "root": {"reorder": False, "remove_dependencies": True},
+            "components": {"remove_hashes": True, "remove_scope": True},
+            "metadata": {"component": {"rename_supplier": True}},
+        }),
+        encoding="utf-8",
+    )
+    options = SbomFixOptionsStore(path).load()
+    assert options.root.reorder is False
+    assert not hasattr(options.root, "remove_dependencies")
+    assert not hasattr(options.components, "remove_hashes")
+    assert options.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)

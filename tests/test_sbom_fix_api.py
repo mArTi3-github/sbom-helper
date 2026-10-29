@@ -50,6 +50,21 @@ def upload(
     return client.post("/api/v1/sbom/fix", files=files, data=data)
 
 
+def upload_analyze(client, sbom):
+    files = {"file": ("bom.json", json.dumps(sbom).encode("utf-8"), "application/json")}
+    return client.post("/api/v1/sbom/fix/analyze", files=files)
+
+
+def upload_fix(client, sbom, remove_fields=None, options=None):
+    files = {"file": ("bom.json", json.dumps(sbom).encode("utf-8"), "application/json")}
+    data = {}
+    if options is not None:
+        data["options"] = json.dumps(options)
+    if remove_fields is not None:
+        data["remove_fields"] = json.dumps(remove_fields)
+    return client.post("/api/v1/sbom/fix", files=files, data=data)
+
+
 @pytest.fixture
 def client(tmp_path):
     test_app = FastAPI()
@@ -59,25 +74,123 @@ def client(tmp_path):
         yield c
 
 
+def test_field_catalog_returns_fstec_fields_and_default_keep(client):
+    response = client.get("/api/v1/sbom/fix/field-catalog")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["fstec_fields"]) == 29
+    assert len(body["default_keep"]) == 10
+    assert {"path": "root.bomFormat", "status": "mandatory"} in body["fstec_fields"]
+
+
+def test_analyze_returns_compact_inventory(client):
+    response = upload_analyze(client, make_sbom())
+    assert response.status_code == 200
+    fields = {item["path"]: item for item in response.json()["fields"]}
+    assert fields["root.dependencies"]["status"] == "additional"
+    assert fields["root.dependencies"]["count"] == 1
+    assert fields["root.version"]["status"] == "mandatory"
+    assert fields["components[].hashes"]["count"] == 1
+
+
+def test_analyze_rejects_invalid_input(client):
+    files = {"file": ("bom.json", b"not json", "application/json")}
+    assert client.post("/api/v1/sbom/fix/analyze", files=files).status_code == 400
+    files = {"file": ("bom.json", json.dumps({"bomFormat": "Other"}).encode(), "application/json")}
+    assert client.post("/api/v1/sbom/fix/analyze", files=files).status_code == 400
+
+
+def test_fix_removes_selected_fields_and_reports_them(client):
+    response = upload_fix(
+        client, make_sbom(),
+        remove_fields=["root.dependencies", "root.services", "components[].hashes"],
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "dependencies" not in body["fixed_sbom"]
+    assert "services" not in body["fixed_sbom"]
+    assert "hashes" not in body["fixed_sbom"]["components"][0]
+    removal = [s for s in body["stats"] if s["rule_id"] == "optional_fields.remove"]
+    assert {(s["field"], s["count"]) for s in removal} == {
+        ("root.dependencies", 1), ("root.services", 1), ("components[].hashes", 1)
+    }
+
+
+def test_fix_ignores_protected_and_malformed_paths(client):
+    response = upload_fix(
+        client, make_sbom(),
+        remove_fields=["root.version", "components[].purl", "bad path"],
+        options={"optional_fields": {"keep": []}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fixed_sbom"]["version"] == 2
+    assert "purl" in body["fixed_sbom"]["components"][0]
+    assert not [s for s in body["stats"] if s["rule_id"] == "optional_fields.remove"]
+
+
+def test_fix_ignores_invalid_keep_lines_in_options(client):
+    response = upload_fix(
+        client, make_sbom(),
+        remove_fields=["components[].hashes"],
+        options={"optional_fields": {"keep": ["bad path", "root.version"]}},
+    )
+    assert response.status_code == 200
+    assert "hashes" not in response.json()["fixed_sbom"]["components"][0]
+
+
+def test_fix_rejects_malformed_remove_fields(client):
+    response = upload_fix(client, make_sbom(), remove_fields="not-a-list")
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_remove_fields"
+
+
+def test_fix_rejects_unparseable_or_non_string_remove_fields(client):
+    files = {"file": ("bom.json", json.dumps(make_sbom()).encode(), "application/json")}
+    for raw in ["not json", json.dumps(["root.dependencies", 1])]:
+        response = client.post(
+            "/api/v1/sbom/fix", files=files, data={"remove_fields": raw}
+        )
+        assert response.status_code == 400
+        assert response.json()["error"] == "invalid_remove_fields"
+
+
+def test_save_options_rejects_invalid_keep(client):
+    response = client.post(
+        "/api/v1/sbom/fix/options",
+        json={"options": {"optional_fields": {"keep": ["components[].group", "bad path"]}}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_options"
+    assert "bad path" in response.json()["detail"]
+
+
+def test_save_and_load_options_keep_list(client):
+    keep = ["components[].group", "components[].licenses"]
+    assert client.post("/api/v1/sbom/fix/options",
+                       json={"options": {"optional_fields": {"keep": keep}}}).status_code == 200
+    body = client.get("/api/v1/sbom/fix/options").json()
+    assert body["options"]["optional_fields"]["keep"] == keep
+
+
 class TestFixSbom:
     def test_fix_returns_expected_shape(self, client: TestClient) -> None:
-        response = upload(
-            client,
-            make_sbom(),
-            json.dumps({"metadata": {"component": {"remove_purl": True}}}),
-        )
+        response = upload(client, make_sbom())
         assert response.status_code == 200
         assert set(response.json()) == {"changed", "fixed_sbom", "stats", "issues"}
         assert response.json()["changed"] is True
 
     def test_fix_with_options_honors_them(self, client: TestClient) -> None:
-        options = {"metadata": {"component": {"remove_purl": True}}}
+        options = {"metadata": {"component": {"manufacturer": "Acme"}}}
         response = upload(client, make_sbom(), json.dumps(options))
         assert response.status_code == 200
         data = response.json()
         stats = {item["rule_id"]: item["count"] for item in data["stats"]}
-        assert "metadata_component.remove_purl" in stats
-        assert len(data["stats"]) == 20
+        assert "metadata_component.add_manufacturer" in stats
+        assert data["fixed_sbom"]["metadata"]["component"]["manufacturer"] == {
+            "name": "Acme"
+        }
+        assert len(data["stats"]) == 10
         assert all(set(item) == {"rule_id", "count"} for item in data["stats"])
         assert all(
             set(item) >= {"code", "path", "component", "details"}
@@ -96,12 +209,12 @@ class TestFixSbom:
         response = upload(client, make_sbom())
         assert response.status_code == 200
         data = response.json()
-        assert len(data["stats"]) == 19
+        assert len(data["stats"]) == 10
         assert data["changed"] is True
         assert data["fixed_sbom"]["specVersion"] == "1.7"
         assert data["fixed_sbom"]["version"] == 2
-        assert "dependencies" not in data["fixed_sbom"]
-        assert "services" not in data["fixed_sbom"]
+        assert data["fixed_sbom"]["dependencies"] == [{"ref": "pkg:pypi/example@1.0"}]
+        assert data["fixed_sbom"]["services"] == [{"name": "svc"}]
 
     def test_invalid_json_returns_error(self, client: TestClient) -> None:
         response = client.post(
@@ -189,7 +302,7 @@ class TestSbomFixOptions:
 
     def test_post_saves_and_get_returns_saved(self, client: TestClient) -> None:
         options = SbomFixOptions(
-            metadata={"component": {"remove_purl": True}},
+            metadata={"component": {"manufacturer": "Acme"}},
             components={"fill_missing_gost_properties": True},
         ).model_dump()
         response = client.post("/api/v1/sbom/fix/options", json={"options": options})
