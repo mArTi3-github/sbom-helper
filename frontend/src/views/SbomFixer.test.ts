@@ -119,16 +119,29 @@ const issuesResponse: SbomFixResponse = {
   ],
 }
 
+const fieldCatalogResponse = {
+  fstec_fields: [
+    { path: 'root.bomFormat', status: 'mandatory' },
+    { path: 'root.serialNumber', status: 'optional' },
+  ],
+  default_keep: [...defaultOptions.optional_fields.keep],
+}
+
 const getFixOptionsMock = vi.fn()
 const saveFixOptionsMock = vi.fn()
 const fixSbomMock = vi.fn()
+const analyzeSbomMock = vi.fn()
+const getFieldCatalogMock = vi.fn()
 const getSettingsMock = vi.fn()
 const updateSettingsMock = vi.fn()
 
 vi.mock('../api/sbom', () => ({
   getFixOptions: () => getFixOptionsMock(),
   saveFixOptions: (options: SbomFixOptions) => saveFixOptionsMock(options),
-  fixSbom: (file: File, options: SbomFixOptions) => fixSbomMock(file, options),
+  fixSbom: (file: File, options: SbomFixOptions, removeFields: string[]) =>
+    fixSbomMock(file, options, removeFields),
+  analyzeSbom: (file: File) => analyzeSbomMock(file),
+  getFieldCatalog: () => getFieldCatalogMock(),
 }))
 
 vi.mock('../api/settings', () => ({
@@ -175,6 +188,8 @@ describe('SbomFixer.vue', () => {
     getFixOptionsMock.mockResolvedValue({ options: cloneOptions() })
     saveFixOptionsMock.mockResolvedValue({ status: 'saved' })
     fixSbomMock.mockResolvedValue(changedResponse)
+    analyzeSbomMock.mockResolvedValue({ fields: [] })
+    getFieldCatalogMock.mockResolvedValue(fieldCatalogResponse)
     getSettingsMock.mockResolvedValue(settingsResponse)
     updateSettingsMock.mockResolvedValue(settingsResponse)
   })
@@ -493,7 +508,7 @@ describe('SbomFixer.vue', () => {
     await flushPromises()
 
     expect(fixSbomMock).toHaveBeenCalledTimes(1)
-    expect(fixSbomMock).toHaveBeenCalledWith(file, cloneOptions())
+    expect(fixSbomMock).toHaveBeenCalledWith(file, cloneOptions(), [])
     expect(wrapper.find('.loading').exists()).toBe(false)
     const card = wrapper.find('.status-card')
     expect(card.classes()).toContain('status-changed')
@@ -751,5 +766,200 @@ describe('SbomFixer.vue', () => {
 
     expect((wrapper.find('.issues-spoiler').element as HTMLDetailsElement).open).toBe(false)
     expect((wrapper.find('.stats-spoiler').element as HTMLDetailsElement).open).toBe(true)
+  })
+
+  it('analyzes the file and renders unchecked candidates', async () => {
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [
+        { path: 'root.dependencies', status: 'additional', count: 1 },
+        { path: 'root.version', status: 'mandatory', count: 1 },
+        { path: 'components[].scope', status: 'additional', count: 3 },
+        { path: 'components[].group', status: 'additional', count: 2 },
+      ],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+
+    expect(analyzeSbomMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-field="root.dependencies"]').exists()).toBe(true)
+    expect(wrapper.find('[data-field="components[].scope"]').exists()).toBe(true)
+    expect(wrapper.find('[data-field="root.version"]').exists()).toBe(false)
+    expect(wrapper.find('[data-field="components[].group"]').exists()).toBe(false)
+
+    expect(wrapper.find('[data-field="root.dependencies"]').text()).toContain('1')
+    expect(wrapper.find('[data-field="components[].scope"]').text()).toContain('3')
+
+    const checkboxes = wrapper.findAll('[data-remove-field]')
+    expect(checkboxes).toHaveLength(2)
+    for (const checkbox of checkboxes) {
+      expect((checkbox.element as HTMLInputElement).checked).toBe(false)
+    }
+  })
+
+  it('recomputes candidates immediately when the keep list is edited', async () => {
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [
+        { path: 'components[].group', status: 'additional', count: 2 },
+        { path: 'components[].scope', status: 'additional', count: 3 },
+      ],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-field="components[].group"]').exists()).toBe(false)
+
+    const keep = defaultOptions.optional_fields.keep.filter((p) => p !== 'components[].group')
+    await wrapper.find('textarea[data-role="keep-list"]').setValue(keep.join('\n'))
+    await flushPromises()
+
+    expect(wrapper.find('[data-field="components[].group"]').exists()).toBe(true)
+    expect(analyzeSbomMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops a selected path when it is added to the keep list', async () => {
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [{ path: 'components[].scope', status: 'additional', count: 3 }],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-remove-field="components[].scope"]').setValue(true)
+    await flushPromises()
+
+    const keep = [...defaultOptions.optional_fields.keep, 'components[].scope']
+    await wrapper.find('textarea[data-role="keep-list"]').setValue(keep.join('\n'))
+    await flushPromises()
+
+    expect(wrapper.find('[data-field="components[].scope"]').exists()).toBe(false)
+  })
+
+  it('sends only selected candidates as remove_fields', async () => {
+    const wrapper = await mountFixer()
+    const file = await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [
+        { path: 'root.dependencies', status: 'additional', count: 1 },
+        { path: 'components[].scope', status: 'additional', count: 3 },
+      ],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-remove-field="root.dependencies"]').setValue(true)
+    await flushPromises()
+
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    expect(fixSbomMock).toHaveBeenCalledWith(file, cloneOptions(), ['root.dependencies'])
+  })
+
+  it('select all and clear all only affect candidates', async () => {
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [
+        { path: 'root.dependencies', status: 'additional', count: 1 },
+        { path: 'root.version', status: 'mandatory', count: 1 },
+        { path: 'components[].scope', status: 'additional', count: 3 },
+      ],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-action="select-all-fields"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-remove-field]')).toHaveLength(2)
+    for (const checkbox of wrapper.findAll('[data-remove-field]')) {
+      expect((checkbox.element as HTMLInputElement).checked).toBe(true)
+    }
+
+    await wrapper.find('[data-action="clear-all-fields"]').trigger('click')
+    await flushPromises()
+    for (const checkbox of wrapper.findAll('[data-remove-field]')) {
+      expect((checkbox.element as HTMLInputElement).checked).toBe(false)
+    }
+
+    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('renders the read-only fstec list with statuses', async () => {
+    getFieldCatalogMock.mockResolvedValueOnce({
+      fstec_fields: [
+        { path: 'root.bomFormat', status: 'mandatory' },
+        { path: 'root.serialNumber', status: 'optional' },
+      ],
+      default_keep: [...defaultOptions.optional_fields.keep],
+    })
+    const wrapper = await mountFixer()
+
+    const details = wrapper.find('details[data-role="fstec-list"]')
+    expect(details.exists()).toBe(true)
+    expect((details.element as HTMLDetailsElement).open).toBe(false)
+
+    ;(details.element as HTMLDetailsElement).open = true
+    await details.trigger('toggle')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-fstec-path="root.bomFormat"]').exists()).toBe(true)
+    expect(wrapper.find('[data-fstec-path="root.serialNumber"]').exists()).toBe(true)
+    expect(wrapper.find('[data-fstec-path="root.bomFormat"]').text()).toContain('Mandatory')
+    expect(wrapper.find('[data-fstec-path="root.serialNumber"]').text()).toContain('Optional')
+  })
+
+  it('reset defaults restores the ten keep paths and static options', async () => {
+    const wrapper = await mountFixer()
+
+    await wrapper.find('.group-card[data-group="root"] .clear-all').trigger('click')
+    await wrapper.find('textarea[data-role="keep-list"]').setValue('')
+    await wrapper.find('.reset-defaults').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find('.manufacturer-input').element as HTMLInputElement).value).toBe(
+      'Positive Technologies',
+    )
+    expect(
+      (wrapper.find('textarea[data-role="keep-list"]').element as HTMLTextAreaElement).value,
+    ).toBe(defaultOptions.optional_fields.keep.join('\n'))
+  })
+
+  it('new file selection resets analysis and selection', async () => {
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [{ path: 'root.dependencies', status: 'additional', count: 1 }],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-remove-field="root.dependencies"]').setValue(true)
+    await flushPromises()
+    expect(wrapper.find('[data-field="root.dependencies"]').exists()).toBe(true)
+
+    await selectFile(wrapper, 'other.json')
+
+    expect(wrapper.find('[data-field="root.dependencies"]').exists()).toBe(false)
+  })
+
+  it('catalog failure does not block the page and keeps the list on reset', async () => {
+    getFieldCatalogMock.mockRejectedValueOnce(new Error('catalog down'))
+    const wrapper = await mountFixer()
+
+    expect(wrapper.find('.group-card').exists()).toBe(true)
+    expect(wrapper.find('.catalog-warning').exists()).toBe(true)
+
+    const textarea = () => wrapper.find('textarea[data-role="keep-list"]')
+    await textarea().setValue('components[].group')
+    const before = (textarea().element as HTMLTextAreaElement).value
+
+    await wrapper.find('.reset-defaults').trigger('click')
+    await flushPromises()
+
+    expect((textarea().element as HTMLTextAreaElement).value).toBe(before)
   })
 })

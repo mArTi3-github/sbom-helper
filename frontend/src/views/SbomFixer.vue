@@ -212,6 +212,111 @@
           </div>
         </div>
       </div>
+
+      <div class="group-card optional-fields-card" data-group="optional-fields">
+        <div class="group-header">
+          <span class="optional-fields-title">{{ t('sbomFixer.optionalFields.title') }}</span>
+          <button
+            type="button"
+            class="btn btn-primary analyze-button"
+            data-action="analyze"
+            :disabled="!selectedFile || analysisLoading"
+            @click="handleAnalyze"
+          >
+            {{ analysisLoading ? t('sbomFixer.optionalFields.analyzing') : t('sbomFixer.optionalFields.analyze') }}
+          </button>
+        </div>
+        <p class="optional-fields-description">{{ t('sbomFixer.optionalFields.description') }}</p>
+
+        <div v-if="catalogFailed" class="catalog-warning">{{ t('sbomFixer.optionalFields.catalogLoadFailed') }}</div>
+
+        <div v-if="analysis === null" class="optional-hint">
+          {{ selectedFile ? t('sbomFixer.optionalFields.needAnalysis') : t('sbomFixer.optionalFields.needFile') }}
+        </div>
+        <template v-else>
+          <div v-if="candidates.length === 0" class="optional-empty">
+            {{ t('sbomFixer.optionalFields.empty') }}
+          </div>
+          <template v-else>
+            <div class="optional-fields-actions">
+              <button
+                type="button"
+                class="btn btn-small"
+                data-action="select-all-fields"
+                @click="selectAllCandidates"
+              >
+                {{ t('sbomFixer.selectAll') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-small"
+                data-action="clear-all-fields"
+                @click="clearAllCandidates"
+              >
+                {{ t('sbomFixer.clearAll') }}
+              </button>
+            </div>
+            <table class="candidate-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>{{ t('sbomFixer.optionalFields.path') }}</th>
+                  <th>{{ t('sbomFixer.optionalFields.occurrences') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="field in candidates" :key="field.path" :data-field="field.path">
+                  <td>
+                    <input
+                      type="checkbox"
+                      class="remove-field-checkbox"
+                      :data-remove-field="field.path"
+                      :checked="selectedRemoveFields.has(field.path)"
+                      @change="onRemoveFieldToggle(field.path, $event)"
+                    />
+                  </td>
+                  <td class="field-path">{{ field.path }}</td>
+                  <td class="field-count" :data-count="field.count">{{ field.count }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+        </template>
+
+        <details v-if="fieldCatalog" class="fstec-details" data-role="fstec-list">
+          <summary>{{ t('sbomFixer.optionalFields.fstecTitle') }}</summary>
+          <table class="fstec-table">
+            <thead>
+              <tr>
+                <th>{{ t('sbomFixer.optionalFields.path') }}</th>
+                <th>{{ t('purlResolver.status') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="field in fieldCatalog.fstec_fields"
+                :key="field.path"
+                :data-fstec-path="field.path"
+              >
+                <td class="field-path">{{ field.path }}</td>
+                <td class="field-status">{{ fstecStatusLabel(field) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </details>
+
+        <div class="keep-list-block">
+          <label class="keep-list-title" for="keep-list">{{ t('sbomFixer.optionalFields.keepTitle') }}</label>
+          <textarea
+            id="keep-list"
+            v-model="keepText"
+            data-role="keep-list"
+            class="keep-list-textarea"
+            rows="6"
+          ></textarea>
+          <div class="keep-list-hint">{{ t('sbomFixer.optionalFields.keepHint') }}</div>
+        </div>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -242,8 +347,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="stat in result.stats" :key="stat.rule_id">
-              <td>{{ t('sbomFixer.rules.' + stat.rule_id) }}</td>
+            <tr v-for="stat in result.stats" :key="stat.rule_id + (stat.field ?? '')">
+              <td>{{ statLabel(stat) }}</td>
               <td class="stat-count">{{ stat.count }}</td>
             </tr>
           </tbody>
@@ -297,11 +402,19 @@ import {
   METADATA_RULES,
   ROOT_RULES,
 } from './sbomFixerRules'
-import { fixSbom, getFixOptions, saveFixOptions } from '../api/sbom'
+import { analyzeSbom, fixSbom, getFieldCatalog, getFixOptions, saveFixOptions } from '../api/sbom'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
-import type { SbomFixIssue, SbomFixOptions, SbomFixResponse } from '../types/api'
+import type {
+  FieldCatalogResponse,
+  FstecField,
+  OptionalFieldInfo,
+  SbomFixIssue,
+  SbomFixOptions,
+  SbomFixResponse,
+  SbomFixStat,
+} from '../types/api'
 
 const { t, te } = useI18n()
 
@@ -318,6 +431,12 @@ const statsOpen = ref(true)
 const issuesOpen = ref(false)
 const downloadIndent = ref(4)
 let changedWhileSaving = false
+
+const fieldCatalog = ref<FieldCatalogResponse | null>(null)
+const catalogFailed = ref(false)
+const analysis = ref<OptionalFieldInfo[] | null>(null)
+const analysisLoading = ref(false)
+const selectedRemoveFields = ref<Set<string>>(new Set())
 
 function defaultFixOptions(): SbomFixOptions {
   return {
@@ -411,6 +530,67 @@ const componentsMaster = computed({
 })
 const componentsIndeterminate = computed(() => !componentsMaster.value && componentValues().some(Boolean))
 
+const candidates = computed(() =>
+  (analysis.value ?? []).filter(
+    (field) => field.status === 'additional' && !options.optional_fields.keep.includes(field.path),
+  ),
+)
+
+const keepText = computed({
+  get: () => options.optional_fields.keep.join('\n'),
+  set: (value: string) => {
+    options.optional_fields.keep = value.split('\n')
+  },
+})
+
+watch(candidates, (list) => {
+  const paths = new Set(list.map((field) => field.path))
+  const kept = [...selectedRemoveFields.value].filter((path) => paths.has(path))
+  if (kept.length !== selectedRemoveFields.value.size) {
+    selectedRemoveFields.value = new Set(kept)
+  }
+})
+
+function onRemoveFieldToggle(path: string, event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked
+  const next = new Set(selectedRemoveFields.value)
+  if (checked) next.add(path)
+  else next.delete(path)
+  selectedRemoveFields.value = next
+}
+
+function selectAllCandidates(): void {
+  selectedRemoveFields.value = new Set(candidates.value.map((field) => field.path))
+}
+
+function clearAllCandidates(): void {
+  selectedRemoveFields.value = new Set()
+}
+
+const FSTEC_CONDITION_KEYS: Record<string, string> = {
+  componentsPresent: 'sbomFixer.optionalFields.conditionComponentsPresent',
+  sourceDistributionHashes: 'sbomFixer.optionalFields.conditionSourceDistributionHashes',
+}
+
+function fstecStatusLabel(field: FstecField): string {
+  const base =
+    field.status === 'mandatory'
+      ? t('sbomFixer.optionalFields.fstecStatusMandatory')
+      : t('sbomFixer.optionalFields.fstecStatusOptional')
+  if (field.condition_key) {
+    const key = FSTEC_CONDITION_KEYS[field.condition_key]
+    if (key) return `${base} (${t(key)})`
+  }
+  return base
+}
+
+function statLabel(stat: SbomFixStat): string {
+  if (stat.field) {
+    return `${t('sbomFixer.optionalFields.remove')}: ${stat.field}`
+  }
+  return t('sbomFixer.rules.' + stat.rule_id)
+}
+
 function describeError(e: unknown): string {
   if (e instanceof ApiError) {
     return t('errors.' + e.error, e.data)
@@ -470,7 +650,9 @@ watch(
 )
 
 function restoreDefaults(): void {
+  const keep = fieldCatalog.value?.default_keep ?? options.optional_fields.keep
   applyOptions(defaultFixOptions())
+  options.optional_fields.keep = keep
   saveStatus.value = 'idle'
   saveError.value = null
 }
@@ -479,6 +661,8 @@ function onFileSelected(file: File): void {
   selectedFile.value = file
   error.value = null
   result.value = null
+  analysis.value = null
+  selectedRemoveFields.value = new Set()
   saveStatus.value = 'idle'
   saveError.value = null
 }
@@ -496,6 +680,24 @@ async function handleSave(): Promise<void> {
   }
 }
 
+async function handleAnalyze(): Promise<void> {
+  if (!selectedFile.value) return
+
+  error.value = null
+  result.value = null
+  analysisLoading.value = true
+
+  try {
+    const response = await analyzeSbom(selectedFile.value)
+    analysis.value = response.fields
+    selectedRemoveFields.value = new Set()
+  } catch (e: unknown) {
+    error.value = describeError(e)
+  } finally {
+    analysisLoading.value = false
+  }
+}
+
 async function handleFix(): Promise<void> {
   if (!selectedFile.value) return
 
@@ -504,7 +706,7 @@ async function handleFix(): Promise<void> {
   loading.value = true
 
   try {
-    result.value = await fixSbom(selectedFile.value, plainOptions())
+    result.value = await fixSbom(selectedFile.value, plainOptions(), [...selectedRemoveFields.value])
     statsOpen.value = true
     issuesOpen.value = false
   } catch (e: unknown) {
@@ -515,7 +717,11 @@ async function handleFix(): Promise<void> {
 }
 
 onMounted(async () => {
-  const [optionsResult, settingsResult] = await Promise.allSettled([getFixOptions(), settingsStore.load()])
+  const [optionsResult, settingsResult, catalogResult] = await Promise.allSettled([
+    getFixOptions(),
+    settingsStore.load(),
+    getFieldCatalog(),
+  ])
   if (optionsResult.status === 'fulfilled') {
     applyOptions(optionsResult.value.options)
   } else {
@@ -523,6 +729,14 @@ onMounted(async () => {
   }
   if (settingsResult.status === 'fulfilled') {
     downloadIndent.value = settingsStore.jsonIndent
+  }
+  if (catalogResult.status === 'fulfilled') {
+    fieldCatalog.value = catalogResult.value
+  } else {
+    catalogFailed.value = true
+  }
+  if (optionsResult.status === 'rejected' && catalogResult.status === 'fulfilled') {
+    options.optional_fields.keep = catalogResult.value.default_keep
   }
 })
 </script>
@@ -800,5 +1014,111 @@ h1 {
   margin-top: 1rem;
   display: flex;
   gap: 0.5rem;
+}
+
+.optional-fields-title {
+  font-weight: 600;
+}
+
+.optional-fields-description {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.optional-hint,
+.optional-empty {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.optional-fields-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.candidate-table,
+.fstec-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.candidate-table th,
+.candidate-table td,
+.fstec-table th,
+.fstec-table td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--color-row-border);
+  vertical-align: top;
+}
+
+.candidate-table th,
+.fstec-table th {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.field-path {
+  font-family: var(--font-mono, monospace);
+}
+
+.field-count {
+  width: 6rem;
+}
+
+.catalog-warning {
+  background: var(--color-warning-bg, rgba(245, 158, 11, 0.12));
+  border: 1px solid var(--color-warning, #f59e0b);
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1rem;
+  color: var(--color-warning, #b45309);
+  margin-bottom: 0.75rem;
+}
+
+.fstec-details {
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-row-border);
+  padding-top: 0.75rem;
+}
+
+.fstec-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.keep-list-block {
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-row-border);
+  padding-top: 0.75rem;
+}
+
+.keep-list-title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.keep-list-textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--border-radius);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.keep-list-hint {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
 }
 </style>
