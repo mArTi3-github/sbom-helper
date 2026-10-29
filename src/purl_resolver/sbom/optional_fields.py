@@ -88,15 +88,21 @@ def normalize_keep(entries: list[object]) -> list[str]:
 
 def invalid_keep_entries(entries: list[object]) -> list[str]:
     result: list[str] = []
+    seen: set[str] = set()
     for entry in entries:
         if not isinstance(entry, str):
-            result.append(str(entry))
+            value = str(entry)
+            if value not in seen:
+                seen.add(value)
+                result.append(value)
             continue
         path = entry.strip()
         if not path:
             continue
         if FIELD_PATH_PATTERN.fullmatch(path) is None or path in FSTEC_PATHS:
-            result.append(path)
+            if path not in seen:
+                seen.add(path)
+                result.append(path)
     return result
 
 
@@ -186,7 +192,7 @@ def remove_optional_fields(
     for path in accepted:
         split = _split_path(path)
         if split is None:
-            continue
+            raise ValueError(f"invalid path: {path}")
         context, field = split
         if context == "root":
             counts[path] = 0

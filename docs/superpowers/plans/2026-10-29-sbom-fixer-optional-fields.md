@@ -18,14 +18,14 @@
 - All user-facing strings live in `frontend/src/i18n/locales/{ru,en}.json` with identical structure.
 - Only enabled static rules appear in `stats`, in canonical order; removal rows follow with `field` set.
 - Nothing is removed unless the user selected the path; the ten former removal options no longer exist.
-- The field-removal vocabulary is limited to direct keys of root, `metadata`, `metadata.component`, and root-`components` recursively; `metadata.component.components` is never scanned or modified.
+- The field-removal vocabulary is limited to direct keys of root, `metadata`, `metadata.component`, and root-`components` recursively; `metadata.component.components` is a direct key of `metadata.component` that can be removed whole, while its subtree is never scanned and is never touched by `components[].<field>` rules.
 - Path grammar: `^(root|metadata|metadata\.component|components\[\])\.[A-Za-z0-9_$@.-]+$`.
 - Default keep list has exactly 10 paths, including `metadata.component.bom-ref` and `components[].bom-ref`.
 - Tests run with `.venv/bin/python -m pytest` and `.venv/bin/ruff check src tests`; frontend with `npm test --prefix frontend` and `npm run build --prefix frontend`.
 
 ## Review Focus
 
-- An SBOM with `metadata.component.components`: removal must not touch that subtree, or removal counts exceed the analysis counts. Pinned in Task 2.
+- An SBOM with `metadata.component.components`: the whole key may be removed, but `components[].<field>` removal must not touch its subtree, or removal counts exceed the analysis counts. Pinned in Task 2.
 - A document key outside the path grammar (e.g. `"weird key"`): it must not appear as a checkbox that the server silently ignores. Pinned in Task 2.
 - An old or hand-edited `data/sbom_fix_options.json` with former `remove_*` keys and invalid `keep` lines: loading must not fail or reset working options. Pinned in Tasks 3 and 4.
 - A half-typed, not-yet-saved line in the keep textarea sent with "Исправить": it must be ignored, not turn the request into `400 invalid_options`. Pinned in Task 4.

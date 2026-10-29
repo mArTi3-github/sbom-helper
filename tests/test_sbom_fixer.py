@@ -1843,6 +1843,7 @@ def test_issue_metadata_component_missing_field(field, code, value):
         pytest.param([], id="list"),
         pytest.param({}, id="empty-object"),
         pytest.param({"name": ""}, id="empty-name"),
+        pytest.param({"name": "  "}, id="whitespace-name"),
         pytest.param({"name": None}, id="null-name"),
         pytest.param({"name": 5}, id="non-string-name"),
     ],

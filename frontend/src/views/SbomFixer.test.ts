@@ -99,6 +99,13 @@ const statsResponse: SbomFixResponse = {
   issues: [],
 }
 
+const statsWithFieldResponse: SbomFixResponse = {
+  changed: true,
+  fixed_sbom: { bomFormat: 'CycloneDX' },
+  stats: [{ rule_id: 'optional_fields.remove', field: 'components[].scope', count: 3 }],
+  issues: [],
+}
+
 const issuesResponse: SbomFixResponse = {
   changed: true,
   fixed_sbom: { bomFormat: 'CycloneDX' },
@@ -610,6 +617,19 @@ describe('SbomFixer.vue', () => {
     expect(rows[1].text()).toContain('0')
   })
 
+  it('renders a removal stat row with its field path', async () => {
+    fixSbomMock.mockResolvedValueOnce(statsWithFieldResponse)
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('.stats-table tbody tr')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].text()).toContain('components[].scope')
+    expect(rows[0].text()).toContain('3')
+  })
+
   it('renders issues in a closed spoiler and builds the table only when opened', async () => {
     fixSbomMock.mockResolvedValueOnce(issuesResponse)
     const wrapper = await mountFixer()
@@ -944,6 +964,24 @@ describe('SbomFixer.vue', () => {
     await selectFile(wrapper, 'other.json')
 
     expect(wrapper.find('[data-field="root.dependencies"]').exists()).toBe(false)
+  })
+
+  it('clears stale candidates when a re-analyze fails', async () => {
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    analyzeSbomMock.mockResolvedValueOnce({
+      fields: [{ path: 'root.dependencies', status: 'additional', count: 1 }],
+    })
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-field="root.dependencies"]').exists()).toBe(true)
+
+    analyzeSbomMock.mockRejectedValueOnce(new ApiError(400, 'invalid_sbom'))
+    await wrapper.find('[data-action="analyze"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-field="root.dependencies"]').exists()).toBe(false)
+    expect(wrapper.find('.error-msg').exists()).toBe(true)
   })
 
   it('catalog failure does not block the page and keeps the list on reset', async () => {

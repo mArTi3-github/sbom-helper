@@ -88,6 +88,14 @@ def test_invalid_keep_entries_stringifies_non_string_entries():
     assert invalid_keep_entries(["components[].group", 123]) == ["123"]
 
 
+def test_invalid_keep_entries_deduplicates_preserving_first_occurrence():
+    assert invalid_keep_entries(["bad path", "bad path"]) == ["bad path"]
+    assert invalid_keep_entries(["bad path", "root.bomFormat", "bad path"]) == [
+        "bad path",
+        "root.bomFormat",
+    ]
+
+
 def test_canonical_sort_key_orders_contexts_then_paths():
     paths = [
         "components[].scope",
@@ -225,6 +233,62 @@ def test_remove_optional_fields_does_not_touch_metadata_component_components():
     counts = remove_optional_fields(data, ["components[].scope"], keep=list(DEFAULT_KEEP_FIELDS))
     assert counts == {"components[].scope": 2}
     assert data["metadata"]["component"]["components"][0]["scope"] == "required"
+
+
+def test_metadata_component_components_is_analyzable_and_removable_whole():
+    data = component_doc()
+    result = {item.path: item for item in analyze_fields(data)}
+    assert result["metadata.component.components"].status == "additional"
+    assert result["metadata.component.components"].count == 1
+
+    counts = remove_optional_fields(
+        data, ["metadata.component.components"], keep=[]
+    )
+    assert counts == {"metadata.component.components": 1}
+    assert "components" not in data["metadata"]["component"]
+
+
+def test_components_nested_three_levels_are_counted_and_removed():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [
+            {
+                "type": "library",
+                "name": "l1",
+                "version": "1",
+                "purl": "pkg:generic/l1@1",
+                "scope": "required",
+                "components": [
+                    {
+                        "type": "library",
+                        "name": "l2",
+                        "version": "1",
+                        "purl": "pkg:generic/l2@1",
+                        "scope": "required",
+                        "components": [
+                            {
+                                "type": "library",
+                                "name": "l3",
+                                "version": "1",
+                                "purl": "pkg:generic/l3@1",
+                                "scope": "required",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    result = {item.path: item for item in analyze_fields(data)}
+    assert result["components[].scope"].count == 3
+
+    counts = remove_optional_fields(data, ["components[].scope"], keep=[])
+    assert counts == {"components[].scope": 3}
+    assert "scope" not in data["components"][0]
+    assert "scope" not in data["components"][0]["components"][0]
+    assert "scope" not in data["components"][0]["components"][0]["components"][0]
 
 
 def test_remove_optional_fields_does_not_touch_external_reference_hashes():

@@ -539,7 +539,9 @@ const candidates = computed(() =>
 const keepText = computed({
   get: () => options.optional_fields.keep.join('\n'),
   set: (value: string) => {
-    options.optional_fields.keep = value.split('\n')
+    options.optional_fields.keep = value
+      .split('\n')
+      .filter((line) => line.trim() !== '')
   },
 })
 
@@ -692,6 +694,8 @@ async function handleAnalyze(): Promise<void> {
     analysis.value = response.fields
     selectedRemoveFields.value = new Set()
   } catch (e: unknown) {
+    analysis.value = null
+    selectedRemoveFields.value = new Set()
     error.value = describeError(e)
   } finally {
     analysisLoading.value = false

@@ -204,7 +204,7 @@ sbom/fixer.py::fix_sbom(data, options, now=None, remove_fields=())
 - `metadata.component` when it is an object (`metadata.component.<key>`);
 - every component in the root `components` array and recursively its nested `components` (pre-order, all levels → `components[].<key>`).
 
-It does not descend into field values: `externalReferences`, `properties`, `licenses`, `hashes`, `manufacturer`, `supplier` and any other object/array are treated as a single field. `metadata.component.components` is never scanned. Keys whose canonical path does not match the grammar (spaces, colons, slashes, etc.) are skipped. The status is the catalogue status for list-1 paths, otherwise `additional`. The `count` is 1 for `root`/`metadata`/`metadata.component` when the key is present, and the number of component objects (all levels) containing the key for `components[]`. Results are sorted canonically (`root` → `metadata` → `metadata.component` → `components[]`, alphabetically within each group).
+It does not descend into field values: `externalReferences`, `properties`, `licenses`, `hashes`, `manufacturer`, `supplier` and any other object/array are treated as a single field. `metadata.component.components` is a direct key of `metadata.component` (and can be removed whole); its subtree is never scanned. Keys whose canonical path does not match the grammar (spaces, colons, slashes, etc.) are skipped. The status is the catalogue status for list-1 paths, otherwise `additional`. The `count` is 1 for `root`/`metadata`/`metadata.component` when the key is present, and the number of component objects (all levels) containing the key for `components[]`. Results are sorted canonically (`root` → `metadata` → `metadata.component` → `components[]`, alphabetically within each group).
 
 Candidates for the UI are the `additional` records whose path is not in `optional_fields.keep`.
 
@@ -235,7 +235,7 @@ The former fixed field-removal options and the supplier-to-manufacturer rename r
 - `root.<field>` → remove the root key;
 - `metadata.<field>` → remove the key when `metadata` is an object;
 - `metadata.component.<field>` → remove the key when `metadata.component` is an object;
-- `components[].<field>` → remove the key from every component object at all nesting levels **inside the root `components` tree**. The `metadata.component.components` subtree is never traversed — exactly as in analysis, so a removal count can never exceed the analysis count.
+- `components[].<field>` → remove the key from every component object at all nesting levels **inside the root `components` tree**. The `metadata.component.components` subtree is never traversed — exactly as in analysis, so a removal count can never exceed the analysis count. `metadata.component.components` itself is a direct key of `metadata.component` and is removed whole via the `metadata.component.<field>` rule.
 
 The whole key is removed (with a value of any shape, including empty array/object). An absent key yields `count = 0`. Invalid, list-1, and list-2 paths are silently ignored and never appear in statistics. A `group` key is removable when the user drops it from list 2 — the former "group is never modified" rule is lifted for this path.
 
@@ -363,7 +363,7 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 - `metadata.timestamp` is added only when absent, `null`, or empty string. It is reported as `metadata.missing_timestamp` when absent, `null`, empty, or a non-string value. An existing non-empty string is never overwritten, and its format is not validated or reported.
 - Nothing is removed by default: removal requires an explicit `remove_fields` selection, and no selection survives a file change.
 - Protected paths are never removed: list-1 paths and paths in `optional_fields.keep` are dropped from `remove_fields` without error.
-- `metadata.component.components` is never scanned or modified, by either analysis or removal.
+- `metadata.component.components` is a direct key of `metadata.component` that can be removed whole; its subtree is never scanned by analysis and never touched by `components[].<field>` removal.
 - The `group` field is modified nowhere except by `optional_fields.remove` when the user drops it from list 2.
 - `components[].hashes` removal removes only the component's own `hashes`; `hashes` inside `externalReferences[]` are preserved.
 - `components.fill_missing_gost_properties` applies only to `components[]` items, never to `metadata.component`.

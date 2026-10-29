@@ -39,6 +39,7 @@ describe('sbomFixerRules catalog', () => {
       'root.remove_dependencies', 'root.remove_services',
       'metadata.remove_properties', 'metadata.remove_tools',
       'metadata_component.remove_external_references', 'metadata_component.remove_purl',
+      'metadata_component.remove_properties',
       'metadata_component.remove_scope', 'metadata_component.rename_supplier',
       'components.remove_hashes', 'components.remove_scope',
     ]) {

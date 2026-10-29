@@ -485,8 +485,10 @@ def _collect_metadata_issues(data: dict, issues: list[FixIssue]) -> None:
             issues.append(FixIssue(code=code, path=path, component=component_name))
 
     manufacturer = component.get("manufacturer")
-    if not isinstance(manufacturer, dict) or not _is_non_empty_string(
-        manufacturer.get("name")
+    if (
+        not isinstance(manufacturer, dict)
+        or not isinstance(manufacturer.get("name"), str)
+        or not manufacturer.get("name").strip()
     ):
         issues.append(
             FixIssue(

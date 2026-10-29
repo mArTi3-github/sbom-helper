@@ -81,6 +81,11 @@ def test_field_catalog_returns_fstec_fields_and_default_keep(client):
     assert len(body["fstec_fields"]) == 29
     assert len(body["default_keep"]) == 10
     assert {"path": "root.bomFormat", "status": "mandatory"} in body["fstec_fields"]
+    assert {
+        "path": "components[].externalReferences[].hashes",
+        "status": "optional",
+        "condition_key": "sourceDistributionHashes",
+    } in body["fstec_fields"]
 
 
 def test_analyze_returns_compact_inventory(client):
