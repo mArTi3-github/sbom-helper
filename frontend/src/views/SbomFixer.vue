@@ -289,7 +289,7 @@
             <thead>
               <tr>
                 <th>{{ t('sbomFixer.optionalFields.path') }}</th>
-                <th>{{ t('purlResolver.status') }}</th>
+                <th>{{ t('sbomFixer.optionalFields.status') }}</th>
               </tr>
             </thead>
             <tbody>

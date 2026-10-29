@@ -171,6 +171,7 @@
       "path": "Path",
       "occurrences": "Occurrences",
       "fstecTitle": "FSTEC requirement fields (reference)",
+      "status": "Status",
       "keepTitle": "Not recommended to remove",
       "keepHint": "One path per line. Fields on this list are never offered for removal.",
       "fstecStatusMandatory": "Mandatory",
