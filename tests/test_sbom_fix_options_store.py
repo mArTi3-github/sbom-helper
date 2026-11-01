@@ -5,7 +5,11 @@ import logging
 
 import pytest
 
-from purl_resolver.sbom.fixer import SbomFixOptions
+from purl_resolver.sbom.fixer import (
+    LicensePatternItem,
+    LicensesFixOptions,
+    SbomFixOptions,
+)
 from purl_resolver.sbom.optional_fields import DEFAULT_KEEP_FIELDS
 from purl_resolver.sbom_fix_options_store import SbomFixOptionsStore
 
@@ -104,3 +108,23 @@ def test_load_ignores_legacy_nested_options(tmp_path):
     assert options == SbomFixOptions()
     assert not hasattr(options, "root")
     assert options.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)
+
+
+def test_save_load_roundtrip_including_licenses(tmp_path):
+    store = SbomFixOptionsStore(tmp_path / "options.json")
+    options = SbomFixOptions(
+        licenses=LicensesFixOptions(
+            add_proprietary=True,
+            add_patterns=[LicensePatternItem(field="name", pattern="vendor")],
+        )
+    )
+    store.save(options)
+    assert store.load() == options
+
+
+def test_old_file_without_licenses_block_uses_defaults(tmp_path):
+    path = tmp_path / "old.json"
+    path.write_text('{"reorder": false}', encoding="utf-8")
+    loaded = SbomFixOptionsStore(path).load()
+    assert loaded.reorder is False
+    assert loaded.licenses == LicensesFixOptions()

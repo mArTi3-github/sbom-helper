@@ -64,6 +64,9 @@ RULE_IDS: tuple[str, ...] = (
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
+    "licenses.filter_non_proprietary",
+    "licenses.add_proprietary",
+    "licenses.remove_proprietary_source_references",
 )
 
 
@@ -71,6 +74,18 @@ class ComponentsFixOptions(BaseModel):
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False
+
+
+class LicensePatternItem(BaseModel):
+    field: str = ""
+    pattern: str = ""
+
+
+class LicensesFixOptions(BaseModel):
+    filter_non_proprietary: bool = False
+    add_proprietary: bool = False
+    remove_proprietary_source_references: bool = False
+    add_patterns: list[LicensePatternItem] = Field(default_factory=list)
 
 
 class OptionalFieldsFixOptions(BaseModel):
@@ -93,6 +108,7 @@ class SbomFixOptions(BaseModel):
     add_manufacturer: bool = True
     manufacturer: str = "Positive Technologies"
     components: ComponentsFixOptions = Field(default_factory=ComponentsFixOptions)
+    licenses: LicensesFixOptions = Field(default_factory=LicensesFixOptions)
     optional_fields: OptionalFieldsFixOptions = Field(default_factory=OptionalFieldsFixOptions)
 
     @field_validator("spec_version", mode="before")
@@ -138,8 +154,11 @@ class SbomFixResult:
 
 
 def _rule_enabled(rule_id: str, options: SbomFixOptions) -> bool:
-    if rule_id.startswith("components."):
-        return getattr(options.components, rule_id.removeprefix("components."))
+    prefix, _, name = rule_id.partition(".")
+    if prefix == "components":
+        return getattr(options.components, name)
+    if prefix == "licenses":
+        return getattr(options.licenses, name)
     return getattr(options, rule_id)
 
 

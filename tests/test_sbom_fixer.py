@@ -7,6 +7,8 @@ from pydantic import ValidationError
 from purl_resolver.sbom.fixer import (
     RULE_IDS,
     FixIssue,
+    LicensePatternItem,
+    LicensesFixOptions,
     OptionalFieldsFixOptions,
     SbomFixOptions,
     _collect_component_issues,
@@ -28,6 +30,9 @@ NEW_RULE_IDS = (
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
+    "licenses.filter_non_proprietary",
+    "licenses.add_proprietary",
+    "licenses.remove_proprietary_source_references",
 )
 
 
@@ -64,12 +69,22 @@ def test_default_stats_contain_only_enabled_rules():
         SbomFixOptions(),
     )
     assert [stat.rule_id for stat in result.stats] == [
-        rule for rule in NEW_RULE_IDS if rule != "components.fill_missing_gost_properties"
+        rule
+        for rule in NEW_RULE_IDS
+        if rule != "components.fill_missing_gost_properties"
+        and not rule.startswith("licenses.")
     ]
 
 
-def test_all_enabled_rules_yield_eight_stats_in_canonical_order():
-    options = SbomFixOptions(components={"fill_missing_gost_properties": True})
+def test_all_enabled_rules_yield_eleven_stats_in_canonical_order():
+    options = SbomFixOptions(
+        components={"fill_missing_gost_properties": True},
+        licenses={
+            "filter_non_proprietary": True,
+            "add_proprietary": True,
+            "remove_proprietary_source_references": True,
+        },
+    )
     result = fix_sbom(
         {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}, options
     )
@@ -113,7 +128,10 @@ def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
     assert len(result.stats) == 7
     assert all(stat.count == 0 for stat in result.stats)
     assert [stat.rule_id for stat in result.stats] == [
-        rule for rule in NEW_RULE_IDS if rule != "components.fill_missing_gost_properties"
+        rule
+        for rule in NEW_RULE_IDS
+        if rule != "components.fill_missing_gost_properties"
+        and not rule.startswith("licenses.")
     ]
 
 
@@ -1940,3 +1958,35 @@ def test_issue_collected_from_final_document_after_rules():
     assert result.issues == []
     assert result.fixed_sbom["specVersion"] == "1.7"
     assert result.fixed_sbom["metadata"]["timestamp"]
+
+
+def test_licenses_options_default_to_disabled():
+    options = SbomFixOptions()
+    assert options.licenses.filter_non_proprietary is False
+    assert options.licenses.add_proprietary is False
+    assert options.licenses.remove_proprietary_source_references is False
+    assert options.licenses.add_patterns == []
+
+
+def test_license_rule_ids_come_last_in_execution_order():
+    assert len(RULE_IDS) == 11
+    assert RULE_IDS[-3:] == (
+        "licenses.filter_non_proprietary",
+        "licenses.add_proprietary",
+        "licenses.remove_proprietary_source_references",
+    )
+
+
+def test_enabled_license_rule_gets_zero_stat_row():
+    data = {"components": []}
+    options = SbomFixOptions(licenses={"filter_non_proprietary": True})
+    result = fix_sbom(data, options)
+    stats = {stat.rule_id: stat.count for stat in result.stats}
+    assert stats["licenses.filter_non_proprietary"] == 0
+    assert "licenses.add_proprietary" not in stats
+
+
+def test_license_pattern_item_defaults_are_empty_strings():
+    item = LicensePatternItem()
+    assert item.field == ""
+    assert item.pattern == ""

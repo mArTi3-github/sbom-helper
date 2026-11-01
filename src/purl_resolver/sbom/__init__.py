@@ -3,6 +3,8 @@ from .enricher import enrich_sbom
 from .fixer import (
     FixIssue,
     FixStat,
+    LicensePatternItem,
+    LicensesFixOptions,
     OptionalFieldsFixOptions,
     SbomFixOptions,
     SbomFixResult,
@@ -18,6 +20,8 @@ __all__ = [
     "CycloneDXParser",
     "FixIssue",
     "FixStat",
+    "LicensePatternItem",
+    "LicensesFixOptions",
     "OptionalFieldsFixOptions",
     "SbomFixOptions",
     "SbomFixResult",

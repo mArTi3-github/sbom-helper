@@ -355,3 +355,28 @@ class TestSbomFixOptions:
         )
         assert response.status_code == 500
         assert response.json() == {"error": "options_save_failed"}
+
+
+def test_save_options_roundtrips_licenses_block(client):
+    payload = {
+        "options": {
+            "licenses": {
+                "add_proprietary": True,
+                "add_patterns": [{"field": "name", "pattern": "vendor"}],
+            }
+        }
+    }
+    response = client.post("/api/v1/sbom/fix/options", json=payload)
+    assert response.status_code == 200
+    options = client.get("/api/v1/sbom/fix/options").json()["options"]
+    assert options["licenses"]["add_proprietary"] is True
+    assert options["licenses"]["add_patterns"] == [{"field": "name", "pattern": "vendor"}]
+
+
+def test_save_options_rejects_non_list_patterns(client):
+    response = client.post(
+        "/api/v1/sbom/fix/options",
+        json={"options": {"licenses": {"add_patterns": "name"}}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_options"
