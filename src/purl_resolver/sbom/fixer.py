@@ -572,6 +572,33 @@ def _filter_non_proprietary_licenses(component: dict) -> int:
     return removed
 
 
+def _matches_license_patterns(
+    component: dict, patterns: list[tuple[str, str]]
+) -> bool:
+    for name, pattern in patterns:
+        value = component.get(name)
+        if value is not None and pattern in str(value):
+            return True
+    return False
+
+
+def _add_proprietary_license(
+    component: dict, patterns: list[tuple[str, str]]
+) -> int:
+    if not patterns or not _matches_license_patterns(component, patterns):
+        return 0
+    if _has_proprietary_license(component):
+        return 0
+    licenses = component.get("licenses")
+    if licenses is None:
+        licenses = []
+        component["licenses"] = licenses
+    elif not isinstance(licenses, list):
+        return 0
+    licenses.append({"license": {"name": PROPRIETARY_LICENSE_NAME}})
+    return 1
+
+
 def _apply_components_rules(
     data: dict,
     options: SbomFixOptions,
@@ -615,12 +642,23 @@ def _apply_licenses_rules(
     counts: dict[str, int],
 ) -> None:
     filter_non_proprietary = options.licenses.filter_non_proprietary
+    add_proprietary = options.licenses.add_proprietary
+    patterns = [
+        (item.field.strip(), item.pattern.strip())
+        for item in options.licenses.add_patterns
+        if item.field.strip() and item.pattern.strip()
+    ]
 
     def apply(component: dict) -> None:
         if filter_non_proprietary:
             counts["licenses.filter_non_proprietary"] = (
                 counts.get("licenses.filter_non_proprietary", 0)
                 + _filter_non_proprietary_licenses(component)
+            )
+        if add_proprietary:
+            counts["licenses.add_proprietary"] = (
+                counts.get("licenses.add_proprietary", 0)
+                + _add_proprietary_license(component, patterns)
             )
 
     _walk_components(data, apply)

@@ -2080,3 +2080,109 @@ def test_filter_non_proprietary_does_not_touch_metadata_component():
         {"license": {"id": "MIT"}}
     ]
     assert _stat(result, "licenses.filter_non_proprietary").count == 0
+
+
+def test_add_proprietary_matches_any_pattern_by_substring():
+    data = {
+        "components": [
+            {"name": "vendor-lib", "licenses": [{"license": {"id": "MIT"}}]},
+            {"name": "other"},
+        ]
+    }
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[
+            {"field": "name", "pattern": "vendor"},
+            {"field": "version", "pattern": "9.9"},
+        ],
+    )
+    result = fix_sbom(data, options)
+    components = result.fixed_sbom["components"]
+    assert components[0]["licenses"] == [
+        {"license": {"id": "MIT"}},
+        {"license": {"name": "Proprietary"}},
+    ]
+    assert "licenses" not in components[1]
+    assert _stat(result, "licenses.add_proprietary").count == 1
+
+
+def test_add_proprietary_skips_missing_and_null_fields():
+    data = {"components": [{"name": "no"}, {"name": "lib", "scope": None}]}
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[
+            {"field": "scope", "pattern": "no"},
+            {"field": "author", "pattern": "no"},
+        ],
+    )
+    result = fix_sbom(data, options)
+    assert "licenses" not in result.fixed_sbom["components"][0]
+    assert "licenses" not in result.fixed_sbom["components"][1]
+    assert _stat(result, "licenses.add_proprietary").count == 0
+
+
+def test_add_proprietary_ignores_blank_pairs():
+    data = {"components": [{"name": "lib"}]}
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[
+            {"field": "  ", "pattern": "lib"},
+            {"field": "name", "pattern": "   "},
+        ],
+    )
+    result = fix_sbom(data, options)
+    assert "licenses" not in result.fixed_sbom["components"][0]
+    assert _stat(result, "licenses.add_proprietary").count == 0
+
+
+def test_add_proprietary_creates_array_for_absent_and_null_licenses():
+    data = {"components": [{"name": "lib"}, {"name": "lib2", "licenses": None}]}
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[{"field": "name", "pattern": "lib"}],
+    )
+    result = fix_sbom(data, options)
+    for component in result.fixed_sbom["components"]:
+        assert component["licenses"] == [{"license": {"name": "Proprietary"}}]
+    assert _stat(result, "licenses.add_proprietary").count == 2
+
+
+def test_add_proprietary_does_not_duplicate_existing_entry():
+    data = {
+        "components": [
+            {
+                "name": "lib",
+                "licenses": [{"license": {"name": "Proprietary"}}],
+            }
+        ]
+    }
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[{"field": "name", "pattern": "lib"}],
+    )
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["components"][0]["licenses"] == [
+        {"license": {"name": "Proprietary"}}
+    ]
+    assert _stat(result, "licenses.add_proprietary").count == 0
+
+
+def test_add_proprietary_skips_non_list_licenses():
+    data = {"components": [{"name": "lib", "licenses": "MIT"}]}
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[{"field": "name", "pattern": "lib"}],
+    )
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["components"][0]["licenses"] == "MIT"
+    assert _stat(result, "licenses.add_proprietary").count == 0
+
+
+def test_add_proprietary_does_not_touch_metadata_component():
+    data = {"metadata": {"component": {"name": "vendor-app"}}}
+    options = _license_options(
+        add_proprietary=True,
+        add_patterns=[{"field": "name", "pattern": "vendor"}],
+    )
+    result = fix_sbom(data, options)
+    assert "licenses" not in result.fixed_sbom["metadata"]["component"]
