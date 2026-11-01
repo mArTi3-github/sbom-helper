@@ -286,10 +286,10 @@
             </thead>
             <tbody>
               <tr v-for="(issue, index) in result.issues" :key="index">
-                <td class="issue-code" :title="issueLabel(issue)">{{ issueLabel(issue) }}</td>
-                <td class="issue-path" :title="issue.path">{{ issue.path }}</td>
-                <td class="issue-component" :title="issue.component ?? ''">{{ issue.component ?? '' }}</td>
-                <td class="issue-details" :title="issueDetails(issue)">{{ issueDetails(issue) }}</td>
+                <td class="issue-code">{{ issueLabel(issue) }}</td>
+                <td class="issue-path">{{ issue.path }}</td>
+                <td class="issue-component">{{ issue.component ?? '' }}</td>
+                <td class="issue-details">{{ issueDetails(issue) }}</td>
               </tr>
             </tbody>
           </table>
@@ -848,34 +848,13 @@ h1 {
 
 .issues-table-wrapper {
   max-height: 24rem;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.issues-table {
-  table-layout: fixed;
-}
-
-.issues-table th,
 .issues-table td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.issue-code {
-  width: 30%;
-}
-
-.issue-path {
-  width: 25%;
-}
-
-.issue-component {
-  width: 15%;
-}
-
-.issue-details {
-  width: 30%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .no-issues-card {

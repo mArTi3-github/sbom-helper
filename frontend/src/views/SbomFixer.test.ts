@@ -630,9 +630,39 @@ describe('SbomFixer.vue', () => {
     expect(rows[0].text()).toContain('openssl')
     expect(rows[0].text()).toContain('GOST:attack_surface, GOST:security_function')
     expect(rows[0].findAll('td')[0].text()).toContain('GOST:attack_surface, GOST:security_function')
-    expect(rows[0].findAll('td')[0].attributes('title')).toBeTruthy()
+    expect(rows[0].findAll('td')[0].attributes('title')).toBeUndefined()
     expect(rows[1].text()).toContain('specVersion')
     expect(rows[1].text()).toContain('{"expected":"1.6 or 1.7"}')
+  })
+
+  it('renders long issue values in full without truncation attributes', async () => {
+    const longPath = '$.components[0].components[1].components[2].components[3]'
+    const longName = 'very-long-component-name-without-any-break-opportunities'
+    fixSbomMock.mockResolvedValueOnce({
+      ...issuesResponse,
+      issues: [
+        {
+          code: 'component.missing_name',
+          path: longPath,
+          component: longName,
+          details: { expected: 'a-very-long-value-that-must-remain-visible' },
+        },
+      ],
+    })
+    const wrapper = await mountFixer()
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+
+    const spoiler = wrapper.find('.issues-spoiler')
+    ;(spoiler.element as HTMLDetailsElement).open = true
+    await spoiler.trigger('toggle')
+    await wrapper.vm.$nextTick()
+
+    const cells = wrapper.findAll('.issues-table tbody tr td')
+    expect(cells[1].text()).toBe(longPath)
+    expect(cells[2].text()).toBe(longName)
+    expect(cells[3].text()).toBe('{"expected":"a-very-long-value-that-must-remain-visible"}')
   })
 
   it('falls back to the bare issue code when no translation exists', async () => {
