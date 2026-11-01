@@ -460,12 +460,45 @@ describe('SbomFixer.vue', () => {
   it('disables the pattern editor while the add rule is off', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('[data-pattern-field]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-pattern-value]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-action="remove-pattern"]').attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-action="add-pattern"]').attributes('disabled')).toBeDefined()
     await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
     expect(wrapper.find('[data-pattern-field]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-pattern-value]').attributes('disabled')).toBeUndefined()
     expect(wrapper.find('[data-action="remove-pattern"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.find('[data-action="add-pattern"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps pattern row values when the add rule is turned off', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
+    await wrapper.find('[data-pattern-field]').setValue('name')
+    await wrapper.find('[data-pattern-value]').setValue('vendor')
+    await wrapper.find(rule('licenses.add_proprietary')).setValue(false)
+    expect((wrapper.find('[data-pattern-field]').element as HTMLInputElement).value).toBe('name')
+    expect((wrapper.find('[data-pattern-value]').element as HTMLInputElement).value).toBe('vendor')
+  })
+
+  it('drops patterns with an empty pattern during normalization', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        licenses: {
+          ...cloneOptions().licenses,
+          add_proprietary: true,
+          add_patterns: [
+            { field: 'name', pattern: '' },
+            { field: 'name', pattern: 'vendor' },
+          ],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.licenses.add_patterns).toEqual([{ field: 'name', pattern: 'vendor' }])
   })
 
   it('saves normalized non-empty patterns', async () => {

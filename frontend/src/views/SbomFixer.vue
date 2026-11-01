@@ -428,6 +428,12 @@ function defaultFixOptions(): SbomFixOptions {
 
 const options = reactive<SbomFixOptions>(defaultFixOptions())
 
+function emptyPatternRow(): IgnorePatternItem {
+  return { field: '', pattern: '' }
+}
+
+const patternRows = ref<IgnorePatternItem[]>([emptyPatternRow()])
+
 function applyOptions(next: SbomFixOptions): void {
   options.reorder = next.reorder
   options.set_spec_version = next.set_spec_version
@@ -446,17 +452,15 @@ function applyOptions(next: SbomFixOptions): void {
   options.optional_fields = { ...options.optional_fields, ...(next.optional_fields ?? {}) }
   const patterns = next.licenses.add_patterns ?? []
   patternRows.value =
-    patterns.length > 0 ? [...patterns] : [{ field: '', pattern: '' }]
+    patterns.length > 0 ? patterns.map((row) => ({ ...row })) : [emptyPatternRow()]
 }
 
 function plainOptions(): SbomFixOptions {
   return JSON.parse(JSON.stringify(options)) as SbomFixOptions
 }
 
-const patternRows = ref<IgnorePatternItem[]>([{ field: '', pattern: '' }])
-
 function addPatternRow(): void {
-  patternRows.value.push({ field: '', pattern: '' })
+  patternRows.value.push(emptyPatternRow())
 }
 
 function removePatternRow(index: number): void {
@@ -636,7 +640,7 @@ watch(
 function restoreDefaults(): void {
   const keep = fieldCatalog.value?.default_keep ?? options.optional_fields.keep
   applyOptions(defaultFixOptions())
-  patternRows.value = [{ field: '', pattern: '' }]
+  patternRows.value = [emptyPatternRow()]
   options.optional_fields.keep = keep
   saveStatus.value = 'idle'
   saveError.value = null
@@ -912,6 +916,11 @@ h1 {
 
 .btn-delete:hover {
   background: var(--color-delete-bg-hover);
+}
+
+.btn-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-small {
