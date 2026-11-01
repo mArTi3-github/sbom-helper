@@ -8,7 +8,6 @@ from purl_resolver.sbom.fixer import (
     RULE_IDS,
     FixIssue,
     LicensePatternItem,
-    LicensesFixOptions,
     OptionalFieldsFixOptions,
     SbomFixOptions,
     _collect_component_issues,
