@@ -423,6 +423,101 @@ describe('SbomFixer.vue', () => {
     expect(saved.licenses.add_patterns).toEqual([{ field: 'name', pattern: 'vendor' }])
   })
 
+  it('shows one empty pattern row when no patterns are saved', async () => {
+    const wrapper = await mountFixer()
+    const rows = wrapper.findAll('[data-group="licenses"] [data-pattern-row]')
+    expect(rows).toHaveLength(1)
+    expect((rows[0].find('[data-pattern-field]').element as HTMLInputElement).value).toBe('')
+    expect((rows[0].find('[data-pattern-value]').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('fills pattern rows from the loaded options', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        licenses: {
+          ...cloneOptions().licenses,
+          add_patterns: [{ field: 'name', pattern: 'vendor' }],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    const rows = wrapper.findAll('[data-group="licenses"] [data-pattern-row]')
+    expect(rows).toHaveLength(1)
+    expect((rows[0].find('[data-pattern-field]').element as HTMLInputElement).value).toBe('name')
+    expect((rows[0].find('[data-pattern-value]').element as HTMLInputElement).value).toBe('vendor')
+  })
+
+  it('adds and removes pattern rows', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-action="add-pattern"]').trigger('click')
+    expect(wrapper.findAll('[data-group="licenses"] [data-pattern-row]')).toHaveLength(2)
+    await wrapper.findAll('[data-action="remove-pattern"]')[1].trigger('click')
+    expect(wrapper.findAll('[data-group="licenses"] [data-pattern-row]')).toHaveLength(1)
+  })
+
+  it('disables the pattern editor while the add rule is off', async () => {
+    const wrapper = await mountFixer()
+    expect(wrapper.find('[data-pattern-field]').attributes('disabled')).toBeDefined()
+    await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
+    expect(wrapper.find('[data-pattern-field]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('saves normalized non-empty patterns', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        licenses: {
+          ...cloneOptions().licenses,
+          add_proprietary: true,
+          add_patterns: [
+            { field: ' name ', pattern: ' vendor ' },
+            { field: '', pattern: 'ignored' },
+          ],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.licenses.add_patterns).toEqual([{ field: 'name', pattern: 'vendor' }])
+  })
+
+  it('sends normalized patterns with the fix request', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
+    await wrapper.find('[data-pattern-field]').setValue(' name ')
+    await wrapper.find('[data-pattern-value]').setValue(' vendor ')
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+    const sentOptions = fixSbomMock.mock.calls[0][1] as SbomFixOptions
+    expect(sentOptions.licenses.add_patterns).toEqual([{ field: 'name', pattern: 'vendor' }])
+  })
+
+  it('restores defaults for the licenses card', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        licenses: {
+          filter_non_proprietary: true,
+          add_proprietary: true,
+          remove_proprietary_source_references: true,
+          add_patterns: [{ field: 'name', pattern: 'vendor' }],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    await wrapper.find('.reset-defaults').trigger('click')
+    for (const id of LICENSES_RULES.map((rule) => rule.id)) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(false)
+    }
+    const rows = wrapper.findAll('[data-group="licenses"] [data-pattern-row]')
+    expect(rows).toHaveLength(1)
+    expect((rows[0].find('[data-pattern-field]').element as HTMLInputElement).value).toBe('')
+  })
+
   it('restores defaults without saving them', async () => {
     const wrapper = await mountFixer()
 

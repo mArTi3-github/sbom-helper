@@ -167,6 +167,15 @@
               @close="openHelpId = null"
             />
           </div>
+          <div class="pattern-rows">
+            <div v-for="(row, idx) in patternRows" :key="idx" class="pattern-row" data-pattern-row>
+              <input v-model="row.field" type="text" class="pattern-input" data-pattern-field :placeholder="t('sbomFixer.licenses.fieldPlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.fieldPlaceholder')" />
+              <span class="pattern-label">{{ t('sbomFixer.licenses.contains') }}</span>
+              <input v-model="row.pattern" type="text" class="pattern-input" data-pattern-value :placeholder="t('sbomFixer.licenses.valuePlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.valuePlaceholder')" />
+              <button type="button" class="btn-delete" data-action="remove-pattern" :aria-label="t('sbomFixer.licenses.removeRow')" @click="removePatternRow(idx)">✕</button>
+            </div>
+            <button type="button" class="btn btn-small" data-action="add-pattern" @click="addPatternRow">{{ t('sbomFixer.licenses.addRow') }}</button>
+          </div>
         </div>
       </div>
 
@@ -361,6 +370,7 @@ import { downloadJson } from '../composables/useDownload'
 import type {
   FieldCatalogResponse,
   FstecField,
+  IgnorePatternItem,
   OptionalFieldInfo,
   SbomFixIssue,
   SbomFixOptions,
@@ -434,10 +444,35 @@ function applyOptions(next: SbomFixOptions): void {
     add_patterns: [...(next.licenses.add_patterns ?? [])],
   }
   options.optional_fields = { ...options.optional_fields, ...(next.optional_fields ?? {}) }
+  const patterns = next.licenses.add_patterns ?? []
+  patternRows.value =
+    patterns.length > 0 ? [...patterns] : [{ field: '', pattern: '' }]
 }
 
 function plainOptions(): SbomFixOptions {
   return JSON.parse(JSON.stringify(options)) as SbomFixOptions
+}
+
+const patternRows = ref<IgnorePatternItem[]>([{ field: '', pattern: '' }])
+
+function addPatternRow(): void {
+  patternRows.value.push({ field: '', pattern: '' })
+}
+
+function removePatternRow(index: number): void {
+  patternRows.value.splice(index, 1)
+}
+
+function normalizedPatterns(): IgnorePatternItem[] {
+  return patternRows.value
+    .map((row) => ({ field: row.field.trim(), pattern: row.pattern.trim() }))
+    .filter((row) => row.field !== '' && row.pattern !== '')
+}
+
+function withNormalizedPatterns(): SbomFixOptions {
+  const next = plainOptions()
+  next.licenses.add_patterns = normalizedPatterns()
+  return next
 }
 
 const openHelpId = ref<string | null>(null)
@@ -601,6 +636,7 @@ watch(
 function restoreDefaults(): void {
   const keep = fieldCatalog.value?.default_keep ?? options.optional_fields.keep
   applyOptions(defaultFixOptions())
+  patternRows.value = [{ field: '', pattern: '' }]
   options.optional_fields.keep = keep
   saveStatus.value = 'idle'
   saveError.value = null
@@ -621,7 +657,7 @@ async function handleSave(): Promise<void> {
   saveError.value = null
   changedWhileSaving = false
   try {
-    await saveFixOptions(plainOptions())
+    await saveFixOptions(withNormalizedPatterns())
     saveStatus.value = changedWhileSaving ? 'idle' : 'saved'
   } catch (e: unknown) {
     saveError.value = describeError(e)
@@ -657,7 +693,7 @@ async function handleFix(): Promise<void> {
   loading.value = true
 
   try {
-    result.value = await fixSbom(selectedFile.value, plainOptions(), [...selectedRemoveFields.value])
+    result.value = await fixSbom(selectedFile.value, withNormalizedPatterns(), [...selectedRemoveFields.value])
     statsOpen.value = true
     issuesOpen.value = false
   } catch (e: unknown) {
@@ -818,6 +854,64 @@ h1 {
 
 .manufacturer-input {
   width: 12rem;
+}
+
+.pattern-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-left: 1.5rem;
+}
+
+.pattern-rows > .btn {
+  align-self: flex-start;
+}
+
+.pattern-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pattern-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--border-radius);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.pattern-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.pattern-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pattern-label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.btn-delete {
+  background: none;
+  border: 1px solid var(--color-delete-border);
+  color: var(--color-error);
+  border-radius: var(--border-radius);
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.btn-delete:hover {
+  background: var(--color-delete-bg-hover);
 }
 
 .btn-small {
