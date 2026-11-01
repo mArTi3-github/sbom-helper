@@ -605,6 +605,19 @@ describe('SbomFixer.vue', () => {
     expect(wrapper.find('.save-status').text()).not.toContain('Saved')
   })
 
+  it('clears the Saved status when a pattern row changes', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
+
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).toContain('Saved')
+
+    await wrapper.find('[data-pattern-field]').setValue('name')
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).not.toContain('Saved')
+  })
+
   it('shows a save failure in save-status, not in the error block', async () => {
     saveFixOptionsMock.mockRejectedValueOnce(new ApiError(500, 'options_save_failed'))
     const wrapper = await mountFixer()

@@ -144,38 +144,35 @@
           </div>
         </div>
         <div class="group-options">
-          <div
-            v-for="rule in LICENSES_RULES"
-            :key="rule.id"
-            class="rule-row"
-            :data-rule-row="rule.id"
-          >
-            <label class="rule-label">
-              <input v-model="options.licenses[rule.key]" type="checkbox" :data-rule="rule.id" />
-              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
-            </label>
-            <RuleHelp
-              :rule-id="rule.id"
-              :description="t(`sbomFixer.help.${rule.id}`)"
-              :before="rule.example.before"
-              :after="rule.example.after"
-              :before-label="t('sbomFixer.exampleBefore')"
-              :after-label="t('sbomFixer.exampleAfter')"
-              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
-              :open="openHelpId === rule.id"
-              @toggle="toggleHelp(rule.id)"
-              @close="openHelpId = null"
-            />
-          </div>
-          <div class="pattern-rows">
-            <div v-for="(row, idx) in patternRows" :key="idx" class="pattern-row" data-pattern-row>
-              <input v-model="row.field" type="text" class="pattern-input" data-pattern-field :placeholder="t('sbomFixer.licenses.fieldPlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.fieldPlaceholder')" />
-              <span class="pattern-label">{{ t('sbomFixer.licenses.contains') }}</span>
-              <input v-model="row.pattern" type="text" class="pattern-input" data-pattern-value :placeholder="t('sbomFixer.licenses.valuePlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.valuePlaceholder')" />
-              <button type="button" class="btn-delete" data-action="remove-pattern" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.removeRow')" @click="removePatternRow(idx)">✕</button>
+          <template v-for="rule in LICENSES_RULES" :key="rule.id">
+            <div class="rule-row" :data-rule-row="rule.id">
+              <label class="rule-label">
+                <input v-model="options.licenses[rule.key]" type="checkbox" :data-rule="rule.id" />
+                <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+              </label>
+              <RuleHelp
+                :rule-id="rule.id"
+                :description="t(`sbomFixer.help.${rule.id}`)"
+                :before="rule.example.before"
+                :after="rule.example.after"
+                :before-label="t('sbomFixer.exampleBefore')"
+                :after-label="t('sbomFixer.exampleAfter')"
+                :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+                :open="openHelpId === rule.id"
+                @toggle="toggleHelp(rule.id)"
+                @close="openHelpId = null"
+              />
             </div>
-            <button type="button" class="btn btn-small" data-action="add-pattern" :disabled="!options.licenses.add_proprietary" @click="addPatternRow">{{ t('sbomFixer.licenses.addRow') }}</button>
-          </div>
+            <div v-if="rule.key === 'add_proprietary'" class="pattern-rows">
+              <div v-for="(row, idx) in patternRows" :key="idx" class="pattern-row" data-pattern-row>
+                <input v-model="row.field" type="text" class="pattern-input" data-pattern-field :placeholder="t('sbomFixer.licenses.fieldPlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.fieldPlaceholder')" />
+                <span class="pattern-label">{{ t('sbomFixer.licenses.contains') }}</span>
+                <input v-model="row.pattern" type="text" class="pattern-input" data-pattern-value :placeholder="t('sbomFixer.licenses.valuePlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.valuePlaceholder')" />
+                <button type="button" class="btn-delete" data-action="remove-pattern" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.removeRow')" @click="removePatternRow(idx)">✕</button>
+              </div>
+              <button type="button" class="btn btn-small" data-action="add-pattern" :disabled="!options.licenses.add_proprietary" @click="addPatternRow">{{ t('sbomFixer.licenses.addRow') }}</button>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -637,6 +634,19 @@ watch(
   { deep: true },
 )
 
+watch(
+  patternRows,
+  () => {
+    if (saveStatus.value === 'saving') {
+      changedWhileSaving = true
+    } else {
+      saveStatus.value = 'idle'
+      saveError.value = null
+    }
+  },
+  { deep: true },
+)
+
 function restoreDefaults(): void {
   const keep = fieldCatalog.value?.default_keep ?? options.optional_fields.keep
   applyOptions(defaultFixOptions())
@@ -914,7 +924,7 @@ h1 {
   line-height: 1;
 }
 
-.btn-delete:hover {
+.btn-delete:hover:not(:disabled) {
   background: var(--color-delete-bg-hover);
 }
 

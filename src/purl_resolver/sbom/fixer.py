@@ -315,17 +315,8 @@ def _is_source_reference_exempt(component: dict) -> bool:
             ):
                 return True
 
-    licenses = component.get("licenses")
-    if isinstance(licenses, list):
-        for entry in licenses:
-            if not isinstance(entry, dict):
-                continue
-            license_info = entry.get("license")
-            if (
-                isinstance(license_info, dict)
-                and license_info.get("name") == "Proprietary"
-            ):
-                return True
+    if _has_proprietary_license(component):
+        return True
 
     return False
 
@@ -664,11 +655,17 @@ def _apply_licenses_rules(
     filter_non_proprietary = options.licenses.filter_non_proprietary
     add_proprietary = options.licenses.add_proprietary
     remove_source_references = options.licenses.remove_proprietary_source_references
-    patterns = [
-        (item.field.strip(), item.pattern.strip())
-        for item in options.licenses.add_patterns
-        if item.field.strip() and item.pattern.strip()
-    ]
+    if not (filter_non_proprietary or add_proprietary or remove_source_references):
+        return
+    patterns = (
+        [
+            (item.field.strip(), item.pattern.strip())
+            for item in options.licenses.add_patterns
+            if item.field.strip() and item.pattern.strip()
+        ]
+        if add_proprietary
+        else []
+    )
 
     def apply(component: dict) -> None:
         if filter_non_proprietary:
