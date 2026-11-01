@@ -380,3 +380,24 @@ def test_save_options_rejects_non_list_patterns(client):
     )
     assert response.status_code == 400
     assert response.json()["error"] == "invalid_options"
+
+
+def test_fix_endpoint_applies_license_options(client):
+    sbom = make_sbom()
+    sbom["components"][0]["name"] = "vendor-lib"
+    options = {
+        "licenses": {
+            "add_proprietary": True,
+            "add_patterns": [{"field": "name", "pattern": "vendor"}],
+        }
+    }
+    response = upload_fix(client, sbom, options=options)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fixed_sbom"]["components"][0]["licenses"] == [
+        {"license": {"name": "Proprietary"}}
+    ]
+    stat = next(
+        stat for stat in body["stats"] if stat["rule_id"] == "licenses.add_proprietary"
+    )
+    assert stat["count"] == 1

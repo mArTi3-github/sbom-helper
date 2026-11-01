@@ -599,6 +599,26 @@ def _add_proprietary_license(
     return 1
 
 
+def _remove_proprietary_source_references(component: dict) -> int:
+    if not _has_proprietary_license(component):
+        return 0
+    references = component.get("externalReferences")
+    if not isinstance(references, list):
+        return 0
+    kept = [
+        reference
+        for reference in references
+        if not (
+            isinstance(reference, dict)
+            and reference.get("type") in ALLOWED_EXTERNAL_REFERENCE_TYPES
+        )
+    ]
+    removed = len(references) - len(kept)
+    if removed:
+        component["externalReferences"] = kept
+    return removed
+
+
 def _apply_components_rules(
     data: dict,
     options: SbomFixOptions,
@@ -643,6 +663,7 @@ def _apply_licenses_rules(
 ) -> None:
     filter_non_proprietary = options.licenses.filter_non_proprietary
     add_proprietary = options.licenses.add_proprietary
+    remove_source_references = options.licenses.remove_proprietary_source_references
     patterns = [
         (item.field.strip(), item.pattern.strip())
         for item in options.licenses.add_patterns
@@ -659,6 +680,11 @@ def _apply_licenses_rules(
             counts["licenses.add_proprietary"] = (
                 counts.get("licenses.add_proprietary", 0)
                 + _add_proprietary_license(component, patterns)
+            )
+        if remove_source_references:
+            counts["licenses.remove_proprietary_source_references"] = (
+                counts.get("licenses.remove_proprietary_source_references", 0)
+                + _remove_proprietary_source_references(component)
             )
 
     _walk_components(data, apply)

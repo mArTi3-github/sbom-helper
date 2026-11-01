@@ -2186,3 +2186,115 @@ def test_add_proprietary_does_not_touch_metadata_component():
     )
     result = fix_sbom(data, options)
     assert "licenses" not in result.fixed_sbom["metadata"]["component"]
+
+
+def test_remove_proprietary_source_references_keeps_other_types():
+    data = {
+        "components": [
+            {
+                "name": "lib",
+                "licenses": [{"license": {"name": "Proprietary"}}],
+                "externalReferences": [
+                    {"type": "vcs", "url": "https://example.com/repo"},
+                    {"type": "website", "url": "https://example.com"},
+                    {"type": "source-distribution", "url": "https://example.com/archive"},
+                ],
+            }
+        ]
+    }
+    options = _license_options(remove_proprietary_source_references=True)
+    result = fix_sbom(data, options)
+    component = result.fixed_sbom["components"][0]
+    assert component["externalReferences"] == [
+        {"type": "website", "url": "https://example.com"}
+    ]
+    assert _stat(result, "licenses.remove_proprietary_source_references").count == 2
+
+
+def test_remove_proprietary_source_references_keeps_emptied_array():
+    data = {
+        "components": [
+            {
+                "name": "lib",
+                "licenses": [{"license": {"name": "Proprietary"}}],
+                "externalReferences": [
+                    {"type": "vcs", "url": "https://example.com/repo"}
+                ],
+            }
+        ]
+    }
+    options = _license_options(remove_proprietary_source_references=True)
+    result = fix_sbom(data, options)
+    component = result.fixed_sbom["components"][0]
+    assert component["externalReferences"] == []
+
+
+def test_remove_proprietary_source_references_skips_non_proprietary():
+    data = {
+        "components": [
+            {
+                "name": "lib",
+                "licenses": [{"license": {"id": "MIT"}}],
+                "externalReferences": [
+                    {"type": "vcs", "url": "https://example.com/repo"}
+                ],
+            }
+        ]
+    }
+    options = _license_options(remove_proprietary_source_references=True)
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["components"][0]["externalReferences"] == [
+        {"type": "vcs", "url": "https://example.com/repo"}
+    ]
+    assert _stat(result, "licenses.remove_proprietary_source_references").count == 0
+
+
+def test_add_proprietary_then_removes_source_references_and_exempts_issue():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {
+            "timestamp": "2026-01-01T00:00:00Z",
+            "component": {
+                "type": "application",
+                "name": "app",
+                "version": "1.0.0",
+                "manufacturer": {"name": "Example"},
+            },
+        },
+        "components": [
+            {
+                "type": "library",
+                "name": "vendor-lib",
+                "version": "1.0.0",
+                "purl": "pkg:pypi/vendor-lib@1.0.0",
+                "properties": [
+                    {"name": "GOST:attack_surface", "value": "no"},
+                    {"name": "GOST:security_function", "value": "no"},
+                ],
+                "externalReferences": [
+                    {"type": "vcs", "url": "https://example.com/repo"}
+                ],
+            }
+        ],
+    }
+    options = SbomFixOptions(
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+        licenses={
+            "add_proprietary": True,
+            "remove_proprietary_source_references": True,
+            "add_patterns": [{"field": "name", "pattern": "vendor"}],
+        },
+    )
+    result = fix_sbom(data, options)
+    component = result.fixed_sbom["components"][0]
+    assert component["licenses"] == [{"license": {"name": "Proprietary"}}]
+    assert component["externalReferences"] == []
+    assert not any(
+        issue.code == "component.missing_source_reference" for issue in result.issues
+    )
