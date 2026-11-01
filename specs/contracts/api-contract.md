@@ -117,7 +117,7 @@ Serve the Fix SBOM web UI page (Vue SPA route).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, fix options in three sections (basic fixes, `components[]` edits, and optional-fields whitelist, the latter with its own analysis controls), master checkboxes for the basic and `components[]` sections, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
+Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, fix options in four sections (basic fixes, `components[]` edits, component license edits with an inline pattern editor, and optional-fields whitelist, the latter with its own analysis controls), master checkboxes for the basic, `components[]`, and license sections, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
 
 ---
 
@@ -130,7 +130,7 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
 `multipart/form-data`:
 
 - `file` — required CycloneDX JSON file. Maximum size: `sbom_settings.max_file_size` (environment `SBOM_MAX_FILE_SIZE`, default 200 MB).
-- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all static rules enabled except the opt-in `components.fill_missing_gost_properties`; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly. Unknown keys, including the former nested `root`, `metadata`, and `metadata.component` option objects and the former per-object `reorder` flags, are ignored by Pydantic; no migration is performed. In particular, a legacy saved `reorder: false` and other nested legacy keys are ignored, so the flat default `true` applies.
+- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all static rules enabled except the opt-in `components.fill_missing_gost_properties` and the three `licenses.*` rules; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `licenses.add_patterns: []`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly. Unknown keys, including the former nested `root`, `metadata`, and `metadata.component` option objects and the former per-object `reorder` flags, are ignored by Pydantic; no migration is performed. In particular, a legacy saved `reorder: false` and other nested legacy keys are ignored, so the flat default `true` applies. An absent `licenses` block is completed by Pydantic field defaults; `add_patterns` entries whose `field` or `pattern` is empty after trimming are ignored by the rules.
 - `remove_fields` — optional JSON string holding an array of path strings (e.g. `["root.dependencies", "components[].hashes"]`). Absent means an empty list. It is not persisted; the selection is per-request and derived from the analysis result. Non-list values or invalid JSON → `400 invalid_remove_fields`; strings outside the path grammar, list-1 paths, and list-2 (`keep`) paths are ignored silently.
 
 ```json
@@ -147,13 +147,21 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
     "filter_properties": true,
     "fill_missing_gost_properties": false
   },
+  "licenses": {
+    "filter_non_proprietary": false,
+    "add_proprietary": false,
+    "remove_proprietary_source_references": false,
+    "add_patterns": [
+      { "field": "name", "pattern": "vendor-lib" }
+    ]
+  },
   "optional_fields": {
     "keep": ["metadata.tools", "metadata.component.purl", "components[].group", "..."]
   }
 }
 ```
 
-`spec_version` must match `^\d+\.\d+$`; `manufacturer` is trimmed and must be a non-empty string.
+`spec_version` must match `^\d+\.\d+$`; `manufacturer` is trimmed and must be a non-empty string. `licenses.add_patterns` is a list of `{field, pattern}` objects; entries with a blank field or pattern are ignored when the rules run. A value of the wrong type for `add_patterns`, or a non-string `field`/`pattern` value, fails Pydantic validation and yields `400 invalid_options`.
 
 #### Success Response (200)
 
@@ -279,10 +287,10 @@ Return the saved default fix options.
 #### Response (200)
 
 ```json
-{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "optional_fields": { "keep": ["..."] } } }
+{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "licenses": { "filter_non_proprietary": false, "add_proprietary": false, "remove_proprietary_source_references": false, "add_patterns": [{ "field": "name", "pattern": "vendor-lib" }] }, "optional_fields": { "keep": ["..."] } } }
 ```
 
-Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning. The response includes `optional_fields.keep`.
+Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning. The response includes `optional_fields.keep` and the `licenses` block. An options file written by an earlier version has no `licenses` block and loads with all three flags `false` and an empty `add_patterns`.
 
 ---
 
@@ -293,7 +301,7 @@ Persist the fix options for future visits.
 #### Request
 
 ```json
-{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
+{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "licenses": { "filter_non_proprietary": false, "add_proprietary": false, "remove_proprietary_source_references": false, "add_patterns": [{ "field": "name", "pattern": "vendor-lib" }] }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
 ```
 
 #### Success Response (200)
@@ -308,7 +316,7 @@ Persist the fix options for future visits.
 { "error": "invalid_options", "detail": "..." }
 ```
 
-Returned for malformed JSON, a missing `options` key, or Pydantic validation failure. When `optional_fields.keep` is a list, it is validated strictly before model validation: any non-empty entry outside the path grammar or equal to a list-1 path yields `400 invalid_options` whose `detail` names the offending entries. (In `/fix` and on settings load, invalid `keep` entries are dropped tolerantly without error.)
+Returned for malformed JSON, a missing `options` key, or Pydantic validation failure. When `optional_fields.keep` is a list, it is validated strictly before model validation: any non-empty entry outside the path grammar or equal to a list-1 path yields `400 invalid_options` whose `detail` names the offending entries. (In `/fix` and on settings load, invalid `keep` entries are dropped tolerantly without error.) A `licenses.add_patterns` value that is not a list of objects, or an element whose `field` or `pattern` is not a string, fails model validation and yields `400 invalid_options` through the same path; an object element may omit either key (it defaults to an empty string) and entries with blank `field` or `pattern` are ignored by the rules.
 
 #### Error Response (500) — save failed
 
