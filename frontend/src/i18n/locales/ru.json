@@ -122,7 +122,7 @@
       "add_manufacturer": "Добавить $.metadata.component.manufacturer, если отсутствует",
       "components": {
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
-        "filter_properties": "Оставить только GOST-свойства",
+        "filter_properties": "Оставить только ГОСТ-свойства",
         "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
       }
     },
