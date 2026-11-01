@@ -95,10 +95,8 @@
     "fix": "Исправить",
     "processing": "Исправление SBOM...",
     "groups": {
-      "root": "Корневой объект",
-      "metadata": "metadata",
-      "components": "components",
-      "metadataComponent": "metadata.component"
+      "basic": "Базовые правки",
+      "components": "Правки массива components[]"
     },
     "selectAll": "Выбрать всё",
     "clearAll": "Снять всё",
@@ -117,21 +115,12 @@
     "download": "Скачать исправленный SBOM",
     "manufacturer": "Производитель",
     "rules": {
-      "root": {
-        "reorder": "Упорядочить поля корня",
-        "set_spec_version": "Установить specVersion",
-        "increment_version": "Увеличить version"
-      },
-      "metadata": {
-        "add_timestamp": "Добавить timestamp, если отсутствует",
-        "reorder": "Упорядочить поля metadata"
-      },
-      "metadata_component": {
-        "reorder": "Упорядочить поля metadata.component",
-        "add_manufacturer": "Добавить manufacturer, если отсутствует"
-      },
+      "reorder": "Упорядочить поля",
+      "set_spec_version": "Установить $.specVersion",
+      "increment_version": "Увеличить $.version",
+      "add_timestamp": "Добавить $.metadata.timestamp, если отсутствует",
+      "add_manufacturer": "Добавить $.metadata.component.manufacturer, если отсутствует",
       "components": {
-        "reorder": "Упорядочить поля компонентов",
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
         "filter_properties": "Оставить только GOST-свойства",
         "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
@@ -140,21 +129,12 @@
     "exampleBefore": "До",
     "exampleAfter": "После",
     "help": {
-      "root": {
-        "reorder": "Приводит ключи корневого объекта к порядку bomFormat, specVersion, serialNumber, version, metadata, components, annotations; остальные ключи остаются после них в исходном относительном порядке. Вложенные объекты не меняет.",
-        "set_spec_version": "Записывает в specVersion значение из поля «Версия спецификации» (по умолчанию 1.7), обрезая пробелы; если поля не было — добавляет его. Значение вне 1.6/1.7 установить можно, но итоговый документ получит несоответствие.",
-        "increment_version": "Увеличивает целочисленное поле version на 1. Если version отсутствует или не является целым числом, правило его не трогает и сообщает 0 изменений."
-      },
-      "metadata": {
-        "reorder": "Ставит timestamp и component в начало, остальные ключи metadata идут после них в исходном порядке. Содержимое не меняется.",
-        "add_timestamp": "Записывает metadata.timestamp с текущим временем UTC в формате YYYY-MM-DDTHH:MM:SSZ, только если поле отсутствует, равно null или пустой строке. Существующее непустое значение не перезаписывается."
-      },
-      "metadata_component": {
-        "reorder": "Ставит type, name, version, manufacturer, затем остальные ключи в исходном порядке.",
-        "add_manufacturer": "Считает manufacturer отсутствующим, если это не объект или его name не является непустой строкой, и записывает объект с единственным полем name, равным значению из поля «Производитель». Существующий корректный manufacturer не меняется. Поле supplier не читается и не изменяется."
-      },
+      "reorder": "Приводит ключи корневого объекта, metadata, metadata.component и каждого компонента дерева components[] к каноническому порядку. У корня: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. У metadata: timestamp, component. У metadata.component: type, name, version, manufacturer. У компонента: type, name, version, purl, externalReferences, properties, components. Остальные ключи сохраняют исходный относительный порядок; вложенные объекты внутри компонентов не упорядочиваются.",
+      "set_spec_version": "Записывает в specVersion значение из поля «Версия спецификации» (по умолчанию 1.7), обрезая пробелы; если поля не было — добавляет его. Значение вне 1.6/1.7 установить можно, но итоговый документ получит несоответствие.",
+      "increment_version": "Увеличивает целочисленное поле version на 1. Если version отсутствует или не является целым числом, правило его не трогает и сообщает 0 изменений.",
+      "add_timestamp": "Записывает metadata.timestamp с текущим временем UTC в формате YYYY-MM-DDTHH:MM:SSZ, только если поле отсутствует, равно null или пустой строке. Существующее непустое значение не перезаписывается.",
+      "add_manufacturer": "Считает manufacturer отсутствующим, если это не объект или его name не является непустой строкой, и записывает объект с единственным полем name, равным значению из поля «Производитель». Существующий корректный manufacturer не меняется. Поле supplier не читается и не изменяется.",
       "components": {
-        "reorder": "У каждого компонента ставит ключи в порядок type, name, version, purl, externalReferences, properties, components, затем остальные в исходном порядке. Применяется рекурсивно ко вложенным components. metadata.component не затрагивается.",
         "filter_external_references": "Оставляет в externalReferences только элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные типы (website, distribution, issue-tracker и т. п.) удаляются; если не осталось ничего, массив остаётся пустым. metadata.component не затрагивается.",
         "filter_properties": "Оставляет в properties только элементы, имя которых начинается ровно с GOST: (с учётом регистра). Остальные удаляются; пустой массив остаётся пустым. metadata.component не затрагивается.",
         "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается."

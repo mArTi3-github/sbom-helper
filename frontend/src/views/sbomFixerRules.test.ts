@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import ru from '../i18n/locales/ru.json'
 import en from '../i18n/locales/en.json'
-import {
-  ALL_FIX_RULES,
-  COMPONENTS_RULES,
-  METADATA_COMPONENT_RULES,
-  METADATA_RULES,
-  ROOT_RULES,
-} from './sbomFixerRules'
+import { ALL_FIX_RULES, BASE_RULES, COMPONENTS_RULES } from './sbomFixerRules'
 
 function lookup(messages: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((acc, part) => {
@@ -17,44 +11,43 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 }
 
 const GROUPS = [
-  { rules: ROOT_RULES, prefix: 'root.', size: 3 },
-  { rules: METADATA_RULES, prefix: 'metadata.', size: 2 },
-  { rules: METADATA_COMPONENT_RULES, prefix: 'metadata_component.', size: 2 },
-  { rules: COMPONENTS_RULES, prefix: 'components.', size: 4 },
+  { rules: BASE_RULES, prefix: '', size: 5 },
+  { rules: COMPONENTS_RULES, prefix: 'components.', size: 3 },
 ]
 
 describe('sbomFixerRules catalog', () => {
-  it('covers all 11 rules with unique ids', () => {
-    expect(ALL_FIX_RULES).toHaveLength(11)
-    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(11)
+  it('covers all 8 rules with unique ids', () => {
+    expect(ALL_FIX_RULES).toHaveLength(8)
+    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(8)
     for (const rule of ALL_FIX_RULES) {
       expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
     }
   })
 
-  it('replaces rename_supplier with add_manufacturer and drops removal rules', () => {
+  it('adds add_manufacturer and drops removal rules', () => {
     const ids = ALL_FIX_RULES.map((rule) => rule.id)
-    expect(ids).toContain('metadata_component.add_manufacturer')
+    expect(ids).toContain('add_manufacturer')
     for (const id of [
       'root.remove_dependencies', 'root.remove_services',
       'metadata.remove_properties', 'metadata.remove_tools',
       'metadata_component.remove_external_references', 'metadata_component.remove_purl',
       'metadata_component.remove_properties',
-      'metadata_component.remove_scope', 'metadata_component.rename_supplier',
+      'metadata_component.remove_scope',
       'components.remove_hashes', 'components.remove_scope',
     ]) {
       expect(ids).not.toContain(id)
     }
   })
 
-  it('keeps each group complete and starts it with the reorder rule', () => {
+  it('starts the base group with the merged reorder rule', () => {
+    expect(BASE_RULES[0].id).toBe('reorder')
     for (const group of GROUPS) {
       expect(group.rules).toHaveLength(group.size)
-      expect(group.rules[0].id).toBe(`${group.prefix}reorder`)
       for (const rule of group.rules) {
         expect(rule.id.startsWith(group.prefix), rule.id).toBe(true)
       }
     }
+    expect(COMPONENTS_RULES[0].id).toBe('components.filter_external_references')
   })
 
   it('provides valid JSON examples that actually differ', () => {

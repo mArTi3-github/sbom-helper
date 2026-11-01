@@ -192,27 +192,7 @@ export interface ImportResponse {
   errors: ImportErrorItem[]
 }
 
-export interface RootFixOptions {
-  reorder: boolean
-  set_spec_version: boolean
-  spec_version: string
-  increment_version: boolean
-}
-
-export interface MetadataComponentFixOptions {
-  reorder: boolean
-  add_manufacturer: boolean
-  manufacturer: string
-}
-
-export interface MetadataFixOptions {
-  add_timestamp: boolean
-  reorder: boolean
-  component: MetadataComponentFixOptions
-}
-
 export interface ComponentsFixOptions {
-  reorder: boolean
   filter_external_references: boolean
   filter_properties: boolean
   fill_missing_gost_properties: boolean
@@ -223,8 +203,13 @@ export interface OptionalFieldsFixOptions {
 }
 
 export interface SbomFixOptions {
-  root: RootFixOptions
-  metadata: MetadataFixOptions
+  reorder: boolean
+  set_spec_version: boolean
+  spec_version: string
+  increment_version: boolean
+  add_timestamp: boolean
+  add_manufacturer: boolean
+  manufacturer: string
   components: ComponentsFixOptions
   optional_fields: OptionalFieldsFixOptions
 }

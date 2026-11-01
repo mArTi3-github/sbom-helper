@@ -10,23 +10,14 @@ import { downloadJson } from '../composables/useDownload'
 import type { SbomFixOptions, SbomFixResponse, SettingsResponse } from '../types/api'
 
 const defaultOptions: SbomFixOptions = {
-  root: {
-    reorder: true,
-    set_spec_version: true,
-    spec_version: '1.7',
-    increment_version: true,
-  },
-  metadata: {
-    add_timestamp: true,
-    reorder: true,
-    component: {
-      reorder: true,
-      add_manufacturer: true,
-      manufacturer: 'Positive Technologies',
-    },
-  },
+  reorder: true,
+  set_spec_version: true,
+  spec_version: '1.7',
+  increment_version: true,
+  add_timestamp: true,
+  add_manufacturer: true,
+  manufacturer: 'Positive Technologies',
   components: {
-    reorder: true,
     filter_external_references: true,
     filter_properties: true,
     fill_missing_gost_properties: false,
@@ -78,7 +69,7 @@ const settingsResponse: SettingsResponse = {
 const changedResponse: SbomFixResponse = {
   changed: true,
   fixed_sbom: { bomFormat: 'CycloneDX' },
-  stats: [{ rule_id: 'root.reorder', count: 1 }],
+  stats: [{ rule_id: 'reorder', count: 1 }],
   issues: [],
 }
 
@@ -93,7 +84,7 @@ const statsResponse: SbomFixResponse = {
   changed: true,
   fixed_sbom: { bomFormat: 'CycloneDX' },
   stats: [
-    { rule_id: 'root.reorder', count: 2 },
+    { rule_id: 'reorder', count: 2 },
     { rule_id: 'components.filter_properties', count: 0 },
   ],
   issues: [],
@@ -109,7 +100,7 @@ const statsWithFieldResponse: SbomFixResponse = {
 const issuesResponse: SbomFixResponse = {
   changed: true,
   fixed_sbom: { bomFormat: 'CycloneDX' },
-  stats: [{ rule_id: 'root.reorder', count: 2 }],
+  stats: [{ rule_id: 'reorder', count: 2 }],
   issues: [
     {
       code: 'component.missing_gost_properties',
@@ -204,7 +195,7 @@ describe('SbomFixer.vue', () => {
   it('renders help for every rule and no warning banner', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('.warning-banner').exists()).toBe(false)
-    expect(wrapper.findAll('.rule-help-button')).toHaveLength(11)
+    expect(wrapper.findAll('.rule-help-button')).toHaveLength(8)
     for (const rule of ALL_FIX_RULES) {
       expect(wrapper.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
     }
@@ -221,22 +212,22 @@ describe('SbomFixer.vue', () => {
 
   it('closes the same help on a second click and keeps only one panel open', async () => {
     const wrapper = await mountFixer()
-    const first = wrapper.find('[data-help-for="root.reorder"]')
+    const first = wrapper.find('[data-help-for="reorder"]')
     await first.trigger('click')
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(1)
 
-    await wrapper.find('[data-help-for="root.increment_version"]').trigger('click')
+    await wrapper.find('[data-help-for="increment_version"]').trigger('click')
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(1)
-    expect(wrapper.find('[data-rule-row="root.increment_version"] .rule-help-panel').exists()).toBe(true)
+    expect(wrapper.find('[data-rule-row="increment_version"] .rule-help-panel').exists()).toBe(true)
 
-    await wrapper.find('[data-help-for="root.increment_version"]').trigger('click')
+    await wrapper.find('[data-help-for="increment_version"]').trigger('click')
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(0)
   })
 
   it('closes help on Escape', async () => {
     const wrapper = await mountFixer()
-    await wrapper.find('[data-help-for="root.reorder"]').trigger('click')
-    await wrapper.find('[data-rule-row="root.reorder"] .rule-help').trigger('keydown', { key: 'Escape' })
+    await wrapper.find('[data-help-for="reorder"]').trigger('click')
+    await wrapper.find('[data-rule-row="reorder"] .rule-help').trigger('keydown', { key: 'Escape' })
     expect(wrapper.findAll('.rule-help-panel')).toHaveLength(0)
   })
 
@@ -250,7 +241,7 @@ describe('SbomFixer.vue', () => {
 
   it('does not toggle the spec version rule when the text input is clicked', async () => {
     const wrapper = await mountFixer()
-    const checkbox = wrapper.find(rule('root.set_spec_version'))
+    const checkbox = wrapper.find(rule('set_spec_version'))
     expect((checkbox.element as HTMLInputElement).checked).toBe(true)
     await wrapper.find('.spec-version-input').trigger('click')
     expect((checkbox.element as HTMLInputElement).checked).toBe(true)
@@ -264,14 +255,15 @@ describe('SbomFixer.vue', () => {
     expect(saveFixOptionsMock).toHaveBeenCalledTimes(1)
     const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
     expect(saved.components.fill_missing_gost_properties).toBe(true)
-    expect(saved.root.reorder).toBe(true)
+    expect(saved.reorder).toBe(true)
   })
 
   it('loads options and settings on mount and fills the form', async () => {
     getFixOptionsMock.mockResolvedValue({
       options: {
         ...cloneOptions(),
-        root: { ...cloneOptions().root, spec_version: '1.6', increment_version: false },
+        spec_version: '1.6',
+        increment_version: false,
       },
     })
     const wrapper = await mountFixer()
@@ -279,8 +271,8 @@ describe('SbomFixer.vue', () => {
     expect(getFixOptionsMock).toHaveBeenCalledTimes(1)
     expect(getSettingsMock).toHaveBeenCalledTimes(1)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).value).toBe('1.6')
-    expect((wrapper.find(rule('root.increment_version')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('increment_version')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
   })
 
   it('falls back to defaults with a warning when options fail to load', async () => {
@@ -289,7 +281,7 @@ describe('SbomFixer.vue', () => {
 
     expect(wrapper.find('.options-warning').exists()).toBe(true)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).value).toBe('1.7')
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
     expect(wrapper.find('.fix-button').exists()).toBe(true)
   })
 
@@ -301,107 +293,84 @@ describe('SbomFixer.vue', () => {
     expect(useSettingsStore().jsonIndent).toBe(4)
   })
 
-  it('root master toggles every root option', async () => {
+  it('basic master toggles every base option', async () => {
     const wrapper = await mountFixer()
-    const master = masterFor(wrapper, 'root')
+    const master = masterFor(wrapper, 'basic')
 
     await master.setValue(false)
     for (const id of [
-      'root.reorder',
-      'root.set_spec_version',
-      'root.increment_version',
+      'reorder',
+      'set_spec_version',
+      'increment_version',
+      'add_timestamp',
+      'add_manufacturer',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(false)
     }
 
     await master.setValue(true)
     for (const id of [
-      'root.reorder',
-      'root.set_spec_version',
-      'root.increment_version',
+      'reorder',
+      'set_spec_version',
+      'increment_version',
+      'add_timestamp',
+      'add_manufacturer',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(true)
     }
   })
 
-  it('metadata master also toggles metadata.component options', async () => {
-    const wrapper = await mountFixer()
-    const master = masterFor(wrapper, 'metadata')
-
-    await master.setValue(true)
-    for (const id of [
-      'metadata.add_timestamp',
-      'metadata.reorder',
-      'metadata_component.reorder',
-      'metadata_component.add_manufacturer',
-    ]) {
-      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(true)
-    }
-
-    await master.setValue(false)
-    for (const id of [
-      'metadata.add_timestamp',
-      'metadata.reorder',
-      'metadata_component.reorder',
-      'metadata_component.add_manufacturer',
-    ]) {
-      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(false)
-    }
-  })
-
-  it('metadata-component master does not change metadata options', async () => {
-    const wrapper = await mountFixer()
-    const subMaster = masterFor(wrapper, 'metadata-component')
-
-    await subMaster.setValue(true)
-    await subMaster.setValue(false)
-
-    expect((wrapper.find(rule('metadata.reorder')).element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.find(rule('metadata.add_timestamp')).element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.find(rule('metadata_component.reorder')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(false)
-  })
-
   it('marks partially selected masters as indeterminate', async () => {
     const wrapper = await mountFixer()
 
-    expect((masterFor(wrapper, 'root').element as HTMLInputElement).indeterminate).toBe(false)
-    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(false)
+    expect((masterFor(wrapper, 'basic').element as HTMLInputElement).indeterminate).toBe(false)
     expect((masterFor(wrapper, 'components').element as HTMLInputElement).indeterminate).toBe(true)
 
-    await wrapper.find(rule('metadata_component.add_manufacturer')).setValue(false)
-    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).indeterminate).toBe(true)
-    expect((masterFor(wrapper, 'metadata').element as HTMLInputElement).checked).toBe(false)
+    await wrapper.find(rule('add_manufacturer')).setValue(false)
+    expect((masterFor(wrapper, 'basic').element as HTMLInputElement).indeterminate).toBe(true)
+    expect((masterFor(wrapper, 'basic').element as HTMLInputElement).checked).toBe(false)
   })
 
   it('select all and clear all operate within their own group', async () => {
     const wrapper = await mountFixer()
 
-    await wrapper.find('.group-card[data-group="root"] .clear-all').trigger('click')
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('components.reorder')).element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find('.group-card[data-group="basic"] .clear-all').trigger('click')
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('components.filter_properties')).element as HTMLInputElement).checked).toBe(true)
 
-    await wrapper.find('.group-card[data-group="root"] .select-all').trigger('click')
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find('.group-card[data-group="basic"] .select-all').trigger('click')
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
 
-    await wrapper.find('[data-group="metadata-component"] .clear-all').trigger('click')
-    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('metadata.reorder')).element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find('.group-card[data-group="components"] .clear-all').trigger('click')
+    for (const id of [
+      'components.filter_external_references',
+      'components.filter_properties',
+      'components.fill_missing_gost_properties',
+    ]) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(false)
+    }
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
 
-    await wrapper.find('[data-group="metadata-component"] .select-all').trigger('click')
-    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(true)
+    await wrapper.find('.group-card[data-group="components"] .select-all').trigger('click')
+    for (const id of [
+      'components.filter_external_references',
+      'components.filter_properties',
+      'components.fill_missing_gost_properties',
+    ]) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(true)
+    }
   })
 
   it('restores defaults without saving them', async () => {
     const wrapper = await mountFixer()
 
-    await wrapper.find('.group-card[data-group="root"] .clear-all').trigger('click')
+    await wrapper.find('.group-card[data-group="basic"] .clear-all').trigger('click')
     await wrapper.find('.spec-version-input').setValue('1.6')
     await wrapper.find('.reset-defaults').trigger('click')
 
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find(rule('components.fill_missing_gost_properties')).element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.find(rule('metadata_component.add_manufacturer')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('add_manufacturer')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).value).toBe('1.7')
     expect(saveFixOptionsMock).not.toHaveBeenCalled()
   })
@@ -429,7 +398,7 @@ describe('SbomFixer.vue', () => {
     await flushPromises()
     expect(wrapper.find('.save-status').text()).toContain('Saved')
 
-    await wrapper.find(rule('root.reorder')).setValue(false)
+    await wrapper.find(rule('reorder')).setValue(false)
     await flushPromises()
     expect(wrapper.find('.save-status').text()).not.toContain('Saved')
 
@@ -468,7 +437,7 @@ describe('SbomFixer.vue', () => {
     const wrapper = await mountFixer()
 
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).disabled).toBe(false)
-    await wrapper.find(rule('root.set_spec_version')).setValue(false)
+    await wrapper.find(rule('set_spec_version')).setValue(false)
     expect((wrapper.find('.spec-version-input').element as HTMLInputElement).disabled).toBe(true)
   })
 
@@ -480,14 +449,14 @@ describe('SbomFixer.vue', () => {
     expect((input().element as HTMLInputElement).disabled).toBe(false)
 
     await input().setValue('ООО Ромашка')
-    await wrapper.find(rule('metadata_component.add_manufacturer')).setValue(false)
+    await wrapper.find(rule('add_manufacturer')).setValue(false)
     expect((input().element as HTMLInputElement).disabled).toBe(true)
 
     await wrapper.find('.save-settings').trigger('click')
     await flushPromises()
 
     const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
-    expect(saved.metadata.component.manufacturer).toBe('ООО Ромашка')
+    expect(saved.manufacturer).toBe('ООО Ромашка')
   })
 
   it('disables the fix button until a file is selected', async () => {
@@ -576,11 +545,11 @@ describe('SbomFixer.vue', () => {
     await flushPromises()
     expect(wrapper.find('.status-card').exists()).toBe(true)
 
-    await wrapper.find(rule('root.reorder')).setValue(false)
+    await wrapper.find(rule('reorder')).setValue(false)
     await selectFile(wrapper, 'other.json')
 
     expect(wrapper.find('.status-card').exists()).toBe(false)
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(false)
   })
 
   it('clears an error when a new file is selected', async () => {
@@ -611,7 +580,7 @@ describe('SbomFixer.vue', () => {
     expect(wrapper.find('.stats-table').text()).toContain('Changes')
     const rows = wrapper.findAll('.stats-table tbody tr')
     expect(rows).toHaveLength(2)
-    expect(rows[0].text()).toContain('Reorder root fields')
+    expect(rows[0].text()).toContain('Reorder fields')
     expect(rows[0].text()).toContain('2')
     expect(rows[1].text()).toContain('Keep only GOST properties')
     expect(rows[1].text()).toContain('0')
@@ -905,7 +874,7 @@ describe('SbomFixer.vue', () => {
       expect((checkbox.element as HTMLInputElement).checked).toBe(false)
     }
 
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
   })
 
   it('renders the read-only fstec list with statuses', async () => {
@@ -935,12 +904,12 @@ describe('SbomFixer.vue', () => {
   it('reset defaults restores the ten keep paths and static options', async () => {
     const wrapper = await mountFixer()
 
-    await wrapper.find('.group-card[data-group="root"] .clear-all').trigger('click')
+    await wrapper.find('.group-card[data-group="basic"] .clear-all').trigger('click')
     await wrapper.find('textarea[data-role="keep-list"]').setValue('')
     await wrapper.find('.reset-defaults').trigger('click')
     await flushPromises()
 
-    expect((wrapper.find(rule('root.reorder')).element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.find(rule('reorder')).element as HTMLInputElement).checked).toBe(true)
     expect((wrapper.find('.manufacturer-input').element as HTMLInputElement).value).toBe(
       'Positive Technologies',
     )

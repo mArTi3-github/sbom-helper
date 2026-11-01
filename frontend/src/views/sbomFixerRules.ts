@@ -1,9 +1,4 @@
-import type {
-  ComponentsFixOptions,
-  MetadataComponentFixOptions,
-  MetadataFixOptions,
-  RootFixOptions,
-} from '../types/api'
+import type { ComponentsFixOptions } from '../types/api'
 
 export interface FixRuleExample {
   readonly before: string
@@ -16,32 +11,43 @@ export interface FixRule<K extends string> {
   readonly example: FixRuleExample
 }
 
-export type RootRuleKey = Exclude<keyof RootFixOptions, 'spec_version'>
-export type MetadataRuleKey = Exclude<keyof MetadataFixOptions, 'component'>
-export type MetadataComponentRuleKey = Exclude<keyof MetadataComponentFixOptions, 'manufacturer'>
+export type BaseRuleKey =
+  | 'reorder'
+  | 'set_spec_version'
+  | 'increment_version'
+  | 'add_timestamp'
+  | 'add_manufacturer'
 export type ComponentsRuleKey = keyof ComponentsFixOptions
 
-export const ROOT_RULES: readonly FixRule<RootRuleKey>[] = [
+export const BASE_RULES: readonly FixRule<BaseRuleKey>[] = [
   {
-    id: 'root.reorder',
+    id: 'reorder',
     key: 'reorder',
     example: {
       before: `{
-  "components": [],
-  "version": 3,
-  "bomFormat": "CycloneDX",
-  "specVersion": "1.7"
+  "components": [
+    { "purl": "pkg:npm/left-pad@1.3.0", "name": "left-pad", "type": "library" }
+  ],
+  "metadata": {
+    "component": { "name": "app", "type": "application" },
+    "timestamp": "2026-10-29T12:00:00Z"
+  },
+  "bomFormat": "CycloneDX"
 }`,
       after: `{
   "bomFormat": "CycloneDX",
-  "specVersion": "1.7",
-  "version": 3,
-  "components": []
+  "metadata": {
+    "timestamp": "2026-10-29T12:00:00Z",
+    "component": { "type": "application", "name": "app" }
+  },
+  "components": [
+    { "type": "library", "name": "left-pad", "purl": "pkg:npm/left-pad@1.3.0" }
+  ]
 }`,
     },
   },
   {
-    id: 'root.set_spec_version',
+    id: 'set_spec_version',
     key: 'set_spec_version',
     example: {
       before: `{
@@ -55,7 +61,7 @@ export const ROOT_RULES: readonly FixRule<RootRuleKey>[] = [
     },
   },
   {
-    id: 'root.increment_version',
+    id: 'increment_version',
     key: 'increment_version',
     example: {
       before: `{
@@ -68,29 +74,8 @@ export const ROOT_RULES: readonly FixRule<RootRuleKey>[] = [
 }`,
     },
   },
-]
-
-export const METADATA_RULES: readonly FixRule<MetadataRuleKey>[] = [
   {
-    id: 'metadata.reorder',
-    key: 'reorder',
-    example: {
-      before: `{
-  "metadata": {
-    "component": { "name": "app" },
-    "timestamp": "2026-10-29T12:00:00Z"
-  }
-}`,
-      after: `{
-  "metadata": {
-    "timestamp": "2026-10-29T12:00:00Z",
-    "component": { "name": "app" }
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata.add_timestamp',
+    id: 'add_timestamp',
     key: 'add_timestamp',
     example: {
       before: `{
@@ -106,37 +91,8 @@ export const METADATA_RULES: readonly FixRule<MetadataRuleKey>[] = [
 }`,
     },
   },
-]
-
-export const METADATA_COMPONENT_RULES: readonly FixRule<MetadataComponentRuleKey>[] = [
   {
-    id: 'metadata_component.reorder',
-    key: 'reorder',
-    example: {
-      before: `{
-  "metadata": {
-    "component": {
-      "manufacturer": { "name": "ООО Ромашка" },
-      "version": "1.0.0",
-      "type": "application",
-      "name": "app"
-    }
-  }
-}`,
-      after: `{
-  "metadata": {
-    "component": {
-      "type": "application",
-      "name": "app",
-      "version": "1.0.0",
-      "manufacturer": { "name": "ООО Ромашка" }
-    }
-  }
-}`,
-    },
-  },
-  {
-    id: 'metadata_component.add_manufacturer',
+    id: 'add_manufacturer',
     key: 'add_manufacturer',
     example: {
       before: `{
@@ -163,34 +119,6 @@ export const METADATA_COMPONENT_RULES: readonly FixRule<MetadataComponentRuleKey
 ]
 
 export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
-  {
-    id: 'components.reorder',
-    key: 'reorder',
-    example: {
-      before: `{
-  "components": [
-    {
-      "properties": [],
-      "purl": "pkg:npm/left-pad@1.3.0",
-      "name": "left-pad",
-      "type": "library",
-      "version": "1.3.0"
-    }
-  ]
-}`,
-      after: `{
-  "components": [
-    {
-      "type": "library",
-      "name": "left-pad",
-      "version": "1.3.0",
-      "purl": "pkg:npm/left-pad@1.3.0",
-      "properties": []
-    }
-  ]
-}`,
-    },
-  },
   {
     id: 'components.filter_external_references',
     key: 'filter_external_references',
@@ -288,9 +216,4 @@ export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
   },
 ]
 
-export const ALL_FIX_RULES: readonly FixRule<string>[] = [
-  ...ROOT_RULES,
-  ...METADATA_RULES,
-  ...METADATA_COMPONENT_RULES,
-  ...COMPONENTS_RULES,
-]
+export const ALL_FIX_RULES: readonly FixRule<string>[] = [...BASE_RULES, ...COMPONENTS_RULES]

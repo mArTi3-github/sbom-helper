@@ -95,10 +95,8 @@
     "fix": "Fix",
     "processing": "Fixing SBOM...",
     "groups": {
-      "root": "Root object",
-      "metadata": "metadata",
-      "components": "components",
-      "metadataComponent": "metadata.component"
+      "basic": "Basic fixes",
+      "components": "components[] edits"
     },
     "selectAll": "Select all",
     "clearAll": "Clear all",
@@ -117,21 +115,12 @@
     "download": "Download fixed SBOM",
     "manufacturer": "Manufacturer",
     "rules": {
-      "root": {
-        "reorder": "Reorder root fields",
-        "set_spec_version": "Set specVersion",
-        "increment_version": "Increment version"
-      },
-      "metadata": {
-        "add_timestamp": "Add timestamp if missing",
-        "reorder": "Reorder metadata fields"
-      },
-      "metadata_component": {
-        "reorder": "Reorder metadata.component fields",
-        "add_manufacturer": "Add manufacturer if missing"
-      },
+      "reorder": "Reorder fields",
+      "set_spec_version": "Set $.specVersion",
+      "increment_version": "Increment $.version",
+      "add_timestamp": "Add $.metadata.timestamp if missing",
+      "add_manufacturer": "Add $.metadata.component.manufacturer if missing",
       "components": {
-        "reorder": "Reorder component fields",
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
         "fill_missing_gost_properties": "Add missing GOST properties"
@@ -140,21 +129,12 @@
     "exampleBefore": "Before",
     "exampleAfter": "After",
     "help": {
-      "root": {
-        "reorder": "Reorders the root object keys to bomFormat, specVersion, serialNumber, version, metadata, components, annotations; any other keys follow them in their original relative order. Nested objects are not changed.",
-        "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
-        "increment_version": "Increments the integer version field by 1. If version is missing or is not an integer, the rule leaves it untouched and reports 0 changes."
-      },
-      "metadata": {
-        "reorder": "Puts timestamp and component first; the remaining metadata keys follow in their original order. The content is not changed.",
-        "add_timestamp": "Writes metadata.timestamp with the current UTC time in YYYY-MM-DDTHH:MM:SSZ format, only if the field is missing, null, or an empty string. An existing non-empty value is not overwritten."
-      },
-      "metadata_component": {
-        "reorder": "Puts type, name, version, manufacturer first, then the remaining keys in their original order.",
-        "add_manufacturer": "Treats manufacturer as missing when it is not an object or its name is not a non-empty string, and writes an object whose only field is name, set to the value from the \"Manufacturer\" field. An existing valid manufacturer is not changed. The supplier field is neither read nor changed."
-      },
+      "reorder": "Sets the key order of the root object, metadata, metadata.component, and every component in the components[] tree to the canonical order. Root: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. metadata: timestamp, component. metadata.component: type, name, version, manufacturer. Component: type, name, version, purl, externalReferences, properties, components. Other keys keep their original relative order; nested objects inside components are not reordered.",
+      "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
+      "increment_version": "Increments the integer version field by 1. If version is missing or is not an integer, the rule leaves it untouched and reports 0 changes.",
+      "add_timestamp": "Writes metadata.timestamp with the current UTC time in YYYY-MM-DDTHH:MM:SSZ format, only if the field is missing, null, or an empty string. An existing non-empty value is not overwritten.",
+      "add_manufacturer": "Treats manufacturer as missing when it is not an object or its name is not a non-empty string, and writes an object whose only field is name, set to the value from the \"Manufacturer\" field. An existing valid manufacturer is not changed. The supplier field is neither read nor changed.",
       "components": {
-        "reorder": "Sets each component's keys to the order type, name, version, purl, externalReferences, properties, components, then the remaining keys in their original order. Applied recursively to nested components. metadata.component is not affected.",
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
         "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected."

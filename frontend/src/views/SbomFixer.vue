@@ -21,41 +21,51 @@
 
       <div v-if="optionsWarning" class="options-warning">{{ t('sbomFixer.loadFailed') }}</div>
 
-      <div class="group-card" data-group="root">
+      <div class="group-card" data-group="basic">
         <div class="group-header">
           <label class="master-label">
             <input
-              v-model="rootMaster"
+              v-model="basicMaster"
               type="checkbox"
               class="master-checkbox"
-              :indeterminate.prop="rootIndeterminate"
+              :indeterminate.prop="basicIndeterminate"
             />
-            <span>{{ t('sbomFixer.groups.root') }}</span>
+            <span>{{ t('sbomFixer.groups.basic') }}</span>
           </label>
           <div class="group-actions">
-            <button type="button" class="btn btn-small select-all" @click="rootMaster = true">{{ t('sbomFixer.selectAll') }}</button>
-            <button type="button" class="btn btn-small clear-all" @click="rootMaster = false">{{ t('sbomFixer.clearAll') }}</button>
+            <button type="button" class="btn btn-small select-all" @click="basicMaster = true">{{ t('sbomFixer.selectAll') }}</button>
+            <button type="button" class="btn btn-small clear-all" @click="basicMaster = false">{{ t('sbomFixer.clearAll') }}</button>
           </div>
         </div>
         <div class="group-options">
           <div
-            v-for="rule in ROOT_RULES"
+            v-for="rule in BASE_RULES"
             :key="rule.id"
             class="rule-row"
             :data-rule-row="rule.id"
           >
             <label class="rule-label">
-              <input v-model="options.root[rule.key]" type="checkbox" :data-rule="rule.id" />
+              <input v-model="options[rule.key]" type="checkbox" :data-rule="rule.id" />
               <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
             </label>
-            <template v-if="rule.id === 'root.set_spec_version'">
+            <template v-if="rule.id === 'set_spec_version'">
               <span class="spec-version-label">{{ t('sbomFixer.specVersion') }}</span>
               <input
-                v-model="options.root.spec_version"
+                v-model="options.spec_version"
                 type="text"
                 class="spec-version-input"
                 :aria-label="t('sbomFixer.specVersion')"
-                :disabled="!options.root.set_spec_version"
+                :disabled="!options.set_spec_version"
+              />
+            </template>
+            <template v-if="rule.id === 'add_manufacturer'">
+              <span class="spec-version-label">{{ t('sbomFixer.manufacturer') }}</span>
+              <input
+                v-model="options.manufacturer"
+                type="text"
+                class="spec-version-input manufacturer-input"
+                :aria-label="t('sbomFixer.manufacturer')"
+                :disabled="!options.add_manufacturer"
               />
             </template>
             <RuleHelp
@@ -70,102 +80,6 @@
               @toggle="toggleHelp(rule.id)"
               @close="openHelpId = null"
             />
-          </div>
-        </div>
-      </div>
-
-      <div class="group-card" data-group="metadata">
-        <div class="group-header">
-          <label class="master-label">
-            <input
-              v-model="metadataMaster"
-              type="checkbox"
-              class="master-checkbox"
-              :indeterminate.prop="metadataIndeterminate"
-            />
-            <span>{{ t('sbomFixer.groups.metadata') }}</span>
-          </label>
-          <div class="group-actions">
-            <button type="button" class="btn btn-small select-all" @click="metadataMaster = true">{{ t('sbomFixer.selectAll') }}</button>
-            <button type="button" class="btn btn-small clear-all" @click="metadataMaster = false">{{ t('sbomFixer.clearAll') }}</button>
-          </div>
-        </div>
-        <div class="group-options">
-          <div
-            v-for="rule in METADATA_RULES"
-            :key="rule.id"
-            class="rule-row"
-            :data-rule-row="rule.id"
-          >
-            <label class="rule-label">
-              <input v-model="options.metadata[rule.key]" type="checkbox" :data-rule="rule.id" />
-              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
-            </label>
-            <RuleHelp
-              :rule-id="rule.id"
-              :description="t(`sbomFixer.help.${rule.id}`)"
-              :before="rule.example.before"
-              :after="rule.example.after"
-              :before-label="t('sbomFixer.exampleBefore')"
-              :after-label="t('sbomFixer.exampleAfter')"
-              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
-              :open="openHelpId === rule.id"
-              @toggle="toggleHelp(rule.id)"
-              @close="openHelpId = null"
-            />
-          </div>
-        </div>
-
-        <div class="subblock" data-group="metadata-component">
-          <div class="group-header">
-            <label class="master-label">
-              <input
-                v-model="metadataComponentMaster"
-                type="checkbox"
-                class="master-checkbox"
-                :indeterminate.prop="metadataComponentIndeterminate"
-              />
-              <span>{{ t('sbomFixer.groups.metadataComponent') }}</span>
-            </label>
-            <div class="group-actions">
-              <button type="button" class="btn btn-small select-all" @click="metadataComponentMaster = true">{{ t('sbomFixer.selectAll') }}</button>
-              <button type="button" class="btn btn-small clear-all" @click="metadataComponentMaster = false">{{ t('sbomFixer.clearAll') }}</button>
-            </div>
-          </div>
-          <div class="group-options">
-            <div
-              v-for="rule in METADATA_COMPONENT_RULES"
-              :key="rule.id"
-              class="rule-row"
-              :data-rule-row="rule.id"
-            >
-              <label class="rule-label">
-                <input v-model="options.metadata.component[rule.key]" type="checkbox" :data-rule="rule.id" />
-                <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
-              </label>
-              <template v-if="rule.id === 'metadata_component.add_manufacturer'">
-                <span class="spec-version-label">{{ t('sbomFixer.manufacturer') }}</span>
-                <input
-                  v-model="options.metadata.component.manufacturer"
-                  type="text"
-                  class="spec-version-input manufacturer-input"
-                  :aria-label="t('sbomFixer.manufacturer')"
-                  :disabled="!options.metadata.component.add_manufacturer"
-                />
-              </template>
-              <RuleHelp
-                :rule-id="rule.id"
-                :description="t(`sbomFixer.help.${rule.id}`)"
-                :before="rule.example.before"
-                :after="rule.example.after"
-                :before-label="t('sbomFixer.exampleBefore')"
-                :after-label="t('sbomFixer.exampleAfter')"
-                :rule-title="t(`sbomFixer.rules.${rule.id}`)"
-                :open="openHelpId === rule.id"
-                @toggle="toggleHelp(rule.id)"
-                @close="openHelpId = null"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -396,12 +310,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import RuleHelp from '../components/RuleHelp.vue'
-import {
-  COMPONENTS_RULES,
-  METADATA_COMPONENT_RULES,
-  METADATA_RULES,
-  ROOT_RULES,
-} from './sbomFixerRules'
+import { BASE_RULES, COMPONENTS_RULES } from './sbomFixerRules'
 import { analyzeSbom, fixSbom, getFieldCatalog, getFixOptions, saveFixOptions } from '../api/sbom'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
@@ -440,23 +349,14 @@ const selectedRemoveFields = ref<Set<string>>(new Set())
 
 function defaultFixOptions(): SbomFixOptions {
   return {
-    root: {
-      reorder: true,
-      set_spec_version: true,
-      spec_version: '1.7',
-      increment_version: true,
-    },
-    metadata: {
-      add_timestamp: true,
-      reorder: true,
-      component: {
-        reorder: true,
-        add_manufacturer: true,
-        manufacturer: 'Positive Technologies',
-      },
-    },
+    reorder: true,
+    set_spec_version: true,
+    spec_version: '1.7',
+    increment_version: true,
+    add_timestamp: true,
+    add_manufacturer: true,
+    manufacturer: 'Positive Technologies',
     components: {
-      reorder: true,
       filter_external_references: true,
       filter_properties: true,
       fill_missing_gost_properties: false,
@@ -470,9 +370,13 @@ function defaultFixOptions(): SbomFixOptions {
 const options = reactive<SbomFixOptions>(defaultFixOptions())
 
 function applyOptions(next: SbomFixOptions): void {
-  options.root = { ...options.root, ...next.root }
-  options.metadata = { ...options.metadata, ...next.metadata }
-  options.metadata.component = { ...options.metadata.component, ...(next.metadata?.component ?? {}) }
+  options.reorder = next.reorder
+  options.set_spec_version = next.set_spec_version
+  options.spec_version = next.spec_version
+  options.increment_version = next.increment_version
+  options.add_timestamp = next.add_timestamp
+  options.add_manufacturer = next.add_manufacturer
+  options.manufacturer = next.manufacturer
   options.components = { ...options.components, ...next.components }
   options.optional_fields = { ...options.optional_fields, ...(next.optional_fields ?? {}) }
 }
@@ -487,40 +391,16 @@ function toggleHelp(id: string): void {
   openHelpId.value = openHelpId.value === id ? null : id
 }
 
-const rootValues = () => ROOT_RULES.map((rule) => options.root[rule.key])
-const metadataValues = () => [
-  ...METADATA_RULES.map((rule) => options.metadata[rule.key]),
-  ...METADATA_COMPONENT_RULES.map((rule) => options.metadata.component[rule.key]),
-]
-const metadataComponentValues = () => METADATA_COMPONENT_RULES.map((rule) => options.metadata.component[rule.key])
+const baseValues = () => BASE_RULES.map((rule) => options[rule.key])
 const componentValues = () => COMPONENTS_RULES.map((rule) => options.components[rule.key])
 
-const rootMaster = computed({
-  get: () => rootValues().every(Boolean),
+const basicMaster = computed({
+  get: () => baseValues().every(Boolean),
   set: (value: boolean) => {
-    for (const rule of ROOT_RULES) options.root[rule.key] = value
+    for (const rule of BASE_RULES) options[rule.key] = value
   },
 })
-const rootIndeterminate = computed(() => !rootMaster.value && rootValues().some(Boolean))
-
-const metadataMaster = computed({
-  get: () => metadataValues().every(Boolean),
-  set: (value: boolean) => {
-    for (const rule of METADATA_RULES) options.metadata[rule.key] = value
-    for (const rule of METADATA_COMPONENT_RULES) options.metadata.component[rule.key] = value
-  },
-})
-const metadataIndeterminate = computed(() => !metadataMaster.value && metadataValues().some(Boolean))
-
-const metadataComponentMaster = computed({
-  get: () => metadataComponentValues().every(Boolean),
-  set: (value: boolean) => {
-    for (const rule of METADATA_COMPONENT_RULES) options.metadata.component[rule.key] = value
-  },
-})
-const metadataComponentIndeterminate = computed(
-  () => !metadataComponentMaster.value && metadataComponentValues().some(Boolean),
-)
+const basicIndeterminate = computed(() => !basicMaster.value && baseValues().some(Boolean))
 
 const componentsMaster = computed({
   get: () => componentValues().every(Boolean),
@@ -805,12 +685,6 @@ h1 {
   padding: 1rem;
   margin-bottom: 1rem;
   box-shadow: var(--color-card-shadow);
-}
-
-.subblock {
-  border-top: 1px solid var(--color-row-border);
-  margin-top: 1rem;
-  padding-top: 1rem;
 }
 
 .group-header {
