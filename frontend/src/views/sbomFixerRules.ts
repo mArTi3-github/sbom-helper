@@ -1,4 +1,4 @@
-import type { ComponentsFixOptions } from '../types/api'
+import type { ComponentsFixOptions, LicensesFixOptions } from '../types/api'
 
 export interface FixRuleExample {
   readonly before: string
@@ -216,4 +216,102 @@ export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
   },
 ]
 
-export const ALL_FIX_RULES: readonly FixRule<string>[] = [...BASE_RULES, ...COMPONENTS_RULES]
+export type LicensesRuleKey = Exclude<keyof LicensesFixOptions, 'add_patterns'>
+
+export const LICENSES_RULES: readonly FixRule<LicensesRuleKey>[] = [
+  {
+    id: 'licenses.filter_non_proprietary',
+    key: 'filter_non_proprietary',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "left-pad",
+      "version": "1.3.0",
+      "licenses": [
+        { "license": { "name": "MIT" } }
+      ]
+    }
+  ]
+}`,
+      after: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "left-pad",
+      "version": "1.3.0"
+    }
+  ]
+}`,
+    },
+  },
+  {
+    id: 'licenses.add_proprietary',
+    key: 'add_proprietary',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "vendor-tool",
+      "version": "2.0.0"
+    }
+  ]
+}`,
+      after: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "vendor-tool",
+      "version": "2.0.0",
+      "licenses": [
+        { "license": { "name": "Proprietary" } }
+      ]
+    }
+  ]
+}`,
+    },
+  },
+  {
+    id: 'licenses.remove_proprietary_source_references',
+    key: 'remove_proprietary_source_references',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "vendor-tool",
+      "version": "2.0.0",
+      "licenses": [
+        { "license": { "name": "Proprietary" } }
+      ],
+      "externalReferences": [
+        { "type": "vcs", "url": "https://github.com/vendor/tool" },
+        { "type": "source-distribution", "url": "https://vendor.example.com/tool.tar.gz" }
+      ]
+    }
+  ]
+}`,
+      after: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "vendor-tool",
+      "version": "2.0.0",
+      "licenses": [
+        { "license": { "name": "Proprietary" } }
+      ],
+      "externalReferences": []
+    }
+  ]
+}`,
+    },
+  },
+]
+
+export const ALL_FIX_RULES: readonly FixRule<string>[] = [
+  ...BASE_RULES,
+  ...COMPONENTS_RULES,
+  ...LICENSES_RULES,
+]

@@ -96,7 +96,8 @@
     "processing": "Fixing SBOM...",
     "groups": {
       "basic": "Basic fixes",
-      "components": "components[] edits"
+      "components": "components[] edits",
+      "licenses": "Component license edits"
     },
     "selectAll": "Select all",
     "clearAll": "Clear all",
@@ -124,10 +125,22 @@
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
         "fill_missing_gost_properties": "Add missing GOST properties"
+      },
+      "licenses": {
+        "filter_non_proprietary": "Remove all licenses without a `name` key equal to \"Proprietary\"",
+        "add_proprietary": "Add a license with a `name` key equal to \"Proprietary\" to components with the following characteristics:",
+        "remove_proprietary_source_references": "Remove `vcs` and `source-distribution` references from components with a proprietary license"
       }
     },
     "exampleBefore": "Before",
     "exampleAfter": "After",
+    "licenses": {
+      "contains": "contains",
+      "fieldPlaceholder": "Field",
+      "valuePlaceholder": "Value",
+      "addRow": "Add row",
+      "removeRow": "Remove row"
+    },
     "help": {
       "reorder": "Sets the key order of the root object, metadata, metadata.component, and every component in the components[] tree to the canonical order. Root: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. metadata: timestamp, component. metadata.component: type, name, version, manufacturer. Component: type, name, version, purl, externalReferences, properties, components. Other keys keep their original relative order. Component objects in the root components[] tree, including nested components, are reordered recursively, while the metadata.component.components subtree is not traversed.",
       "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
@@ -138,6 +151,11 @@
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
         "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected."
+      },
+      "licenses": {
+        "filter_non_proprietary": "Only a license entry whose name field equals \"Proprietary\" counts as proprietary; license.id, an expression, and other license names are not treated as proprietary. The rule removes all such non-proprietary entries from licenses; if none remain, the whole licenses key is removed. metadata.component is not affected.",
+        "add_proprietary": "Adds a license entry whose only field is name, set to \"Proprietary\", to a component whose value in one of the configured pairs contains the pattern as a substring (case-sensitive). Pairs whose field or value is blank after trimming are ignored. If the component already has a proprietary license, nothing is added. metadata.component is not affected.",
+        "remove_proprietary_source_references": "Removes externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive) from a component with a proprietary license. Other references are kept; if none remain, the externalReferences array stays empty ([]). metadata.component is not affected."
       }
     },
     "optionalFields": {

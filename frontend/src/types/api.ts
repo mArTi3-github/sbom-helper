@@ -136,6 +136,13 @@ export interface IgnorePatternItem {
   pattern: string
 }
 
+export interface LicensesFixOptions {
+  filter_non_proprietary: boolean
+  add_proprietary: boolean
+  remove_proprietary_source_references: boolean
+  add_patterns: IgnorePatternItem[]
+}
+
 export interface SbomSummary {
   total_purls: number
   found: number
@@ -211,6 +218,7 @@ export interface SbomFixOptions {
   add_manufacturer: boolean
   manufacturer: string
   components: ComponentsFixOptions
+  licenses: LicensesFixOptions
   optional_fields: OptionalFieldsFixOptions
 }
 

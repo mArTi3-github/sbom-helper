@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import ru from '../i18n/locales/ru.json'
 import en from '../i18n/locales/en.json'
-import { ALL_FIX_RULES, BASE_RULES, COMPONENTS_RULES } from './sbomFixerRules'
+import { ALL_FIX_RULES, BASE_RULES, COMPONENTS_RULES, LICENSES_RULES } from './sbomFixerRules'
 
 function lookup(messages: Record<string, unknown>, path: string): unknown {
   return path.split('.').reduce<unknown>((acc, part) => {
@@ -13,12 +13,13 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 const GROUPS = [
   { rules: BASE_RULES, prefix: '', size: 5, flat: true },
   { rules: COMPONENTS_RULES, prefix: 'components.', size: 3, flat: false },
+  { rules: LICENSES_RULES, prefix: 'licenses.', size: 3, flat: false },
 ]
 
 describe('sbomFixerRules catalog', () => {
-  it('covers all 8 rules with unique ids', () => {
-    expect(ALL_FIX_RULES).toHaveLength(8)
-    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(8)
+  it('covers all 11 rules with unique ids', () => {
+    expect(ALL_FIX_RULES).toHaveLength(11)
+    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(11)
     for (const rule of ALL_FIX_RULES) {
       expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
     }
@@ -51,6 +52,11 @@ describe('sbomFixerRules catalog', () => {
       }
     }
     expect(COMPONENTS_RULES[0].id).toBe('components.filter_external_references')
+    expect(LICENSES_RULES.map((rule) => rule.id)).toEqual([
+      'licenses.filter_non_proprietary',
+      'licenses.add_proprietary',
+      'licenses.remove_proprietary_source_references',
+    ])
   })
 
   it('provides valid JSON examples that actually differ', () => {

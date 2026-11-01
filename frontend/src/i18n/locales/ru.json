@@ -96,7 +96,8 @@
     "processing": "Исправление SBOM...",
     "groups": {
       "basic": "Базовые правки",
-      "components": "Правки массива components[]"
+      "components": "Правки массива components[]",
+      "licenses": "Правки, касающиеся лицензий компонентов"
     },
     "selectAll": "Выбрать всё",
     "clearAll": "Снять всё",
@@ -124,10 +125,22 @@
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
         "filter_properties": "Оставить только ГОСТ-свойства",
         "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
+      },
+      "licenses": {
+        "filter_non_proprietary": "Удалить все лицензии без поля с ключом `name`, равным «Proprietary»",
+        "add_proprietary": "Добавить лицензию с ключом `name`, равным «Proprietary» для компонентов со следующими признаками:",
+        "remove_proprietary_source_references": "Удалить ссылки `vcs` и `source-distribution` у компонентов с проприетарной лицензией"
       }
     },
     "exampleBefore": "До",
     "exampleAfter": "После",
+    "licenses": {
+      "contains": "содержит",
+      "fieldPlaceholder": "Поле",
+      "valuePlaceholder": "Значение",
+      "addRow": "Добавить строку",
+      "removeRow": "Удалить строку"
+    },
     "help": {
       "reorder": "Приводит ключи корневого объекта, metadata, metadata.component и каждого компонента дерева components[] к каноническому порядку. У корня: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. У metadata: timestamp, component. У metadata.component: type, name, version, manufacturer. У компонента: type, name, version, purl, externalReferences, properties, components. Остальные ключи сохраняют исходный относительный порядок. Объекты компонентов в дереве корневого components[], включая вложенные компоненты, упорядочиваются рекурсивно, а поддерево metadata.component.components не обходится.",
       "set_spec_version": "Записывает в specVersion значение из поля «Версия спецификации» (по умолчанию 1.7), обрезая пробелы; если поля не было — добавляет его. Значение вне 1.6/1.7 установить можно, но итоговый документ получит несоответствие.",
@@ -138,6 +151,11 @@
         "filter_external_references": "Оставляет в externalReferences только элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные типы (website, distribution, issue-tracker и т. п.) удаляются; если не осталось ничего, массив остаётся пустым. metadata.component не затрагивается.",
         "filter_properties": "Оставляет в properties только элементы, имя которых начинается ровно с GOST: (с учётом регистра). Остальные удаляются; пустой массив остаётся пустым. metadata.component не затрагивается.",
         "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается."
+      },
+      "licenses": {
+        "filter_non_proprietary": "Проприетарной считается только запись лицензии с полем name, равным «Proprietary»; license.id, expression и другие имена лицензий проприетарными не считаются. Правило удаляет из licenses все такие не-проприетарные записи; если не осталось ни одной, ключ licenses удаляется целиком. metadata.component не затрагивается.",
+        "add_proprietary": "Добавляет запись лицензии с единственным полем name, равным «Proprietary», компоненту, у которого значение в одной из настроенных пар содержит образец как подстроку (с учётом регистра). Пары, где поле или значение пустое после обрезки пробелов, игнорируются. Если проприетарная лицензия у компонента уже есть, правило ничего не добавляет. metadata.component не затрагивается.",
+        "remove_proprietary_source_references": "Удаляет из externalReferences компонента с проприетарной лицензией элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные ссылки сохраняются; если ничего не осталось, массив externalReferences остаётся пустым ([]). metadata.component не затрагивается."
       }
     },
     "optionalFields": {

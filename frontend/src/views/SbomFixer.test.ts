@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
 import SbomFixer from './SbomFixer.vue'
-import { ALL_FIX_RULES } from './sbomFixerRules'
+import { ALL_FIX_RULES, LICENSES_RULES } from './sbomFixerRules'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
@@ -21,6 +21,12 @@ const defaultOptions: SbomFixOptions = {
     filter_external_references: true,
     filter_properties: true,
     fill_missing_gost_properties: false,
+  },
+  licenses: {
+    filter_non_proprietary: false,
+    add_proprietary: false,
+    remove_proprietary_source_references: false,
+    add_patterns: [],
   },
   optional_fields: {
     keep: [
@@ -195,7 +201,7 @@ describe('SbomFixer.vue', () => {
   it('renders help for every rule and no warning banner', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('.warning-banner').exists()).toBe(false)
-    expect(wrapper.findAll('.rule-help-button')).toHaveLength(8)
+    expect(wrapper.findAll('.rule-help-button')).toHaveLength(11)
     for (const rule of ALL_FIX_RULES) {
       expect(wrapper.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
     }
@@ -359,6 +365,62 @@ describe('SbomFixer.vue', () => {
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(true)
     }
+  })
+
+  it('renders the licenses card with three rules and help', async () => {
+    const wrapper = await mountFixer()
+    const card = wrapper.find('.group-card[data-group="licenses"]')
+    expect(card.exists()).toBe(true)
+    expect(card.findAll('[data-rule-row]')).toHaveLength(3)
+    expect(card.findAll('.rule-help-button')).toHaveLength(3)
+    for (const rule of LICENSES_RULES) {
+      expect(card.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
+    }
+  })
+
+  it('toggles all three license rules with the master checkbox', async () => {
+    const wrapper = await mountFixer()
+    const master = masterFor(wrapper, 'licenses')
+    await master.setValue(true)
+    for (const id of LICENSES_RULES.map((item) => item.id)) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(true)
+    }
+    await master.setValue(false)
+    for (const id of LICENSES_RULES.map((item) => item.id)) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(false)
+    }
+  })
+
+  it('selects and clears all license rules with the card buttons', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('.group-card[data-group="licenses"] .select-all').trigger('click')
+    for (const id of LICENSES_RULES.map((item) => item.id)) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(true)
+    }
+    await wrapper.find('.group-card[data-group="licenses"] .clear-all').trigger('click')
+    for (const id of LICENSES_RULES.map((item) => item.id)) {
+      expect((wrapper.find(rule(id)).element as HTMLInputElement).checked, id).toBe(false)
+    }
+  })
+
+  it('saves the licenses block loaded from the server', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        licenses: {
+          filter_non_proprietary: true,
+          add_proprietary: false,
+          remove_proprietary_source_references: false,
+          add_patterns: [{ field: 'name', pattern: 'vendor' }],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.licenses.filter_non_proprietary).toBe(true)
+    expect(saved.licenses.add_patterns).toEqual([{ field: 'name', pattern: 'vendor' }])
   })
 
   it('restores defaults without saving them', async () => {

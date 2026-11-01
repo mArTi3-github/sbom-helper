@@ -127,6 +127,49 @@
         </div>
       </div>
 
+      <div class="group-card" data-group="licenses">
+        <div class="group-header">
+          <label class="master-label">
+            <input
+              v-model="licensesMaster"
+              type="checkbox"
+              class="master-checkbox"
+              :indeterminate.prop="licensesIndeterminate"
+            />
+            <span>{{ t('sbomFixer.groups.licenses') }}</span>
+          </label>
+          <div class="group-actions">
+            <button type="button" class="btn btn-small select-all" @click="licensesMaster = true">{{ t('sbomFixer.selectAll') }}</button>
+            <button type="button" class="btn btn-small clear-all" @click="licensesMaster = false">{{ t('sbomFixer.clearAll') }}</button>
+          </div>
+        </div>
+        <div class="group-options">
+          <div
+            v-for="rule in LICENSES_RULES"
+            :key="rule.id"
+            class="rule-row"
+            :data-rule-row="rule.id"
+          >
+            <label class="rule-label">
+              <input v-model="options.licenses[rule.key]" type="checkbox" :data-rule="rule.id" />
+              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+            </label>
+            <RuleHelp
+              :rule-id="rule.id"
+              :description="t(`sbomFixer.help.${rule.id}`)"
+              :before="rule.example.before"
+              :after="rule.example.after"
+              :before-label="t('sbomFixer.exampleBefore')"
+              :after-label="t('sbomFixer.exampleAfter')"
+              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+              :open="openHelpId === rule.id"
+              @toggle="toggleHelp(rule.id)"
+              @close="openHelpId = null"
+            />
+          </div>
+        </div>
+      </div>
+
       <div class="group-card optional-fields-card" data-group="optional-fields">
         <div class="group-header">
           <span class="optional-fields-title">{{ t('sbomFixer.optionalFields.title') }}</span>
@@ -310,7 +353,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FileUploadZone from '../components/FileUploadZone.vue'
 import RuleHelp from '../components/RuleHelp.vue'
-import { BASE_RULES, COMPONENTS_RULES } from './sbomFixerRules'
+import { BASE_RULES, COMPONENTS_RULES, LICENSES_RULES } from './sbomFixerRules'
 import { analyzeSbom, fixSbom, getFieldCatalog, getFixOptions, saveFixOptions } from '../api/sbom'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
@@ -361,6 +404,12 @@ function defaultFixOptions(): SbomFixOptions {
       filter_properties: true,
       fill_missing_gost_properties: false,
     },
+    licenses: {
+      filter_non_proprietary: false,
+      add_proprietary: false,
+      remove_proprietary_source_references: false,
+      add_patterns: [],
+    },
     optional_fields: {
       keep: [],
     },
@@ -378,6 +427,12 @@ function applyOptions(next: SbomFixOptions): void {
   options.add_manufacturer = next.add_manufacturer
   options.manufacturer = next.manufacturer
   options.components = { ...options.components, ...next.components }
+  options.licenses = {
+    filter_non_proprietary: next.licenses.filter_non_proprietary,
+    add_proprietary: next.licenses.add_proprietary,
+    remove_proprietary_source_references: next.licenses.remove_proprietary_source_references,
+    add_patterns: [...(next.licenses.add_patterns ?? [])],
+  }
   options.optional_fields = { ...options.optional_fields, ...(next.optional_fields ?? {}) }
 }
 
@@ -409,6 +464,18 @@ const componentsMaster = computed({
   },
 })
 const componentsIndeterminate = computed(() => !componentsMaster.value && componentValues().some(Boolean))
+
+const licenseValues = () => LICENSES_RULES.map((rule) => options.licenses[rule.key])
+
+const licensesMaster = computed({
+  get: () => licenseValues().every(Boolean),
+  set: (value: boolean) => {
+    for (const rule of LICENSES_RULES) options.licenses[rule.key] = value
+  },
+})
+const licensesIndeterminate = computed(
+  () => !licensesMaster.value && licenseValues().some(Boolean),
+)
 
 const candidates = computed(() =>
   (analysis.value ?? []).filter(
