@@ -186,16 +186,16 @@ class TestFixSbom:
         assert response.json()["changed"] is True
 
     def test_fix_with_options_honors_them(self, client: TestClient) -> None:
-        options = {"metadata": {"component": {"manufacturer": "Acme"}}}
+        options = {"manufacturer": "Acme"}
         response = upload(client, make_sbom(), json.dumps(options))
         assert response.status_code == 200
         data = response.json()
         stats = {item["rule_id"]: item["count"] for item in data["stats"]}
-        assert "metadata_component.add_manufacturer" in stats
+        assert "add_manufacturer" in stats
         assert data["fixed_sbom"]["metadata"]["component"]["manufacturer"] == {
             "name": "Acme"
         }
-        assert len(data["stats"]) == 10
+        assert len(data["stats"]) == 7
         assert all(set(item) == {"rule_id", "count"} for item in data["stats"])
         assert all(
             set(item) >= {"code", "path", "component", "details"}
@@ -214,7 +214,7 @@ class TestFixSbom:
         response = upload(client, make_sbom())
         assert response.status_code == 200
         data = response.json()
-        assert len(data["stats"]) == 10
+        assert len(data["stats"]) == 7
         assert data["changed"] is True
         assert data["fixed_sbom"]["specVersion"] == "1.7"
         assert data["fixed_sbom"]["version"] == 2
@@ -255,7 +255,7 @@ class TestFixSbom:
         response = upload(
             client,
             make_sbom(),
-            json.dumps({"root": {"spec_version": "9.9.9"}}),
+            json.dumps({"spec_version": "9.9.9"}),
         )
         assert response.status_code == 400
         body = response.json()
@@ -287,7 +287,7 @@ class TestSbomFixOptions:
 
     def test_get_with_non_utf8_file_returns_defaults(self, client: TestClient) -> None:
         store = client.app.state.sbom_fix_options_store
-        store._path.write_bytes(b'{"root": {"reorder": false}}\xff')
+        store._path.write_bytes(b'{"reorder": false}\xff')
         response = client.get("/api/v1/sbom/fix/options")
         assert response.status_code == 200
         assert response.json() == {"options": SbomFixOptions().model_dump()}
@@ -297,17 +297,17 @@ class TestSbomFixOptions:
     ) -> None:
         response = client.post(
             "/api/v1/sbom/fix/options",
-            json={"options": {"root": {"spec_version": " 1.7 "}}},
+            json={"options": {"spec_version": " 1.7 "}},
         )
         assert response.status_code == 200
 
         response = client.get("/api/v1/sbom/fix/options")
         assert response.status_code == 200
-        assert response.json()["options"]["root"]["spec_version"] == "1.7"
+        assert response.json()["options"]["spec_version"] == "1.7"
 
     def test_post_saves_and_get_returns_saved(self, client: TestClient) -> None:
         options = SbomFixOptions(
-            metadata={"component": {"manufacturer": "Acme"}},
+            manufacturer="Acme",
             components={"fill_missing_gost_properties": True},
         ).model_dump()
         response = client.post("/api/v1/sbom/fix/options", json={"options": options})
@@ -321,7 +321,7 @@ class TestSbomFixOptions:
     def test_post_invalid_options_returns_400(self, client: TestClient) -> None:
         response = client.post(
             "/api/v1/sbom/fix/options",
-            json={"options": {"root": {"spec_version": "bad"}}},
+            json={"options": {"spec_version": "bad"}},
         )
         assert response.status_code == 400
         body = response.json()

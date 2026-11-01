@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from purl_resolver.sbom.fixer import RootFixOptions, SbomFixOptions
+from purl_resolver.sbom.fixer import SbomFixOptions
 from purl_resolver.sbom.optional_fields import DEFAULT_KEEP_FIELDS
 from purl_resolver.sbom_fix_options_store import SbomFixOptionsStore
 
@@ -17,7 +17,7 @@ def test_load_missing_file_returns_defaults(tmp_path):
 
 def test_save_load_roundtrip_including_spec_version(tmp_path):
     store = SbomFixOptionsStore(tmp_path / "options.json")
-    options = SbomFixOptions(root={"spec_version": "1.6"})
+    options = SbomFixOptions(spec_version="1.6")
     store.save(options)
     assert store.load() == options
 
@@ -32,7 +32,7 @@ def test_corrupt_json_returns_defaults(tmp_path, caplog):
 
 def test_corrupt_non_utf8_file_returns_defaults(tmp_path, caplog):
     path = tmp_path / "bad-encoding.json"
-    path.write_bytes(b'{"root": {"reorder": false}}\xff')
+    path.write_bytes(b'{"reorder": false}\xff')
     with caplog.at_level(logging.WARNING):
         assert SbomFixOptionsStore(path).load() == SbomFixOptions()
     assert "bad-encoding.json" in caplog.text
@@ -40,7 +40,7 @@ def test_corrupt_non_utf8_file_returns_defaults(tmp_path, caplog):
 
 def test_invalid_spec_version_returns_defaults(tmp_path, caplog):
     path = tmp_path / "invalid.json"
-    path.write_text('{"root": {"spec_version": "9.9.9"}}', encoding="utf-8")
+    path.write_text('{"spec_version": "9.9.9"}', encoding="utf-8")
     with caplog.at_level(logging.WARNING):
         assert SbomFixOptionsStore(path).load() == SbomFixOptions()
     assert "invalid.json" in caplog.text
@@ -54,11 +54,11 @@ def test_os_error_returns_defaults(tmp_path, caplog):
 
 def test_partial_json_fills_defaults(tmp_path):
     path = tmp_path / "partial.json"
-    path.write_text('{"root": {"reorder": false}}', encoding="utf-8")
+    path.write_text('{"reorder": false}', encoding="utf-8")
     loaded = SbomFixOptionsStore(path).load()
-    assert loaded.root.reorder is False
-    assert loaded.root.set_spec_version is True
-    assert loaded.metadata.add_timestamp is True
+    assert loaded.reorder is False
+    assert loaded.set_spec_version is True
+    assert loaded.add_timestamp is True
 
 
 def test_custom_path_is_used(tmp_path):
@@ -72,16 +72,13 @@ def test_custom_path_is_used(tmp_path):
 def test_save_writes_indented_utf8_json_with_trailing_newline(tmp_path):
     path = tmp_path / "options.json"
     store = SbomFixOptionsStore(path)
-    options = SbomFixOptions.model_construct(
-        root=RootFixOptions.model_construct(spec_version="1.7-тест")
-    )
+    options = SbomFixOptions.model_construct(spec_version="1.7-тест")
 
     store.save(options)
 
     text = path.read_text(encoding="utf-8")
     assert text.endswith("\n")
-    assert '\n  "root": {' in text
-    assert "1.7-тест" in text
+    assert '\n  "spec_version": "1.7-тест"' in text
     assert json.loads(text) == options.model_dump()
 
 
@@ -93,18 +90,17 @@ def test_save_propagates_write_errors(tmp_path):
         store.save(SbomFixOptions())
 
 
-def test_load_ignores_legacy_remove_keys(tmp_path):
+def test_load_ignores_legacy_nested_options(tmp_path):
     path = tmp_path / "legacy.json"
     path.write_text(
         json.dumps({
             "root": {"reorder": False, "remove_dependencies": True},
-            "components": {"remove_hashes": True, "remove_scope": True},
             "metadata": {"component": {"rename_supplier": True}},
+            "components": {"remove_hashes": True},
         }),
         encoding="utf-8",
     )
     options = SbomFixOptionsStore(path).load()
-    assert options.root.reorder is False
-    assert not hasattr(options.root, "remove_dependencies")
-    assert not hasattr(options.components, "remove_hashes")
+    assert options == SbomFixOptions()
+    assert not hasattr(options, "root")
     assert options.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)

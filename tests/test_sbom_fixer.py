@@ -20,31 +20,42 @@ from purl_resolver.sbom.fixer import (
 from purl_resolver.sbom.optional_fields import DEFAULT_KEEP_FIELDS
 
 NEW_RULE_IDS = (
-    "root.reorder",
-    "root.set_spec_version",
-    "root.increment_version",
-    "metadata.add_timestamp",
-    "metadata.reorder",
-    "metadata_component.reorder",
-    "metadata_component.add_manufacturer",
-    "components.reorder",
+    "reorder",
+    "set_spec_version",
+    "increment_version",
+    "add_timestamp",
+    "add_manufacturer",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
 )
 
 
-def test_defaults_expose_new_options_and_keep_list():
+def _reorder_only_options() -> SbomFixOptions:
+    return SbomFixOptions(
+        reorder=True,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+    )
+
+
+def test_defaults_expose_flat_base_options():
     o = SbomFixOptions()
-    assert o.metadata.component.add_manufacturer is True
-    assert o.metadata.component.manufacturer == "Positive Technologies"
+    assert o.reorder is True
+    assert o.set_spec_version is True
+    assert o.spec_version == "1.7"
+    assert o.increment_version is True
+    assert o.add_timestamp is True
+    assert o.add_manufacturer is True
+    assert o.manufacturer == "Positive Technologies"
     assert o.components.fill_missing_gost_properties is False
     assert o.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)
-    for removed in ("remove_dependencies", "remove_services"):
-        assert not hasattr(o.root, removed)
-    assert not hasattr(o.metadata, "remove_properties")
-    assert not hasattr(o.metadata.component, "remove_purl")
-    assert not hasattr(o.components, "remove_hashes")
+    for removed in ("root", "metadata"):
+        assert not hasattr(o, removed)
+    for removed in ("reorder", "remove_dependencies", "remove_services"):
+        assert not hasattr(o.components, removed)
 
 
 def test_default_stats_contain_only_enabled_rules():
@@ -57,7 +68,7 @@ def test_default_stats_contain_only_enabled_rules():
     ]
 
 
-def test_all_enabled_rules_yield_eleven_stats_in_canonical_order():
+def test_all_enabled_rules_yield_eight_stats_in_canonical_order():
     options = SbomFixOptions(components={"fill_missing_gost_properties": True})
     result = fix_sbom(
         {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}, options
@@ -81,12 +92,12 @@ def test_keep_list_normalizes_entries_and_rejects_non_list():
 @pytest.mark.parametrize("value", ["", " ", "   ", "1", "1.7.0", "v1.7", "1,7", 1.7])
 def test_invalid_spec_version_rejected(value):
     with pytest.raises(ValidationError):
-        SbomFixOptions(root={"spec_version": value})
+        SbomFixOptions(spec_version=value)
 
 
 def test_spec_version_is_trimmed_before_validation():
-    options = SbomFixOptions(root={"spec_version": " 1.7 "})
-    assert options.root.spec_version == "1.7"
+    options = SbomFixOptions(spec_version=" 1.7 ")
+    assert options.spec_version == "1.7"
 
 
 def test_rule_ids_match_canonical_order():
@@ -99,7 +110,7 @@ def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
     assert result.fixed_sbom == data
     assert result.fixed_sbom is not data
     assert result.changed is False
-    assert len(result.stats) == 10
+    assert len(result.stats) == 7
     assert all(stat.count == 0 for stat in result.stats)
     assert [stat.rule_id for stat in result.stats] == [
         rule for rule in NEW_RULE_IDS if rule != "components.fill_missing_gost_properties"
@@ -127,12 +138,12 @@ def test_add_manufacturer_fills_missing_or_empty(component):
         "version": 1,
         "metadata": {"component": component},
     }
-    options = SbomFixOptions(metadata={"component": {"manufacturer": "  Acme  "}})
+    options = SbomFixOptions(manufacturer="  Acme  ")
     result = fix_sbom(data, options)
     assert data["metadata"]["component"].get("manufacturer") in (None, {}, {"name": "  "})
     assert result.fixed_sbom["metadata"]["component"]["manufacturer"] == {"name": "Acme"}
     stats = {stat.rule_id: stat.count for stat in result.stats}
-    assert stats["metadata_component.add_manufacturer"] == 1
+    assert stats["add_manufacturer"] == 1
 
 
 def test_add_manufacturer_keeps_existing_value_and_ignores_supplier():
@@ -164,16 +175,16 @@ def test_add_manufacturer_disabled_leaves_component_untouched():
             "component": {"type": "application", "name": "app", "version": "1.0"}
         },
     }
-    options = SbomFixOptions(metadata={"component": {"add_manufacturer": False}})
+    options = SbomFixOptions(add_manufacturer=False)
     result = fix_sbom(data, options)
     assert "manufacturer" not in result.fixed_sbom["metadata"]["component"]
-    assert "metadata_component.add_manufacturer" not in _stats(result)
+    assert "add_manufacturer" not in _stats(result)
 
 
 @pytest.mark.parametrize("value", ["", "   "])
 def test_empty_manufacturer_value_is_rejected(value):
     with pytest.raises(ValidationError):
-        SbomFixOptions(metadata={"component": {"manufacturer": value}})
+        SbomFixOptions(manufacturer=value)
 
 
 def test_remove_fields_runs_before_add_manufacturer_and_appears_in_stats():
@@ -322,7 +333,7 @@ def test_root_reorder_puts_schema_last():
         "bomFormat", "specVersion", "serialNumber", "version",
         "components", "annotations", "$schema",
     ]
-    assert result.stats[0].count == 1
+    assert _stats(result)["reorder"] == 1
 
 
 def test_root_reorder_skips_missing_keys_and_preserves_other_relative_order():
@@ -333,7 +344,7 @@ def test_root_reorder_skips_missing_keys_and_preserves_other_relative_order():
         "extra_a": 1,
         "bomFormat": "CycloneDX",
     }
-    result = fix_sbom(data, SbomFixOptions(root={"set_spec_version": False}))
+    result = fix_sbom(data, SbomFixOptions(set_spec_version=False))
     assert list(result.fixed_sbom) == [
         "bomFormat", "components", "$schema", "extra_b", "extra_a",
     ]
@@ -350,12 +361,12 @@ def test_metadata_reorder_puts_timestamp_and_component_first():
             "timestamp": "2020-01-01T00:00:00Z",
         },
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(data, _reorder_only_options())
     assert list(result.fixed_sbom["metadata"]) == [
         "timestamp", "component", "authors", "manufacture",
     ]
     stats = {stat.rule_id: stat.count for stat in result.stats}
-    assert stats["metadata.reorder"] == 1
+    assert stats["reorder"] == 1
 
 
 def test_metadata_component_reorder_puts_canonical_fields_first():
@@ -372,12 +383,12 @@ def test_metadata_component_reorder_puts_canonical_fields_first():
             },
         },
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(data, _reorder_only_options())
     assert list(result.fixed_sbom["metadata"]["component"]) == [
         "type", "name", "version", "manufacturer", "bom-ref",
     ]
     stats = {stat.rule_id: stat.count for stat in result.stats}
-    assert stats["metadata_component.reorder"] == 1
+    assert stats["reorder"] == 1
 
 
 def test_components_reorder_is_recursive_and_counts_each_changed_component():
@@ -396,7 +407,7 @@ def test_components_reorder_is_recursive_and_counts_each_changed_component():
             },
         ]
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(data, _reorder_only_options())
     components = result.fixed_sbom["components"]
     assert list(components[0]) == ["type", "name", "version"]
     assert list(components[1]) == ["type", "name"]
@@ -405,7 +416,7 @@ def test_components_reorder_is_recursive_and_counts_each_changed_component():
     ]
     assert list(components[2]["components"][0]) == ["type", "name", "purl"]
     stats = {stat.rule_id: stat.count for stat in result.stats}
-    assert stats["components.reorder"] == 2
+    assert stats["reorder"] == 2
 
 
 def test_components_reorder_does_not_enter_metadata_component_components():
@@ -419,11 +430,36 @@ def test_components_reorder_does_not_enter_metadata_component_components():
         },
         "components": [{"type": "library", "name": "a"}],
     }
-    result = fix_sbom(data, SbomFixOptions())
+    result = fix_sbom(data, _reorder_only_options())
     nested = result.fixed_sbom["metadata"]["component"]["components"][0]
     assert list(nested) == ["name", "type"]
     stats = {stat.rule_id: stat.count for stat in result.stats}
-    assert stats["components.reorder"] == 0
+    assert stats["reorder"] == 0
+
+
+def test_merged_reorder_counts_only_changed_objects():
+    data = {
+        "components": [{"version": "1", "name": "a", "type": "library"}],
+        "metadata": {
+            "component": {"name": "root", "type": "application"},
+            "timestamp": "2020-01-01T00:00:00Z",
+        },
+        "specVersion": "1.7",
+        "bomFormat": "CycloneDX",
+    }
+    options = SbomFixOptions(
+        reorder=True,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+    )
+    result = fix_sbom(data, options)
+    assert list(result.fixed_sbom) == ["bomFormat", "specVersion", "metadata", "components"]
+    assert list(result.fixed_sbom["metadata"]) == ["timestamp", "component"]
+    assert list(result.fixed_sbom["metadata"]["component"]) == ["type", "name"]
+    assert list(result.fixed_sbom["components"][0]) == ["type", "name", "version"]
+    assert _stats(result)["reorder"] == 4
 
 
 def test_disabled_reorder_changes_nothing_and_is_absent_from_stats():
@@ -438,12 +474,11 @@ def test_disabled_reorder_changes_nothing_and_is_absent_from_stats():
         "components": [{"version": "1", "name": "a", "type": "library"}],
     }
     options = SbomFixOptions(
-        root={"reorder": False},
-        metadata={
-            "reorder": False,
-            "component": {"reorder": False, "add_manufacturer": False},
-        },
-        components={"reorder": False},
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
     )
     result = fix_sbom(data, options)
     assert list(result.fixed_sbom) == [
@@ -455,10 +490,7 @@ def test_disabled_reorder_changes_nothing_and_is_absent_from_stats():
         "version", "name", "type",
     ]
     rule_ids = {stat.rule_id for stat in result.stats}
-    assert "root.reorder" not in rule_ids
-    assert "metadata.reorder" not in rule_ids
-    assert "metadata_component.reorder" not in rule_ids
-    assert "components.reorder" not in rule_ids
+    assert "reorder" not in rule_ids
     assert all(stat.count == 0 for stat in result.stats)
 
 
@@ -468,33 +500,33 @@ def _stats(result):
 
 def test_set_spec_version_replaces_value_and_counts_one():
     data = {"bomFormat": "CycloneDX", "specVersion": "1.6"}
-    result = fix_sbom(data, SbomFixOptions(root={"spec_version": "1.7"}))
+    result = fix_sbom(data, SbomFixOptions(spec_version="1.7"))
     assert result.fixed_sbom["specVersion"] == "1.7"
-    assert _stats(result)["root.set_spec_version"] == 1
+    assert _stats(result)["set_spec_version"] == 1
     assert result.changed is True
 
 
 def test_set_spec_version_adds_missing_key_and_counts_one():
     data = {"bomFormat": "CycloneDX"}
-    result = fix_sbom(data, SbomFixOptions(root={"spec_version": "1.6"}))
+    result = fix_sbom(data, SbomFixOptions(spec_version="1.6"))
     assert result.fixed_sbom["specVersion"] == "1.6"
-    assert _stats(result)["root.set_spec_version"] == 1
+    assert _stats(result)["set_spec_version"] == 1
 
 
 def test_set_spec_version_same_value_counts_zero():
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
-    result = fix_sbom(data, SbomFixOptions(root={"spec_version": "1.7"}))
+    result = fix_sbom(data, SbomFixOptions(spec_version="1.7"))
     assert result.fixed_sbom == data
-    assert _stats(result)["root.set_spec_version"] == 0
+    assert _stats(result)["set_spec_version"] == 0
 
 
 def test_set_spec_version_strips_configured_value():
     options = SbomFixOptions()
-    options.root.spec_version = " 1.7 "
+    options.spec_version = " 1.7 "
     data = {"bomFormat": "CycloneDX", "specVersion": "1.6"}
     result = fix_sbom(data, options)
     assert result.fixed_sbom["specVersion"] == "1.7"
-    assert _stats(result)["root.set_spec_version"] == 1
+    assert _stats(result)["set_spec_version"] == 1
 
 
 @pytest.mark.parametrize("value", [0, 1, -3])
@@ -502,7 +534,7 @@ def test_increment_version_increments_integers(value):
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": value}
     result = fix_sbom(data, SbomFixOptions())
     assert result.fixed_sbom["version"] == value + 1
-    assert _stats(result)["root.increment_version"] == 1
+    assert _stats(result)["increment_version"] == 1
 
 
 @pytest.mark.parametrize("value", ["1", 1.5, True, False, None])
@@ -510,14 +542,14 @@ def test_increment_version_leaves_missing_or_non_int_unchanged(value):
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": value}
     result = fix_sbom(data, SbomFixOptions())
     assert result.fixed_sbom["version"] == value
-    assert _stats(result)["root.increment_version"] == 0
+    assert _stats(result)["increment_version"] == 0
 
 
 def test_increment_version_absent_counts_zero_and_does_not_add_key():
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
     result = fix_sbom(data, SbomFixOptions())
     assert "version" not in result.fixed_sbom
-    assert _stats(result)["root.increment_version"] == 0
+    assert _stats(result)["increment_version"] == 0
 
 
 def test_disabled_root_rules_leave_fields_untouched_and_are_absent_from_stats():
@@ -529,40 +561,36 @@ def test_disabled_root_rules_leave_fields_untouched_and_are_absent_from_stats():
         "services": [],
     }
     options = SbomFixOptions(
-        root={
-            "set_spec_version": False,
-            "increment_version": False,
-        }
+        set_spec_version=False,
+        increment_version=False,
     )
     result = fix_sbom(data, options)
     assert result.fixed_sbom == data
     rule_ids = {stat.rule_id for stat in result.stats}
-    assert "root.set_spec_version" not in rule_ids
-    assert "root.increment_version" not in rule_ids
+    assert "set_spec_version" not in rule_ids
+    assert "increment_version" not in rule_ids
     assert result.changed is False
 
 
 def test_added_spec_version_goes_last_when_root_reorder_disabled():
     data = {"bomFormat": "CycloneDX", "version": 5}
-    options = SbomFixOptions(root={"reorder": False})
+    options = SbomFixOptions(reorder=False)
     result = fix_sbom(data, options)
     assert list(result.fixed_sbom) == ["bomFormat", "version", "specVersion"]
     stats = _stats(result)
-    assert stats["root.set_spec_version"] == 1
-    assert stats["root.increment_version"] == 1
-    assert "root.reorder" not in stats
+    assert stats["set_spec_version"] == 1
+    assert stats["increment_version"] == 1
+    assert "reorder" not in stats
     assert result.changed is True
 
 
 def test_any_root_rule_with_positive_count_sets_changed():
     options = SbomFixOptions(
-        root={
-            "set_spec_version": False,
-        }
+        set_spec_version=False,
     )
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1}
     result = fix_sbom(data, options)
-    assert _stats(result)["root.increment_version"] == 1
+    assert _stats(result)["increment_version"] == 1
     assert result.changed is True
 
 
@@ -579,7 +607,7 @@ def test_add_timestamp_sets_now_when_absent_null_or_empty(metadata):
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "metadata": metadata}
     result = fix_sbom(data, SbomFixOptions(), now=NOW)
     assert result.fixed_sbom["metadata"]["timestamp"] == NOW_TEXT
-    assert _stats(result)["metadata.add_timestamp"] == 1
+    assert _stats(result)["add_timestamp"] == 1
     assert result.changed is True
 
 
@@ -596,14 +624,14 @@ def test_add_timestamp_never_overwrites_existing_non_empty_value(value):
     }
     result = fix_sbom(data, SbomFixOptions(), now=NOW)
     assert result.fixed_sbom["metadata"]["timestamp"] == value
-    assert _stats(result)["metadata.add_timestamp"] == 0
+    assert _stats(result)["add_timestamp"] == 0
 
 
 def test_add_timestamp_does_nothing_without_metadata():
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7"}
     result = fix_sbom(data, SbomFixOptions(), now=NOW)
     assert "metadata" not in result.fixed_sbom
-    assert _stats(result)["metadata.add_timestamp"] == 0
+    assert _stats(result)["add_timestamp"] == 0
     assert result.changed is False
 
 
@@ -630,7 +658,7 @@ def test_add_timestamp_is_idempotent_with_same_now():
     first = fix_sbom(data, SbomFixOptions(), now=NOW)
     second = fix_sbom(first.fixed_sbom, SbomFixOptions(), now=NOW)
     assert second.fixed_sbom["metadata"]["timestamp"] == NOW_TEXT
-    assert _stats(second)["metadata.add_timestamp"] == 0
+    assert _stats(second)["add_timestamp"] == 0
     assert second.changed is False
 
 
@@ -677,10 +705,10 @@ def test_metadata_component_add_manufacturer_skips_when_component_missing_or_nul
     metadata,
 ):
     data = {"bomFormat": "CycloneDX", "specVersion": "1.7", "metadata": metadata}
-    options = SbomFixOptions(metadata={"add_timestamp": False})
+    options = SbomFixOptions(add_timestamp=False)
     result = fix_sbom(data, options, now=NOW)
     assert result.fixed_sbom["metadata"] == metadata
-    assert _stats(result)["metadata_component.add_manufacturer"] == 0
+    assert _stats(result)["add_manufacturer"] == 0
 
 
 @pytest.mark.parametrize("metadata", [None, [], "text"], ids=["null", "list", "string"])
@@ -689,8 +717,8 @@ def test_metadata_rules_skip_when_metadata_is_not_object(metadata):
     result = fix_sbom(data, SbomFixOptions(), now=NOW)
     assert result.fixed_sbom["metadata"] == metadata
     stats = _stats(result)
-    assert stats["metadata.add_timestamp"] == 0
-    assert stats["metadata_component.add_manufacturer"] == 0
+    assert stats["add_timestamp"] == 0
+    assert stats["add_manufacturer"] == 0
 
 
 def test_disabled_metadata_rules_leave_fields_untouched_and_are_absent_from_stats():
@@ -710,21 +738,16 @@ def test_disabled_metadata_rules_leave_fields_untouched_and_are_absent_from_stat
         },
     }
     options = SbomFixOptions(
-        root={"reorder": False},
-        metadata={
-            "add_timestamp": False,
-            "reorder": False,
-            "component": {
-                "reorder": False,
-                "add_manufacturer": False,
-            },
-        },
+        reorder=False,
+        add_timestamp=False,
+        add_manufacturer=False,
     )
     result = fix_sbom(data, options, now=NOW)
     assert result.fixed_sbom == data
     rule_ids = {stat.rule_id for stat in result.stats}
-    assert "metadata.add_timestamp" not in rule_ids
-    assert "metadata_component.add_manufacturer" not in rule_ids
+    assert "reorder" not in rule_ids
+    assert "add_timestamp" not in rule_ids
+    assert "add_manufacturer" not in rule_ids
     assert result.changed is False
 
 
@@ -1157,14 +1180,11 @@ def test_disabled_components_rules_leave_fields_untouched():
         ]
     }
     options = SbomFixOptions(
-        root={"reorder": False, "set_spec_version": False},
-        metadata={
-            "add_timestamp": False,
-            "reorder": False,
-            "component": {"reorder": False},
-        },
+        reorder=False,
+        set_spec_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
         components={
-            "reorder": False,
             "filter_external_references": False,
             "filter_properties": False,
             "fill_missing_gost_properties": False,
@@ -1603,21 +1623,12 @@ def test_collect_component_issues_ignores_non_list_input():
 
 def _all_disabled_options():
     return SbomFixOptions(
-        root={
-            "reorder": False,
-            "set_spec_version": False,
-            "increment_version": False,
-        },
-        metadata={
-            "add_timestamp": False,
-            "reorder": False,
-            "component": {
-                "reorder": False,
-                "add_manufacturer": False,
-            },
-        },
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
         components={
-            "reorder": False,
             "filter_external_references": False,
             "filter_properties": False,
             "fill_missing_gost_properties": False,

@@ -56,61 +56,18 @@ REQUIRED_GOST_PROPERTIES: tuple[tuple[str, str], ...] = (
 )
 
 RULE_IDS: tuple[str, ...] = (
-    "root.reorder",
-    "root.set_spec_version",
-    "root.increment_version",
-    "metadata.add_timestamp",
-    "metadata.reorder",
-    "metadata_component.reorder",
-    "metadata_component.add_manufacturer",
-    "components.reorder",
+    "reorder",
+    "set_spec_version",
+    "increment_version",
+    "add_timestamp",
+    "add_manufacturer",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
 )
 
 
-class RootFixOptions(BaseModel):
-    reorder: bool = True
-    set_spec_version: bool = True
-    spec_version: str = "1.7"
-    increment_version: bool = True
-
-    @field_validator("spec_version", mode="before")
-    @classmethod
-    def _validate_spec_version(cls, value: object) -> str:
-        if isinstance(value, str):
-            value = value.strip()
-        if not isinstance(value, str) or not SPEC_VERSION_PATTERN.fullmatch(value):
-            raise ValueError("spec_version must match ^\\d+\\.\\d+$")
-        return value
-
-
-class MetadataComponentFixOptions(BaseModel):
-    reorder: bool = True
-    add_manufacturer: bool = True
-    manufacturer: str = "Positive Technologies"
-
-    @field_validator("manufacturer", mode="before")
-    @classmethod
-    def _validate_manufacturer(cls, value: object) -> str:
-        if isinstance(value, str):
-            value = value.strip()
-        if not isinstance(value, str) or not value:
-            raise ValueError("manufacturer must be a non-empty string")
-        return value
-
-
-class MetadataFixOptions(BaseModel):
-    add_timestamp: bool = True
-    reorder: bool = True
-    component: MetadataComponentFixOptions = Field(
-        default_factory=MetadataComponentFixOptions
-    )
-
-
 class ComponentsFixOptions(BaseModel):
-    reorder: bool = True
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False
@@ -128,12 +85,33 @@ class OptionalFieldsFixOptions(BaseModel):
 
 
 class SbomFixOptions(BaseModel):
-    root: RootFixOptions = Field(default_factory=RootFixOptions)
-    metadata: MetadataFixOptions = Field(default_factory=MetadataFixOptions)
+    reorder: bool = True
+    set_spec_version: bool = True
+    spec_version: str = "1.7"
+    increment_version: bool = True
+    add_timestamp: bool = True
+    add_manufacturer: bool = True
+    manufacturer: str = "Positive Technologies"
     components: ComponentsFixOptions = Field(default_factory=ComponentsFixOptions)
-    optional_fields: OptionalFieldsFixOptions = Field(
-        default_factory=OptionalFieldsFixOptions
-    )
+    optional_fields: OptionalFieldsFixOptions = Field(default_factory=OptionalFieldsFixOptions)
+
+    @field_validator("spec_version", mode="before")
+    @classmethod
+    def _validate_spec_version(cls, value: object) -> str:
+        if isinstance(value, str):
+            value = value.strip()
+        if not isinstance(value, str) or not SPEC_VERSION_PATTERN.fullmatch(value):
+            raise ValueError("spec_version must match ^\\d+\\.\\d+$")
+        return value
+
+    @field_validator("manufacturer", mode="before")
+    @classmethod
+    def _validate_manufacturer(cls, value: object) -> str:
+        if isinstance(value, str):
+            value = value.strip()
+        if not isinstance(value, str) or not value:
+            raise ValueError("manufacturer must be a non-empty string")
+        return value
 
 
 @dataclass
@@ -160,18 +138,9 @@ class SbomFixResult:
 
 
 def _rule_enabled(rule_id: str, options: SbomFixOptions) -> bool:
-    if rule_id.startswith("root."):
-        return getattr(options.root, rule_id.removeprefix("root."))
-    if rule_id.startswith("metadata_component."):
-        return getattr(
-            options.metadata.component,
-            rule_id.removeprefix("metadata_component."),
-        )
-    if rule_id.startswith("metadata."):
-        return getattr(options.metadata, rule_id.removeprefix("metadata."))
     if rule_id.startswith("components."):
         return getattr(options.components, rule_id.removeprefix("components."))
-    raise ValueError(f"Unknown rule id: {rule_id}")
+    return getattr(options, rule_id)
 
 
 def _enabled_rule_ids(options: SbomFixOptions) -> list[str]:
@@ -212,18 +181,18 @@ def _apply_root_rules(
     options: SbomFixOptions,
     counts: dict[str, int],
 ) -> None:
-    if _rule_enabled("root.set_spec_version", options):
-        target = options.root.spec_version.strip()
-        counts["root.set_spec_version"] = int(data.get("specVersion") != target)
+    if _rule_enabled("set_spec_version", options):
+        target = options.spec_version.strip()
+        counts["set_spec_version"] = int(data.get("specVersion") != target)
         data["specVersion"] = target
 
-    if _rule_enabled("root.increment_version", options):
+    if _rule_enabled("increment_version", options):
         version = data.get("version")
         if isinstance(version, int) and not isinstance(version, bool):
             data["version"] = version + 1
-            counts["root.increment_version"] = 1
+            counts["increment_version"] = 1
         else:
-            counts["root.increment_version"] = 0
+            counts["increment_version"] = 0
 
 
 def _format_timestamp(now: datetime) -> str:
@@ -262,16 +231,16 @@ def _apply_metadata_rules(
     if not isinstance(metadata, dict):
         return
 
-    if _rule_enabled("metadata.add_timestamp", options):
-        counts["metadata.add_timestamp"] = _add_timestamp(metadata, now)
+    if _rule_enabled("add_timestamp", options):
+        counts["add_timestamp"] = _add_timestamp(metadata, now)
 
     component = metadata.get("component")
     if not isinstance(component, dict):
         return
 
-    if _rule_enabled("metadata_component.add_manufacturer", options):
-        counts["metadata_component.add_manufacturer"] = _add_manufacturer(
-            component, options.metadata.component.manufacturer
+    if _rule_enabled("add_manufacturer", options):
+        counts["add_manufacturer"] = _add_manufacturer(
+            component, options.manufacturer
         )
 
 
@@ -589,36 +558,30 @@ def _apply_components_rules(
     _walk_components(data, apply)
 
 
-def _apply_reorders(
+def _apply_reorder(
     data: dict,
     options: SbomFixOptions,
     counts: dict[str, int],
-) -> dict:
-    if _rule_enabled("root.reorder", options):
-        counts["root.reorder"] = int(_reorder_in_place(data, ROOT_PRIORITY))
-
+) -> None:
+    if not options.reorder:
+        return
+    count = int(_reorder_in_place(data, ROOT_PRIORITY))
     metadata = data.get("metadata")
     if isinstance(metadata, dict):
-        if _rule_enabled("metadata.reorder", options):
-            counts["metadata.reorder"] = int(
-                _reorder_in_place(metadata, METADATA_PRIORITY)
-            )
+        count += int(_reorder_in_place(metadata, METADATA_PRIORITY))
         metadata_component = metadata.get("component")
-        if isinstance(metadata_component, dict) and _rule_enabled(
-            "metadata_component.reorder", options
-        ):
-            counts["metadata_component.reorder"] = int(
+        if isinstance(metadata_component, dict):
+            count += int(
                 _reorder_in_place(metadata_component, METADATA_COMPONENT_PRIORITY)
             )
-
     components = data.get("components")
-    if isinstance(components, list) and _rule_enabled("components.reorder", options):
-        counts["components.reorder"] = sum(
+    if isinstance(components, list):
+        count += sum(
             _reorder_component_tree(component)
             for component in components
             if isinstance(component, dict)
         )
-    return data
+    counts["reorder"] = count
 
 
 def fix_sbom(
@@ -637,7 +600,7 @@ def fix_sbom(
     _apply_root_rules(fixed_sbom, options, counts)
     _apply_metadata_rules(fixed_sbom, options, counts, now)
     _apply_components_rules(fixed_sbom, options, counts)
-    fixed_sbom = _apply_reorders(fixed_sbom, options, counts)
+    _apply_reorder(fixed_sbom, options, counts)
     stats = [
         FixStat(rule_id=rule_id, count=counts.get(rule_id, 0))
         for rule_id in _enabled_rule_ids(options)
