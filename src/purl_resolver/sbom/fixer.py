@@ -48,6 +48,8 @@ ALLOWED_EXTERNAL_REFERENCE_TYPES: tuple[str, ...] = (
     "source-distribution",
 )
 
+PROPRIETARY_LICENSE_NAME = "Proprietary"
+
 GOST_PROPERTY_PREFIX = "GOST:"
 
 REQUIRED_GOST_PROPERTIES: tuple[tuple[str, str], ...] = (
@@ -540,6 +542,36 @@ def _fill_gost_properties(component: dict) -> int:
     return added
 
 
+def _is_proprietary_license_entry(entry: Any) -> bool:
+    return (
+        isinstance(entry, dict)
+        and isinstance(entry.get("license"), dict)
+        and entry["license"].get("name") == PROPRIETARY_LICENSE_NAME
+    )
+
+
+def _has_proprietary_license(component: dict) -> bool:
+    licenses = component.get("licenses")
+    return isinstance(licenses, list) and any(
+        _is_proprietary_license_entry(entry) for entry in licenses
+    )
+
+
+def _filter_non_proprietary_licenses(component: dict) -> int:
+    licenses = component.get("licenses")
+    if not isinstance(licenses, list):
+        return 0
+    kept = [entry for entry in licenses if _is_proprietary_license_entry(entry)]
+    removed = len(licenses) - len(kept)
+    if not removed:
+        return 0
+    if kept:
+        component["licenses"] = kept
+    else:
+        del component["licenses"]
+    return removed
+
+
 def _apply_components_rules(
     data: dict,
     options: SbomFixOptions,
@@ -572,6 +604,23 @@ def _apply_components_rules(
             counts["components.fill_missing_gost_properties"] = (
                 counts.get("components.fill_missing_gost_properties", 0)
                 + _fill_gost_properties(component)
+            )
+
+    _walk_components(data, apply)
+
+
+def _apply_licenses_rules(
+    data: dict,
+    options: SbomFixOptions,
+    counts: dict[str, int],
+) -> None:
+    filter_non_proprietary = options.licenses.filter_non_proprietary
+
+    def apply(component: dict) -> None:
+        if filter_non_proprietary:
+            counts["licenses.filter_non_proprietary"] = (
+                counts.get("licenses.filter_non_proprietary", 0)
+                + _filter_non_proprietary_licenses(component)
             )
 
     _walk_components(data, apply)
@@ -619,6 +668,7 @@ def fix_sbom(
     _apply_root_rules(fixed_sbom, options, counts)
     _apply_metadata_rules(fixed_sbom, options, counts, now)
     _apply_components_rules(fixed_sbom, options, counts)
+    _apply_licenses_rules(fixed_sbom, options, counts)
     _apply_reorder(fixed_sbom, options, counts)
     stats = [
         FixStat(rule_id=rule_id, count=counts.get(rule_id, 0))

@@ -1989,3 +1989,94 @@ def test_license_pattern_item_defaults_are_empty_strings():
     item = LicensePatternItem()
     assert item.field == ""
     assert item.pattern == ""
+
+
+def _license_options(**licenses) -> SbomFixOptions:
+    return SbomFixOptions(
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+        components={
+            "filter_external_references": False,
+            "filter_properties": False,
+        },
+        licenses=licenses,
+    )
+
+
+def _stat(result, rule_id):
+    return next(stat for stat in result.stats if stat.rule_id == rule_id)
+
+
+def test_filter_non_proprietary_keeps_only_proprietary_entries():
+    data = {
+        "components": [
+            {
+                "type": "library",
+                "name": "lib",
+                "version": "1.0.0",
+                "purl": "pkg:pypi/lib@1.0.0",
+                "licenses": [
+                    {"license": {"id": "MIT"}},
+                    {"license": {"name": "Proprietary"}},
+                    {"expression": "Apache-2.0"},
+                ],
+            }
+        ]
+    }
+    result = fix_sbom(data, _license_options(filter_non_proprietary=True))
+    component = result.fixed_sbom["components"][0]
+    assert component["licenses"] == [{"license": {"name": "Proprietary"}}]
+    assert _stat(result, "licenses.filter_non_proprietary").count == 2
+
+
+def test_filter_non_proprietary_walks_nested_components():
+    data = {
+        "components": [
+            {
+                "name": "parent",
+                "components": [
+                    {"name": "child", "licenses": [{"license": {"id": "MIT"}}]}
+                ],
+            }
+        ]
+    }
+    result = fix_sbom(data, _license_options(filter_non_proprietary=True))
+    child = result.fixed_sbom["components"][0]["components"][0]
+    assert "licenses" not in child
+    assert _stat(result, "licenses.filter_non_proprietary").count == 1
+
+
+def test_filter_non_proprietary_removes_emptied_array():
+    data = {"components": [{"name": "lib", "licenses": [{"license": {"id": "MIT"}}]}]}
+    result = fix_sbom(data, _license_options(filter_non_proprietary=True))
+    assert "licenses" not in result.fixed_sbom["components"][0]
+
+
+def test_filter_non_proprietary_leaves_preexisting_empty_array():
+    data = {"components": [{"name": "lib", "licenses": []}]}
+    result = fix_sbom(data, _license_options(filter_non_proprietary=True))
+    assert result.fixed_sbom["components"][0]["licenses"] == []
+    assert _stat(result, "licenses.filter_non_proprietary").count == 0
+
+
+def test_filter_non_proprietary_leaves_non_list_licenses():
+    data = {"components": [{"name": "lib", "licenses": "MIT"}]}
+    result = fix_sbom(data, _license_options(filter_non_proprietary=True))
+    assert result.fixed_sbom["components"][0]["licenses"] == "MIT"
+    assert _stat(result, "licenses.filter_non_proprietary").count == 0
+
+
+def test_filter_non_proprietary_does_not_touch_metadata_component():
+    data = {
+        "metadata": {
+            "component": {"name": "app", "licenses": [{"license": {"id": "MIT"}}]}
+        }
+    }
+    result = fix_sbom(data, _license_options(filter_non_proprietary=True))
+    assert result.fixed_sbom["metadata"]["component"]["licenses"] == [
+        {"license": {"id": "MIT"}}
+    ]
+    assert _stat(result, "licenses.filter_non_proprietary").count == 0
