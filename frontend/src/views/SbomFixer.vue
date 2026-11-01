@@ -172,9 +172,9 @@
               <input v-model="row.field" type="text" class="pattern-input" data-pattern-field :placeholder="t('sbomFixer.licenses.fieldPlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.fieldPlaceholder')" />
               <span class="pattern-label">{{ t('sbomFixer.licenses.contains') }}</span>
               <input v-model="row.pattern" type="text" class="pattern-input" data-pattern-value :placeholder="t('sbomFixer.licenses.valuePlaceholder')" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.valuePlaceholder')" />
-              <button type="button" class="btn-delete" data-action="remove-pattern" :aria-label="t('sbomFixer.licenses.removeRow')" @click="removePatternRow(idx)">✕</button>
+              <button type="button" class="btn-delete" data-action="remove-pattern" :disabled="!options.licenses.add_proprietary" :aria-label="t('sbomFixer.licenses.removeRow')" @click="removePatternRow(idx)">✕</button>
             </div>
-            <button type="button" class="btn btn-small" data-action="add-pattern" @click="addPatternRow">{{ t('sbomFixer.licenses.addRow') }}</button>
+            <button type="button" class="btn btn-small" data-action="add-pattern" :disabled="!options.licenses.add_proprietary" @click="addPatternRow">{{ t('sbomFixer.licenses.addRow') }}</button>
           </div>
         </div>
       </div>

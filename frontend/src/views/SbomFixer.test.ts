@@ -450,6 +450,7 @@ describe('SbomFixer.vue', () => {
 
   it('adds and removes pattern rows', async () => {
     const wrapper = await mountFixer()
+    await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
     await wrapper.find('[data-action="add-pattern"]').trigger('click')
     expect(wrapper.findAll('[data-group="licenses"] [data-pattern-row]')).toHaveLength(2)
     await wrapper.findAll('[data-action="remove-pattern"]')[1].trigger('click')
@@ -459,8 +460,12 @@ describe('SbomFixer.vue', () => {
   it('disables the pattern editor while the add rule is off', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('[data-pattern-field]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-action="remove-pattern"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-action="add-pattern"]').attributes('disabled')).toBeDefined()
     await wrapper.find(rule('licenses.add_proprietary')).setValue(true)
     expect(wrapper.find('[data-pattern-field]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-action="remove-pattern"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-action="add-pattern"]').attributes('disabled')).toBeUndefined()
   })
 
   it('saves normalized non-empty patterns', async () => {
