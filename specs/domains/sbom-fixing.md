@@ -121,7 +121,7 @@ def analyze_fields(data) -> list[FieldInfo]
 def remove_optional_fields(data, paths, keep) -> dict[str, int]
 ```
 
-Default set: every static option is `True` except `components.fill_missing_gost_properties` (`False`); `spec_version` is `"1.7"`; `manufacturer` is `"Positive Technologies"`; `optional_fields.keep` equals `DEFAULT_KEEP_FIELDS`. With defaults `stats` contains 7 entries (the 8 static rules minus `components.fill_missing_gost_properties`) plus any removal rows.
+Default set: every static option is `True` except `components.fill_missing_gost_properties` (`False`); `spec_version` is `"1.7"`; `manufacturer` is `"Positive Technologies"`; `optional_fields.keep` equals `DEFAULT_KEEP_FIELDS`.
 
 ## White Lists
 

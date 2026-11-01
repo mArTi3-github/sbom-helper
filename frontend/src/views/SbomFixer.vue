@@ -286,10 +286,10 @@
             </thead>
             <tbody>
               <tr v-for="(issue, index) in result.issues" :key="index">
-                <td class="issue-code">{{ issueLabel(issue) }}</td>
-                <td class="issue-path">{{ issue.path }}</td>
-                <td class="issue-component">{{ issue.component ?? '' }}</td>
-                <td class="issue-details">{{ issueDetails(issue) }}</td>
+                <td>{{ issueLabel(issue) }}</td>
+                <td>{{ issue.path }}</td>
+                <td>{{ issue.component ?? '' }}</td>
+                <td>{{ issueDetails(issue) }}</td>
               </tr>
             </tbody>
           </table>

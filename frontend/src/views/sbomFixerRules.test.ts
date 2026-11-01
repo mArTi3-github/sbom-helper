@@ -11,8 +11,8 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 }
 
 const GROUPS = [
-  { rules: BASE_RULES, prefix: '', size: 5 },
-  { rules: COMPONENTS_RULES, prefix: 'components.', size: 3 },
+  { rules: BASE_RULES, prefix: '', size: 5, flat: true },
+  { rules: COMPONENTS_RULES, prefix: 'components.', size: 3, flat: false },
 ]
 
 describe('sbomFixerRules catalog', () => {
@@ -45,6 +45,9 @@ describe('sbomFixerRules catalog', () => {
       expect(group.rules).toHaveLength(group.size)
       for (const rule of group.rules) {
         expect(rule.id.startsWith(group.prefix), rule.id).toBe(true)
+        if (group.flat) {
+          expect(rule.id.includes('.'), rule.id).toBe(false)
+        }
       }
     }
     expect(COMPONENTS_RULES[0].id).toBe('components.filter_external_references')
