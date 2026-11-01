@@ -2,11 +2,11 @@
 
 ## Description
 
-Synchronous normalization of a CycloneDX SBOM JSON document. The domain applies an explicitly selected subset of 11 named static rules plus an analysis-driven removal of optional fields, returns the fixed document together with per-rule statistics and a report of the defects that remain after the fixes were applied. It targets a fixed catalogue of formal defects (fields removed, `specVersion` set to `1.7`, external reference and property filters, optional GOST properties, missing `manufacturer`), not full FSTEC methodology compliance — producing a fully compliant SBOM is another service's responsibility. Removal of optional fields is a cosmetic cleanup of additional CycloneDX fields not described in the FSTEC tables, not a compliance pass. No database or background queue is involved. See `docs/superpowers/specs/2026-10-26-sbom-fixer-design.md` and `docs/superpowers/specs/2026-10-29-sbom-fixer-optional-fields-design.md` for the design rationale (git-ignored).
+Synchronous normalization of a CycloneDX SBOM JSON document. The domain applies an explicitly selected subset of 8 named static rules plus an analysis-driven removal of optional fields, returns the fixed document together with per-rule statistics and a report of the defects that remain after the fixes were applied. It targets a fixed catalogue of formal defects (fields removed, `specVersion` set to `1.7`, external reference and property filters, optional GOST properties, missing `manufacturer`), not full FSTEC methodology compliance — producing a fully compliant SBOM is another service's responsibility. Removal of optional fields is a cosmetic cleanup of additional CycloneDX fields not described in the FSTEC tables, not a compliance pass. No database or background queue is involved. See `docs/superpowers/specs/2026-10-26-sbom-fixer-design.md`, `docs/superpowers/specs/2026-10-29-sbom-fixer-optional-fields-design.md` and `docs/superpowers/specs/2026-11-01-sbom-fixer-base-fixes-group-design.md` for the design rationale (git-ignored).
 
 ## Key Files
 
-- `src/purl_resolver/sbom/fixer.py` — option models, the 11 static rules, `fix_sbom()` orchestrator, `FixStat`, `FixIssue`, `SbomFixResult`, and the issue collector
+- `src/purl_resolver/sbom/fixer.py` — option models, the 8 static rules, `fix_sbom()` orchestrator, `FixStat`, `FixIssue`, `SbomFixResult`, and the issue collector
 - `src/purl_resolver/sbom/optional_fields.py` — FSTEC field catalog (`FSTEC_FIELDS`, `FSTEC_PATHS`), the keep list (`DEFAULT_KEEP_FIELDS`), path grammar (`FIELD_PATH_PATTERN`), `normalize_keep`/`invalid_keep_entries`/`canonical_sort_key`, and the analysis/removal functions (`analyze_fields`, `remove_optional_fields`)
 - `src/purl_resolver/sbom/__init__.py` — public exports: `fix_sbom`, `SbomFixOptions`, `SbomFixResult`, `FixStat`, `FixIssue`, `OptionalFieldsFixOptions`
 - `src/purl_resolver/sbom/parser.py` — `CycloneDXParser` / `SbomParseError`; validates the root object and `bomFormat == "CycloneDX"` before fixing
@@ -15,7 +15,7 @@ Synchronous normalization of a CycloneDX SBOM JSON document. The domain applies 
 - `src/purl_resolver/router.py` — includes the `sbom_fix` sub-router
 - `src/purl_resolver/main.py` — creates `app.state.sbom_fix_options_store = SbomFixOptionsStore()` in the lifespan
 - `frontend/src/views/SbomFixer.vue` — Fix SBOM page
-- `frontend/src/views/sbomFixerRules.ts` — catalog of the 11 static rules (rule id, option key, before/after JSON examples) that drives the rule rows of the page
+- `frontend/src/views/sbomFixerRules.ts` — catalog of the 8 static rules (`BASE_RULES` with 5 entries, `COMPONENTS_RULES` with 3; rule id, option key, before/after JSON examples) that drives the rule rows of the page
 - `frontend/src/components/RuleHelp.vue` — inline rule help: "(i)" button and a panel with the rule description and before/after snippets
 - `frontend/src/api/sbom.ts` — `fixSbom()`, `getFixOptions()`, `saveFixOptions()`, `analyzeSbom()`, `getFieldCatalog()`
 - `frontend/src/types/api.ts` — `SbomFixOptions`, `SbomFixStat`, `SbomFixIssue`, `SbomFixResponse`, `SbomFixOptionsResponse`, `OptionalFieldsFixOptions`, `OptionalFieldStatus`, `OptionalFieldInfo`, `FstecField`, `FieldCatalogResponse`
@@ -42,37 +42,17 @@ REQUIRED_GOST_PROPERTIES = (("GOST:attack_surface", "no"),
                             ("GOST:security_function", "no"))
 
 RULE_IDS = (
-    "root.reorder",
-    "root.set_spec_version",
-    "root.increment_version",
-    "metadata.add_timestamp",
-    "metadata.reorder",
-    "metadata_component.reorder",
-    "metadata_component.add_manufacturer",
-    "components.reorder",
+    "reorder",
+    "set_spec_version",
+    "increment_version",
+    "add_timestamp",
+    "add_manufacturer",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
 )
 
-class RootFixOptions(BaseModel):
-    reorder: bool = True
-    set_spec_version: bool = True
-    spec_version: str = "1.7"          # must match ^\d+\.\d+$
-    increment_version: bool = True
-
-class MetadataComponentFixOptions(BaseModel):
-    reorder: bool = True
-    add_manufacturer: bool = True
-    manufacturer: str = "Positive Technologies"  # trimmed, non-empty
-
-class MetadataFixOptions(BaseModel):
-    add_timestamp: bool = True
-    reorder: bool = True
-    component: MetadataComponentFixOptions = Field(default_factory=MetadataComponentFixOptions)
-
 class ComponentsFixOptions(BaseModel):
-    reorder: bool = True
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False  # opt-in
@@ -82,8 +62,13 @@ class OptionalFieldsFixOptions(BaseModel):
     # validator (mode="before") rejects non-lists and otherwise applies normalize_keep()
 
 class SbomFixOptions(BaseModel):
-    root: RootFixOptions = Field(default_factory=RootFixOptions)
-    metadata: MetadataFixOptions = Field(default_factory=MetadataFixOptions)
+    reorder: bool = True
+    set_spec_version: bool = True
+    spec_version: str = "1.7"          # validator: trim, must match ^\d+\.\d+$
+    increment_version: bool = True
+    add_timestamp: bool = True
+    add_manufacturer: bool = True
+    manufacturer: str = "Positive Technologies"  # validator: trim, non-empty
     components: ComponentsFixOptions = Field(default_factory=ComponentsFixOptions)
     optional_fields: OptionalFieldsFixOptions = Field(default_factory=OptionalFieldsFixOptions)
 
@@ -136,7 +121,7 @@ def analyze_fields(data) -> list[FieldInfo]
 def remove_optional_fields(data, paths, keep) -> dict[str, int]
 ```
 
-Default set: every static option is `True` except `components.fill_missing_gost_properties` (`False`); `spec_version` is `"1.7"`; `manufacturer` is `"Positive Technologies"`; `optional_fields.keep` equals `DEFAULT_KEEP_FIELDS`. With defaults `stats` contains 10 entries (the 11 static rules minus `components.fill_missing_gost_properties`) plus any removal rows.
+Default set: every static option is `True` except `components.fill_missing_gost_properties` (`False`); `spec_version` is `"1.7"`; `manufacturer` is `"Positive Technologies"`; `optional_fields.keep` equals `DEFAULT_KEEP_FIELDS`. With defaults `stats` contains 7 entries (the 8 static rules minus `components.fill_missing_gost_properties`) plus any removal rows.
 
 ## White Lists
 
@@ -186,7 +171,7 @@ sbom/fixer.py::fix_sbom(data, options, now=None, remove_fields=())
   |  4. metadata rules: add timestamp; metadata.component: add manufacturer
   |  5. components rules (recursive pre-order): filter externalReferences/properties,
   |     fill GOST properties
-  |  6. reorder pass LAST: root -> metadata -> metadata.component -> all components
+  |  6. reorder rule LAST: root -> metadata -> metadata.component -> all components
   |  7. stats for every enabled rule + optional_fields.remove rows; changed = any(count > 0)
   |  8. issues collected from the final fixed_sbom
   v
@@ -214,17 +199,14 @@ Rules mutate a deep copy and never create issues; all issues come from a separat
 
 | # | Rule ID | Default | Behavior | `count` |
 |---|---|---|---|---|
-| 1 | `root.reorder` | on | Root key order: `bomFormat`, `specVersion`, `serialNumber`, `version`, `metadata`, `components`, `annotations`, then other keys in original relative order | 1 if key order changed else 0 |
-| 2 | `root.set_spec_version` | on | Set `specVersion` to trimmed `spec_version` (add if absent) | 1 if value changed/added else 0 |
-| 3 | `root.increment_version` | on | Increment `version` by 1 when it is an integer (not `bool`) | 1 if incremented |
-| 4 | `metadata.add_timestamp` | on | Add `metadata.timestamp` (current UTC, `YYYY-MM-DDTHH:MM:SSZ`) only when it is absent, `null`, or `""`; an existing non-empty value is never overwritten (a non-null, non-string value is left in place and reported) | 1 if added |
-| 5 | `metadata.reorder` | on | Order `timestamp`, `component`, then other keys | 1/0 |
-| 6 | `metadata_component.reorder` | on | Order `type`, `name`, `version`, `manufacturer`, then other keys | 1/0 |
-| 7 | `metadata_component.add_manufacturer` | on | When `metadata.component` is an object: treat `manufacturer` as absent when it is not an object or its `name` is not a non-empty string, then write `{"name": "<manufacturer>"}`; an existing valid `manufacturer` is never changed and `supplier` is never read or modified | 1 if written else 0 |
-| 8 | `components.reorder` | on | Per component: `type`, `name`, `version`, `purl`, `externalReferences`, `properties`, `components`, then others; recursive | Number of components whose key order changed |
-| 9 | `components.filter_external_references` | on | Keep only array items whose `type` is exactly `vcs` or `source-distribution`; empty arrays stay empty | Number of removed items |
-| 10 | `components.filter_properties` | on | Keep only array items whose `name` is a string starting exactly with `GOST:` (case-sensitive) | Number of removed items |
-| 11 | `components.fill_missing_gost_properties` | **off** | Create `properties: []` when absent/`null`; add missing `{"name": "GOST:attack_surface", "value": "no"}` and `{"name": "GOST:security_function", "value": "no"}`; leave non-array `properties` untouched | Number of added properties |
+| 1 | `reorder` | on | Orders every covered object: root keys `bomFormat`, `specVersion`, `serialNumber`, `version`, `metadata`, `components`, `annotations`; then `metadata` keys `timestamp`, `component`; then `metadata.component` keys `type`, `name`, `version`, `manufacturer`; then each component of the root `components[]` tree recursively (pre-order): `type`, `name`, `version`, `purl`, `externalReferences`, `properties`, `components`. Remaining keys keep their original relative order; `metadata.component.components` is not traversed; non-object nodes are skipped | Number of objects whose key order changed: root, `metadata`, `metadata.component`, and each component of the `components[]` tree count 1 each |
+| 2 | `set_spec_version` | on | Set `specVersion` to trimmed `spec_version` (add if absent) | 1 if value changed/added else 0 |
+| 3 | `increment_version` | on | Increment `version` by 1 when it is an integer (not `bool`) | 1 if incremented |
+| 4 | `add_timestamp` | on | Add `metadata.timestamp` (current UTC, `YYYY-MM-DDTHH:MM:SSZ`) only when it is absent, `null`, or `""`; an existing non-empty value is never overwritten (a non-null, non-string value is left in place and reported) | 1 if added |
+| 5 | `add_manufacturer` | on | When `metadata.component` is an object: treat `manufacturer` as absent when it is not an object or its `name` is not a non-empty string, then write `{"name": "<manufacturer>"}`; an existing valid `manufacturer` is never changed and `supplier` is never read or modified | 1 if written else 0 |
+| 6 | `components.filter_external_references` | on | Keep only array items whose `type` is exactly `vcs` or `source-distribution`; empty arrays stay empty | Number of removed items |
+| 7 | `components.filter_properties` | on | Keep only array items whose `name` is a string starting exactly with `GOST:` (case-sensitive) | Number of removed items |
+| 8 | `components.fill_missing_gost_properties` | **off** | Create `properties: []` when absent/`null`; add missing `{"name": "GOST:attack_surface", "value": "no"}` and `{"name": "GOST:security_function", "value": "no"}`; leave non-array `properties` untouched | Number of added properties |
 
 The former fixed field-removal options and the supplier-to-manufacturer rename rule no longer exist. Removal is now analysis-driven via the `optional_fields.remove` pseudo-rule described below; the full list of removed options is recorded in the historical design doc.
 
@@ -241,17 +223,18 @@ The whole key is removed (with a value of any shape, including empty array/objec
 
 Notes:
 
-- All component rules (8–11) apply only to the root `components[]` tree (each root component plus its nested `components`, walked pre-order); `metadata.component` and its nested components are outside this tree and are never touched by these rules.
+- All `components.*` rules (6–8) apply only to the root `components[]` tree (each root component plus its nested `components`, walked pre-order); `metadata.component` and its nested components are outside this tree and are never touched by these rules.
 - `components.filter_properties` runs before `components.fill_missing_gost_properties`, so non-GOST properties are removed and then missing GOST properties are appended.
-- The reorder pass (rules 1, 5, 6, 8) runs after every mutation so the final key order reflects the final set of fields.
-- Removal runs before `metadata_component.add_manufacturer`, so a manufacturer added in the same run cannot be removed by it.
+- The `reorder` rule (rule 1) runs after every mutation so the final key order reflects the final set of fields.
+- Removal runs before `add_manufacturer`, so a manufacturer added in the same run cannot be removed by it.
 
 Every static rule is documented in the UI by an inline help panel that shows the rule's behaviour and a before/after SBOM fragment; the examples reflect the rule boundaries stated in the table above.
 
 ## Statistics (`stats`)
 
-- `stats` is a list of `{"rule_id": str, "count": int}` for the enabled static rules in canonical order, followed by one removal row per accepted path.
+- `stats` is a list of `{"rule_id": str, "count": int}` for the enabled static rules in `RULE_IDS` order, followed by one removal row per accepted path.
 - It contains **all enabled static rules**, including entries with `count == 0`.
+- `reorder` is a single row regardless of how many objects it reordered; its `count` is the number of objects whose key order changed. With defaults there are 7 static rows (the 8 rules minus the opt-in `components.fill_missing_gost_properties`).
 - Disabled rules are omitted.
 - Removal rows use `{"rule_id": "optional_fields.remove", "count": int, "field": "<path>"}`; `field` is present only on removal rows, in canonical path order (`root` → `metadata` → `metadata.component` → `components[]`, alphabetically within a group), and is included even when `count == 0`.
 - `changed` is `true` iff at least one `stat.count > 0`.
@@ -322,7 +305,7 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 {
   "changed": true,
   "fixed_sbom": { "bomFormat": "CycloneDX", "...": "..." },
-  "stats": [{ "rule_id": "root.reorder", "count": 1 }],
+  "stats": [{ "rule_id": "reorder", "count": 3 }],
   "issues": [{
     "code": "component.missing_gost_properties",
     "path": "$.components[0]",
@@ -357,7 +340,7 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 - Every enabled static rule appears in `stats` in canonical order, including zero counts; disabled rules do not appear. Removal rows follow with `field` set, one per accepted path, in canonical order.
 - `changed == any(stat.count > 0 for stat in stats)`.
 - Issues are collected **only** from the final fixed document; rules never emit issues, so there are no cascading duplicates.
-- The reorder pass is the final mutation; no rule runs after it.
+- The `reorder` rule (rule 1) is the final mutation; no rule runs after it.
 - `spec_version` is validated as `^\d+\.\d+$` regardless of `set_spec_version`; values outside `1.6`/`1.7` are allowed but reported as `root.spec_version_not_allowed`.
 - `manufacturer` is trimmed and must be a non-empty string regardless of `add_manufacturer`; an empty/whitespace value is rejected by the model validator.
 - `metadata.timestamp` is added only when absent, `null`, or empty string. It is reported as `metadata.missing_timestamp` when absent, `null`, empty, or a non-string value. An existing non-empty string is never overwritten, and its format is not validated or reported.
@@ -377,7 +360,7 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 `SbomFixOptionsStore` (in `sbom_fix_options_store.py`, instantiated once in `main.py`):
 
 - File path default: `./data/sbom_fix_options.json`; the constructor accepts an override `path` (used by tests).
-- `load() → SbomFixOptions`: missing file → built-in defaults; corrupt JSON, I/O error, or Pydantic validation failure → log warning and return built-in defaults; a partial JSON object is completed by Pydantic field defaults. Legacy keys (former `remove_*` options and the supplier rename rule) are ignored.
+- `load() → SbomFixOptions`: missing file → built-in defaults; corrupt JSON, I/O error, or Pydantic validation failure → log warning and return built-in defaults; a partial JSON object is completed by Pydantic field defaults. The persisted JSON is flat: `reorder`, `set_spec_version`, `spec_version`, `increment_version`, `add_timestamp`, `add_manufacturer`, `manufacturer`, plus the nested `components` and `optional_fields` objects. Legacy keys — the former nested `root`, `metadata`, and `metadata.component` objects with their per-object `reorder` flags, the former `remove_*` options, and the supplier rename rule — are unknown fields to Pydantic and are silently ignored; there is no migration code or compatibility branch.
 - `save(options) → None`: creates the parent directory, writes JSON with `indent=2`, `ensure_ascii=False`, and a trailing newline.
 - The whole option object (including `spec_version`, `manufacturer`, and `optional_fields.keep`) is persisted. No database is used. The store is exposed to routes via `request.app.state.sbom_fix_options_store`.
 

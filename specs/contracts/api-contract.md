@@ -117,7 +117,7 @@ Serve the Fix SBOM web UI page (Vue SPA route).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, grouped fix options with master checkboxes, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
+Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, fix options in three sections (basic fixes, `components[]` edits, and optional-fields whitelist, the latter with its own analysis controls), master checkboxes for the basic and `components[]` sections, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
 
 ---
 
@@ -130,28 +130,19 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
 `multipart/form-data`:
 
 - `file` — required CycloneDX JSON file. Maximum size: `sbom_settings.max_file_size` (environment `SBOM_MAX_FILE_SIZE`, default 200 MB).
-- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all rules enabled except `components.fill_missing_gost_properties`; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly.
+- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all static rules enabled except the opt-in `components.fill_missing_gost_properties`; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly. Unknown keys, including the former nested `root`, `metadata`, and `metadata.component` option objects and the former per-object `reorder` flags, are ignored by Pydantic; no migration is performed.
 - `remove_fields` — optional JSON string holding an array of path strings (e.g. `["root.dependencies", "components[].hashes"]`). Absent means an empty list. It is not persisted; the selection is per-request and derived from the analysis result. Non-list values or invalid JSON → `400 invalid_remove_fields`; strings outside the path grammar, list-1 paths, and list-2 (`keep`) paths are ignored silently.
 
 ```json
 {
-  "root": {
-    "reorder": true,
-    "set_spec_version": true,
-    "spec_version": "1.7",
-    "increment_version": true
-  },
-  "metadata": {
-    "add_timestamp": true,
-    "reorder": true,
-    "component": {
-      "reorder": true,
-      "add_manufacturer": true,
-      "manufacturer": "Positive Technologies"
-    }
-  },
+  "reorder": true,
+  "set_spec_version": true,
+  "spec_version": "1.7",
+  "increment_version": true,
+  "add_timestamp": true,
+  "add_manufacturer": true,
+  "manufacturer": "Positive Technologies",
   "components": {
-    "reorder": true,
     "filter_external_references": true,
     "filter_properties": true,
     "fill_missing_gost_properties": false
@@ -171,7 +162,7 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
   "changed": true,
   "fixed_sbom": { "bomFormat": "CycloneDX", "specVersion": "1.7", "...": "..." },
   "stats": [
-    { "rule_id": "root.reorder", "count": 1 },
+    { "rule_id": "reorder", "count": 3 },
     "...",
     { "rule_id": "optional_fields.remove", "field": "components[].hashes", "count": 3 }
   ],
@@ -288,7 +279,7 @@ Return the saved default fix options.
 #### Response (200)
 
 ```json
-{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." }, "optional_fields": { "keep": ["..."] } } }
+{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "optional_fields": { "keep": ["..."] } } }
 ```
 
 Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning. The response includes `optional_fields.keep`.
@@ -302,7 +293,7 @@ Persist the fix options for future visits.
 #### Request
 
 ```json
-{ "options": { "root": { "...": "..." }, "metadata": { "...": "..." }, "components": { "...": "..." }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
+{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
 ```
 
 #### Success Response (200)
