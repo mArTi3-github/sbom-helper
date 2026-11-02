@@ -127,7 +127,8 @@
         "remove_leaf_missing_version": "Remove leaf components without version",
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
-        "fill_missing_gost_properties": "Add missing GOST properties"
+        "fill_missing_gost_properties": "Add missing GOST properties",
+        "add_provided_by": "Add the GOST:provided_by property to components with the following characteristics:"
       },
       "licenses": {
         "filter_non_proprietary": "Remove all licenses without a `name` key equal to \"Proprietary\"",
@@ -144,6 +145,14 @@
       "addRow": "Add row",
       "removeRow": "Remove row"
     },
+    "providedBy": {
+      "contains": "contains",
+      "fieldPlaceholder": "Field",
+      "valuePlaceholder": "Value",
+      "namePlaceholder": "Certified security product name",
+      "addRow": "Add row",
+      "removeRow": "Remove row"
+    },
     "help": {
       "reorder": "Sets the key order of the root object, metadata, metadata.component, and every component in the components[] tree to the canonical order. Root: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. metadata: timestamp, component. metadata.component: type, name, version, manufacturer. Component: type, name, version, purl, externalReferences, properties, components. Other keys keep their original relative order. Component objects in the root components[] tree, including nested components, are reordered recursively, while the metadata.component.components subtree is not traversed.",
       "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
@@ -156,7 +165,8 @@
         "remove_leaf_missing_version": "Removes only leaf components whose version is absent, null, an empty string, or not a string. A component with a non-empty components array is preserved. If the array becomes empty after removal, it stays []. metadata.component is not affected.",
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
-        "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected."
+        "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected.",
+        "add_provided_by": "For components whose field contains the configured value (case-sensitive substring), adds a GOST:provided_by entry to properties[] with the value from the \"Certified security product name\" column. Rows with any blank field are ignored; when several rows match, the first one wins. Components with an already filled GOST:provided_by are unchanged; an empty value is filled in the existing entry without creating a duplicate. A missing properties array is created; a non-array properties value is left untouched. metadata.component is not affected."
       },
       "licenses": {
         "filter_non_proprietary": "Only a license entry whose name field equals \"Proprietary\" counts as proprietary; license.id, an expression, and other license names are not treated as proprietary. The rule removes all such non-proprietary entries from licenses; if none remain, the whole licenses key is removed. metadata.component is not affected.",

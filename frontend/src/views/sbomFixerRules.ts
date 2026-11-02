@@ -17,7 +17,7 @@ export type BaseRuleKey =
   | 'increment_version'
   | 'add_timestamp'
   | 'add_manufacturer'
-export type ComponentsRuleKey = keyof ComponentsFixOptions
+export type ComponentsRuleKey = Exclude<keyof ComponentsFixOptions, 'provided_by_patterns'>
 
 export const BASE_RULES: readonly FixRule<BaseRuleKey>[] = [
   {
@@ -263,6 +263,38 @@ export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
       "properties": [
         { "name": "GOST:attack_surface", "value": "no" },
         { "name": "GOST:security_function", "value": "no" }
+      ]
+    }
+  ]
+}`,
+    },
+  },
+  {
+    id: 'components.add_provided_by',
+    key: 'add_provided_by',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "astra-utils",
+      "version": "1.0.0",
+      "purl": "pkg:deb/astra/astra-utils@1.0.0"
+    }
+  ]
+}`,
+      after: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "astra-utils",
+      "version": "1.0.0",
+      "purl": "pkg:deb/astra/astra-utils@1.0.0",
+      "properties": [
+        {
+          "name": "GOST:provided_by",
+          "value": "Операционная система специального назначения \\"Astra Linux Special Edition\\""
+        }
       ]
     }
   ]

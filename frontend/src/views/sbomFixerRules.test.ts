@@ -12,14 +12,14 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 
 const GROUPS = [
   { rules: BASE_RULES, prefix: '', size: 5, flat: true },
-  { rules: COMPONENTS_RULES, prefix: 'components.', size: 6, flat: false },
+  { rules: COMPONENTS_RULES, prefix: 'components.', size: 7, flat: false },
   { rules: LICENSES_RULES, prefix: 'licenses.', size: 3, flat: false },
 ]
 
 describe('sbomFixerRules catalog', () => {
-  it('covers all 14 rules with unique ids', () => {
-    expect(ALL_FIX_RULES).toHaveLength(14)
-    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(14)
+  it('covers all 15 rules with unique ids', () => {
+    expect(ALL_FIX_RULES).toHaveLength(15)
+    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(15)
     for (const rule of ALL_FIX_RULES) {
       expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
     }
@@ -58,6 +58,7 @@ describe('sbomFixerRules catalog', () => {
       'components.filter_external_references',
       'components.filter_properties',
       'components.fill_missing_gost_properties',
+      'components.add_provided_by',
     ])
     expect(LICENSES_RULES.map((rule) => rule.id)).toEqual([
       'licenses.filter_non_proprietary',

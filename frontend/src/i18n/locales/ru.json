@@ -127,7 +127,8 @@
         "remove_leaf_missing_version": "Удалить компоненты-листья без version",
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
         "filter_properties": "Оставить только ГОСТ-свойства",
-        "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
+        "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства",
+        "add_provided_by": "Добавить свойство GOST:provided_by для компонентов со следующими признаками:"
       },
       "licenses": {
         "filter_non_proprietary": "Удалить все лицензии без поля с ключом `name`, равным «Proprietary»",
@@ -144,6 +145,14 @@
       "addRow": "Добавить строку",
       "removeRow": "Удалить строку"
     },
+    "providedBy": {
+      "contains": "содержит",
+      "fieldPlaceholder": "Поле",
+      "valuePlaceholder": "Значение",
+      "namePlaceholder": "Название сертифицированного СЗИ",
+      "addRow": "Добавить строку",
+      "removeRow": "Удалить строку"
+    },
     "help": {
       "reorder": "Приводит ключи корневого объекта, metadata, metadata.component и каждого компонента дерева components[] к каноническому порядку. У корня: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. У metadata: timestamp, component. У metadata.component: type, name, version, manufacturer. У компонента: type, name, version, purl, externalReferences, properties, components. Остальные ключи сохраняют исходный относительный порядок. Объекты компонентов в дереве корневого components[], включая вложенные компоненты, упорядочиваются рекурсивно, а поддерево metadata.component.components не обходится.",
       "set_spec_version": "Записывает в specVersion значение из поля «Версия спецификации» (по умолчанию 1.7), обрезая пробелы; если поля не было — добавляет его. Значение вне 1.6/1.7 установить можно, но итоговый документ получит несоответствие.",
@@ -156,7 +165,8 @@
         "remove_leaf_missing_version": "Удаляет только компоненты-листья, у которых version отсутствует, равен null, пустой строке или не является строкой. Компонент с непустым массивом components сохраняется. Если после удаления массив опустел, он остаётся пустым []. metadata.component не затрагивается.",
         "filter_external_references": "Оставляет в externalReferences только элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные типы (website, distribution, issue-tracker и т. п.) удаляются; если не осталось ничего, массив остаётся пустым. metadata.component не затрагивается.",
         "filter_properties": "Оставляет в properties только элементы, имя которых начинается ровно с GOST: (с учётом регистра). Остальные удаляются; пустой массив остаётся пустым. metadata.component не затрагивается.",
-        "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается."
+        "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается.",
+        "add_provided_by": "Для компонентов, у которых поле содержит заданное значение (подстрока с учётом регистра), добавляет в properties[] свойство GOST:provided_by со значением из столбца «Название сертифицированного СЗИ». Строки с пустым любым из трёх полей игнорируются; при нескольких совпадениях используется первая сверху строка. Компоненты с уже заполненным GOST:provided_by не меняются; пустое значение заполняется в существующем элементе без создания дубля. Свойства отсутствующего массива properties создаются; нестроковый properties не изменяется. metadata.component не затрагивается."
       },
       "licenses": {
         "filter_non_proprietary": "Проприетарной считается только запись лицензии с полем name, равным «Proprietary»; license.id, expression и другие имена лицензий проприетарными не считаются. Правило удаляет из licenses все такие не-проприетарные записи; если не осталось ни одной, ключ licenses удаляется целиком. metadata.component не затрагивается.",

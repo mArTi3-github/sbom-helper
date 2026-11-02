@@ -136,6 +136,12 @@ export interface IgnorePatternItem {
   pattern: string
 }
 
+export interface ProvidedByPatternItem {
+  field: string
+  pattern: string
+  provided_by: string
+}
+
 export interface LicensesFixOptions {
   filter_non_proprietary: boolean
   add_proprietary: boolean
@@ -206,6 +212,8 @@ export interface ComponentsFixOptions {
   filter_external_references: boolean
   filter_properties: boolean
   fill_missing_gost_properties: boolean
+  add_provided_by: boolean
+  provided_by_patterns: ProvidedByPatternItem[]
 }
 
 export interface OptionalFieldsFixOptions {
