@@ -130,7 +130,7 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
 `multipart/form-data`:
 
 - `file` — required CycloneDX JSON file. Maximum size: `sbom_settings.max_file_size` (environment `SBOM_MAX_FILE_SIZE`, default 200 MB).
-- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all static rules enabled except the opt-in `components.fill_missing_gost_properties` and the three `licenses.*` rules; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `licenses.add_patterns: []`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly. Unknown keys, including the former nested `root`, `metadata`, and `metadata.component` option objects and the former per-object `reorder` flags, are ignored by Pydantic; no migration is performed. In particular, a legacy saved `reorder: false` and other nested legacy keys are ignored, so the flat default `true` applies. An absent `licenses` block is completed by Pydantic field defaults; `add_patterns` entries whose `field` or `pattern` is empty after trimming are ignored by the rules.
+- `options` — optional JSON string containing an `SbomFixOptions` object. When omitted, the built-in defaults are used (all static rules enabled except the opt-in `components.remove_leaf_missing_purl`, `components.remove_leaf_invalid_purl`, `components.remove_leaf_missing_version`, `components.fill_missing_gost_properties`, and the three `licenses.*` rules; `spec_version: "1.7"`, `manufacturer: "Positive Technologies"`, `licenses.add_patterns: []`, `optional_fields.keep` = the 10 default paths). The endpoint does not read the saved options file; the page always sends the current set explicitly. Unknown keys, including the former nested `root`, `metadata`, and `metadata.component` option objects and the former per-object `reorder` flags, are ignored by Pydantic; no migration is performed. In particular, a legacy saved `reorder: false` and other nested legacy keys are ignored, so the flat default `true` applies. An absent `licenses` block is completed by Pydantic field defaults; the three `components.remove_leaf_*` keys default to `false` when absent, so an old options file without them loads with the leaf-removal rules disabled; `add_patterns` entries whose `field` or `pattern` is empty after trimming are ignored by the rules.
 - `remove_fields` — optional JSON string holding an array of path strings (e.g. `["root.dependencies", "components[].hashes"]`). Absent means an empty list. It is not persisted; the selection is per-request and derived from the analysis result. Non-list values or invalid JSON → `400 invalid_remove_fields`; strings outside the path grammar, list-1 paths, and list-2 (`keep`) paths are ignored silently.
 
 ```json
@@ -143,6 +143,9 @@ Apply the selected normalization rules to a CycloneDX SBOM file. The operation i
   "add_manufacturer": true,
   "manufacturer": "Positive Technologies",
   "components": {
+    "remove_leaf_missing_purl": false,
+    "remove_leaf_invalid_purl": false,
+    "remove_leaf_missing_version": false,
     "filter_external_references": true,
     "filter_properties": true,
     "fill_missing_gost_properties": false
@@ -287,10 +290,10 @@ Return the saved default fix options.
 #### Response (200)
 
 ```json
-{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "licenses": { "filter_non_proprietary": false, "add_proprietary": false, "remove_proprietary_source_references": false, "add_patterns": [{ "field": "name", "pattern": "vendor-lib" }] }, "optional_fields": { "keep": ["..."] } } }
+{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "remove_leaf_missing_purl": false, "remove_leaf_invalid_purl": false, "remove_leaf_missing_version": false, "...": "..." }, "licenses": { "filter_non_proprietary": false, "add_proprietary": false, "remove_proprietary_source_references": false, "add_patterns": [{ "field": "name", "pattern": "vendor-lib" }] }, "optional_fields": { "keep": ["..."] } } }
 ```
 
-Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning. The response includes `optional_fields.keep` and the `licenses` block. An options file written by an earlier version has no `licenses` block and loads with all three flags `false` and an empty `add_patterns`.
+Returns `200` with built-in defaults when the options file does not exist or is corrupt; corrupt files are logged as a warning. The response includes `optional_fields.keep` and the `licenses` block. An options file written by an earlier version has no `licenses` block and no `components.remove_leaf_*` keys; it loads with all three `licenses.*` flags `false`, an empty `add_patterns`, and the three leaf-removal flags `false`.
 
 ---
 
@@ -301,7 +304,7 @@ Persist the fix options for future visits.
 #### Request
 
 ```json
-{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "...": "..." }, "licenses": { "filter_non_proprietary": false, "add_proprietary": false, "remove_proprietary_source_references": false, "add_patterns": [{ "field": "name", "pattern": "vendor-lib" }] }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
+{ "options": { "reorder": true, "set_spec_version": true, "spec_version": "1.7", "increment_version": true, "add_timestamp": true, "add_manufacturer": true, "manufacturer": "Positive Technologies", "components": { "remove_leaf_missing_purl": false, "remove_leaf_invalid_purl": false, "remove_leaf_missing_version": false, "...": "..." }, "licenses": { "filter_non_proprietary": false, "add_proprietary": false, "remove_proprietary_source_references": false, "add_patterns": [{ "field": "name", "pattern": "vendor-lib" }] }, "optional_fields": { "keep": ["metadata.tools", "components[].group"] } } }
 ```
 
 #### Success Response (200)
