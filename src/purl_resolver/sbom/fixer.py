@@ -293,6 +293,12 @@ def _is_leaf_component(component: dict) -> bool:
 
 
 def _collect_leaf_ids(components: list) -> set[int]:
+    """Collect ``id()`` values of leaf component dicts.
+
+    Component dict identity is preserved across the removal passes: only list
+    containers are rebuilt, never the component dicts themselves, so the ids
+    stay valid for every pass.
+    """
     leaf_ids: set[int] = set()
     for component in components:
         if not isinstance(component, dict):
@@ -309,16 +315,22 @@ def _remove_leaf_components(
     leaf_ids: set[int],
     predicate: Callable[[dict], bool],
 ) -> tuple[list, int]:
+    """Remove leaves matching ``predicate``, rebuilding only list containers.
+
+    Component dicts keep their identity across passes (only the lists that hold
+    them are replaced), which is what makes the ``id()``-based ``leaf_ids`` set
+    valid for repeated passes.
+    """
     kept: list = []
     removed = 0
     for component in components:
         if isinstance(component, dict):
-            nested = component.get("components")
-            if isinstance(nested, list) and nested:
+            if not _is_leaf_component(component):
                 new_nested, nested_removed = _remove_leaf_components(
-                    nested, leaf_ids, predicate
+                    component["components"], leaf_ids, predicate
                 )
-                component["components"] = new_nested
+                if nested_removed:
+                    component["components"] = new_nested
                 removed += nested_removed
             if id(component) in leaf_ids and predicate(component):
                 removed += 1
@@ -354,14 +366,19 @@ def _apply_leaf_removals(
     components = data.get("components")
     if not isinstance(components, list):
         return
+    enabled_rules = [
+        (rule_id, predicate)
+        for rule_id, predicate in (
+            ("components.remove_leaf_missing_purl", _has_missing_purl),
+            ("components.remove_leaf_invalid_purl", _has_invalid_purl),
+            ("components.remove_leaf_missing_version", _has_missing_version),
+        )
+        if _rule_enabled(rule_id, options)
+    ]
+    if not enabled_rules:
+        return
     leaf_ids = _collect_leaf_ids(components)
-    for rule_id, predicate in (
-        ("components.remove_leaf_missing_purl", _has_missing_purl),
-        ("components.remove_leaf_invalid_purl", _has_invalid_purl),
-        ("components.remove_leaf_missing_version", _has_missing_version),
-    ):
-        if not _rule_enabled(rule_id, options):
-            continue
+    for rule_id, predicate in enabled_rules:
         components, removed = _remove_leaf_components(
             components, leaf_ids, predicate
         )

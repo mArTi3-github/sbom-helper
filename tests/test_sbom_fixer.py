@@ -1120,6 +1120,25 @@ def test_container_is_not_rechecked_after_children_removed():
     assert parent["components"] == []
 
 
+def test_container_is_not_rechecked_after_children_removed_with_two_rules():
+    data = {"components": [{
+        "name": "container",
+        "components": [{"name": "child"}],
+    }]}
+    result = fix_sbom(
+        data,
+        _leaf_options(
+            remove_leaf_missing_purl=True,
+            remove_leaf_missing_version=True,
+        ),
+    )
+    parent = result.fixed_sbom["components"][0]
+    assert parent["name"] == "container"
+    assert parent["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+    assert _stats(result)["components.remove_leaf_missing_version"] == 0
+
+
 def test_remove_leaf_invalid_purl_removes_invalid_keeps_valid():
     data = {"components": [
         {"name": "bad", "purl": "not-a-purl", "version": "1"},

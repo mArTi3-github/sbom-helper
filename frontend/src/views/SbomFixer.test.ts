@@ -396,9 +396,11 @@ describe('SbomFixer.vue', () => {
   it('resets leaf removal flags to false', async () => {
     const wrapper = await mountFixer()
     await wrapper.find(rule('components.remove_leaf_missing_purl')).setValue(true)
+    await wrapper.find(rule('components.remove_leaf_invalid_purl')).setValue(true)
     await wrapper.find(rule('components.remove_leaf_missing_version')).setValue(true)
     await wrapper.find('.reset-defaults').trigger('click')
     expect((wrapper.find(rule('components.remove_leaf_missing_purl')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('components.remove_leaf_invalid_purl')).element as HTMLInputElement).checked).toBe(false)
     expect((wrapper.find(rule('components.remove_leaf_missing_version')).element as HTMLInputElement).checked).toBe(false)
   })
 
