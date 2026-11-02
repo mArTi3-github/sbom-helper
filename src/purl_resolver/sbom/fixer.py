@@ -75,6 +75,7 @@ RULE_IDS: tuple[str, ...] = (
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
+    "components.add_provided_by",
     "licenses.filter_non_proprietary",
     "licenses.add_proprietary",
     "licenses.remove_proprietary_source_references",
@@ -711,8 +712,8 @@ def _matches_license_patterns(
 def _first_matching_provided_by(
     component: dict, patterns: list[tuple[str, str, str]]
 ) -> str | None:
-    for field, pattern, provided_by in patterns:
-        if _field_contains_pattern(component, field, pattern):
+    for field_name, pattern, provided_by in patterns:
+        if _field_contains_pattern(component, field_name, pattern):
             return provided_by
     return None
 
@@ -798,6 +799,18 @@ def _apply_components_rules(
     )
     filter_properties = _rule_enabled("components.filter_properties", options)
     fill_gost = _rule_enabled("components.fill_missing_gost_properties", options)
+    add_provided_by = _rule_enabled("components.add_provided_by", options)
+    provided_by_patterns = (
+        [
+            (item.field.strip(), item.pattern.strip(), item.provided_by.strip())
+            for item in options.components.provided_by_patterns
+            if item.field.strip()
+            and item.pattern.strip()
+            and item.provided_by.strip()
+        ]
+        if add_provided_by
+        else []
+    )
 
     def apply(component: dict) -> None:
         external_references = component.get("externalReferences")
@@ -820,6 +833,12 @@ def _apply_components_rules(
             counts["components.fill_missing_gost_properties"] = (
                 counts.get("components.fill_missing_gost_properties", 0)
                 + _fill_gost_properties(component)
+            )
+
+        if add_provided_by:
+            counts["components.add_provided_by"] = (
+                counts.get("components.add_provided_by", 0)
+                + _add_provided_by(component, provided_by_patterns)
             )
 
     _walk_components(data, apply)

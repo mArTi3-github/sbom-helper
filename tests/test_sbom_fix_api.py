@@ -195,7 +195,7 @@ class TestFixSbom:
         assert data["fixed_sbom"]["metadata"]["component"]["manufacturer"] == {
             "name": "Acme"
         }
-        assert len(data["stats"]) == 7
+        assert len(data["stats"]) == 8
         assert all(set(item) == {"rule_id", "count"} for item in data["stats"])
         assert all(
             set(item) >= {"code", "path", "component", "details"}
@@ -214,7 +214,7 @@ class TestFixSbom:
         response = upload(client, make_sbom())
         assert response.status_code == 200
         data = response.json()
-        assert len(data["stats"]) == 7
+        assert len(data["stats"]) == 8
         assert data["changed"] is True
         assert data["fixed_sbom"]["specVersion"] == "1.7"
         assert data["fixed_sbom"]["version"] == 2
@@ -466,5 +466,33 @@ def test_fix_endpoint_applies_license_options(client):
     ]
     stat = next(
         stat for stat in body["stats"] if stat["rule_id"] == "licenses.add_proprietary"
+    )
+    assert stat["count"] == 1
+
+
+def test_fix_endpoint_applies_provided_by_options(client):
+    sbom = make_sbom()
+    sbom["components"][0]["purl"] = "pkg:deb/astra/astra-utils@1.0"
+    options = {
+        "components": {
+            "provided_by_patterns": [
+                {
+                    "field": "purl",
+                    "pattern": "pkg:deb/astra",
+                    "provided_by": "Astra Linux SE",
+                }
+            ]
+        }
+    }
+    response = upload_fix(client, sbom, options=options)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fixed_sbom"]["components"][0]["properties"] == [
+        {"name": "GOST:provided_by", "value": "Astra Linux SE"}
+    ]
+    stat = next(
+        stat
+        for stat in body["stats"]
+        if stat["rule_id"] == "components.add_provided_by"
     )
     assert stat["count"] == 1

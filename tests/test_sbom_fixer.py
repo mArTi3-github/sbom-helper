@@ -36,6 +36,7 @@ NEW_RULE_IDS = (
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
+    "components.add_provided_by",
     "licenses.filter_non_proprietary",
     "licenses.add_proprietary",
     "licenses.remove_proprietary_source_references",
@@ -88,13 +89,14 @@ def test_default_stats_contain_only_enabled_rules():
     assert [stat.rule_id for stat in result.stats] == list(DEFAULT_RULE_IDS)
 
 
-def test_all_enabled_rules_yield_fourteen_stats_in_canonical_order():
+def test_all_enabled_rules_yield_fifteen_stats_in_canonical_order():
     options = SbomFixOptions(
         components={
             "remove_leaf_missing_purl": True,
             "remove_leaf_invalid_purl": True,
             "remove_leaf_missing_version": True,
             "fill_missing_gost_properties": True,
+            "add_provided_by": True,
         },
         licenses={
             "filter_non_proprietary": True,
@@ -142,7 +144,7 @@ def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
     assert result.fixed_sbom == data
     assert result.fixed_sbom is not data
     assert result.changed is False
-    assert len(result.stats) == 7
+    assert len(result.stats) == 8
     assert all(stat.count == 0 for stat in result.stats)
     assert [stat.rule_id for stat in result.stats] == list(DEFAULT_RULE_IDS)
 
@@ -2219,7 +2221,7 @@ def test_licenses_options_default_to_disabled():
 
 
 def test_license_rule_ids_come_last_in_execution_order():
-    assert len(RULE_IDS) == 14
+    assert len(RULE_IDS) == 15
     assert RULE_IDS[-3:] == (
         "licenses.filter_non_proprietary",
         "licenses.add_proprietary",
@@ -2342,6 +2344,166 @@ def test_add_provided_by_skips_non_list_properties():
         component, [("purl", "pkg:deb/astra", "Astra")]
     ) == 0
     assert component["properties"] == "bad"
+
+
+def _component_rules_options(**components):
+    return SbomFixOptions(
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+        components=ComponentsFixOptions(**components),
+    )
+
+
+def _astra_component(**overrides):
+    component = {
+        "type": "library",
+        "name": "astra-utils",
+        "version": "1.0",
+        "purl": "pkg:deb/astra/astra-utils@1.0",
+    }
+    component.update(overrides)
+    return component
+
+
+def test_add_provided_by_rule_adds_property_and_counts():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [_astra_component()],
+    }
+    result = fix_sbom(data, _component_rules_options())
+    component = result.fixed_sbom["components"][0]
+    assert component["properties"] == [
+        {
+            "name": "GOST:provided_by",
+            "value": (
+                'Операционная система специального назначения '
+                '"Astra Linux Special Edition"'
+            ),
+        }
+    ]
+    stats = {stat.rule_id: stat.count for stat in result.stats}
+    assert stats["components.add_provided_by"] == 1
+
+
+def test_add_provided_by_walks_nested_components_but_not_metadata():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {"component": _astra_component(name="meta")},
+        "components": [
+            {
+                "type": "application",
+                "name": "app",
+                "version": "1.0",
+                "purl": "pkg:npm/app@1.0",
+                "components": [_astra_component(name="nested")],
+            }
+        ],
+    }
+    result = fix_sbom(data, _component_rules_options())
+    root = result.fixed_sbom["components"][0]
+    assert root["components"][0]["properties"][0]["name"] == "GOST:provided_by"
+    assert "properties" not in result.fixed_sbom["metadata"]["component"]
+
+
+def test_add_provided_by_ignores_blank_rows_and_uses_next_match():
+    options = _component_rules_options(
+        provided_by_patterns=[
+            ProvidedByPatternItem(field="purl", pattern="pkg:deb/astra", provided_by=""),
+            ProvidedByPatternItem(field="", pattern="astra", provided_by="A"),
+            ProvidedByPatternItem(field="name", pattern="astra", provided_by="B"),
+        ]
+    )
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [_astra_component()],
+    }
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["components"][0]["properties"] == [
+        {"name": "GOST:provided_by", "value": "B"}
+    ]
+
+
+def test_add_provided_by_first_row_wins_across_fields():
+    options = _component_rules_options(
+        provided_by_patterns=[
+            ProvidedByPatternItem(
+                field="purl", pattern="pkg:deb/astra", provided_by="From purl"
+            ),
+            ProvidedByPatternItem(
+                field="name", pattern="astra", provided_by="From name"
+            ),
+        ]
+    )
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [_astra_component()],
+    }
+    result = fix_sbom(data, options)
+    assert result.fixed_sbom["components"][0]["properties"] == [
+        {"name": "GOST:provided_by", "value": "From purl"}
+    ]
+
+
+def test_add_provided_by_without_active_rows_is_a_noop():
+    options = _component_rules_options(
+        provided_by_patterns=[
+            ProvidedByPatternItem(field="purl", pattern="", provided_by="A"),
+            ProvidedByPatternItem(field="purl", pattern="pkg:deb/astra", provided_by=""),
+        ]
+    )
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [_astra_component()],
+    }
+    result = fix_sbom(data, options)
+    assert "properties" not in result.fixed_sbom["components"][0]
+    stats = {stat.rule_id: stat.count for stat in result.stats}
+    assert stats["components.add_provided_by"] == 0
+
+
+def test_add_provided_by_suppresses_missing_source_reference_in_same_run():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [_astra_component()],
+    }
+    result = fix_sbom(data, _component_rules_options())
+    codes = [issue.code for issue in result.issues]
+    assert "component.missing_source_reference" not in codes
+
+
+def test_add_provided_by_runs_after_fill_and_keeps_all_gost_properties():
+    data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "components": [_astra_component()],
+    }
+    options = _component_rules_options(fill_missing_gost_properties=True)
+    result = fix_sbom(data, options)
+    names = [
+        prop["name"]
+        for prop in result.fixed_sbom["components"][0]["properties"]
+    ]
+    assert names == [
+        "GOST:attack_surface",
+        "GOST:security_function",
+        "GOST:provided_by",
+    ]
 
 
 def _license_options(**licenses) -> SbomFixOptions:
