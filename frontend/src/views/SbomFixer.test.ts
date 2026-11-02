@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
 import SbomFixer from './SbomFixer.vue'
-import { ALL_FIX_RULES, LICENSES_RULES } from './sbomFixerRules'
+import { ALL_FIX_RULES, COMPONENTS_RULES, LICENSES_RULES } from './sbomFixerRules'
 import { ApiError } from '../api/client'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import { downloadJson } from '../composables/useDownload'
@@ -24,6 +24,15 @@ const defaultOptions: SbomFixOptions = {
     filter_external_references: true,
     filter_properties: true,
     fill_missing_gost_properties: false,
+    add_provided_by: true,
+    provided_by_patterns: [
+      {
+        field: 'purl',
+        pattern: 'pkg:deb/astra',
+        provided_by:
+          'Операционная система специального назначения "Astra Linux Special Edition"',
+      },
+    ],
   },
   licenses: {
     filter_non_proprietary: false,
@@ -204,7 +213,7 @@ describe('SbomFixer.vue', () => {
   it('renders help for every rule and no warning banner', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('.warning-banner').exists()).toBe(false)
-    expect(wrapper.findAll('.rule-help-button')).toHaveLength(14)
+    expect(wrapper.findAll('.rule-help-button')).toHaveLength(ALL_FIX_RULES.length)
     for (const rule of ALL_FIX_RULES) {
       expect(wrapper.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
     }
@@ -376,11 +385,11 @@ describe('SbomFixer.vue', () => {
     }
   })
 
-  it('renders six component rule rows with help', async () => {
+  it('renders a component rule row with help for every component rule', async () => {
     const wrapper = await mountFixer()
     const card = wrapper.find('.group-card[data-group="components"]')
-    expect(card.findAll('[data-rule-row]')).toHaveLength(6)
-    expect(card.findAll('.rule-help-button')).toHaveLength(6)
+    expect(card.findAll('[data-rule-row]')).toHaveLength(COMPONENTS_RULES.length)
+    expect(card.findAll('.rule-help-button')).toHaveLength(COMPONENTS_RULES.length)
   })
 
   it('saves the three leaf removal flags as disabled by default', async () => {
@@ -1243,5 +1252,155 @@ describe('SbomFixer.vue', () => {
     await flushPromises()
 
     expect((textarea().element as HTMLTextAreaElement).value).toBe(before)
+  })
+
+  it('renders the provided_by editor with the Astra default row', async () => {
+    const wrapper = await mountFixer()
+    const rows = wrapper.findAll(
+      '[data-group="components"] [data-provided-by-row]',
+    )
+    expect(rows).toHaveLength(1)
+    expect(
+      (rows[0].find('[data-provided-by-field]').element as HTMLInputElement).value,
+    ).toBe('purl')
+    expect(
+      (rows[0].find('[data-provided-by-value]').element as HTMLInputElement).value,
+    ).toBe('pkg:deb/astra')
+    expect(
+      (rows[0].find('[data-provided-by-name]').element as HTMLInputElement).value,
+    ).toContain('Astra Linux Special Edition')
+  })
+
+  it('fills provided_by rows from the loaded options', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        components: {
+          ...cloneOptions().components,
+          provided_by_patterns: [
+            { field: 'name', pattern: 'vendor', provided_by: 'Vendor SZI' },
+          ],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    const row = wrapper.find('[data-group="components"] [data-provided-by-row]')
+    expect(
+      (row.find('[data-provided-by-field]').element as HTMLInputElement).value,
+    ).toBe('name')
+    expect(
+      (row.find('[data-provided-by-value]').element as HTMLInputElement).value,
+    ).toBe('vendor')
+    expect(
+      (row.find('[data-provided-by-name]').element as HTMLInputElement).value,
+    ).toBe('Vendor SZI')
+  })
+
+  it('adds and removes provided_by rows', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-action="add-provided-by"]').trigger('click')
+    expect(
+      wrapper.findAll('[data-group="components"] [data-provided-by-row]'),
+    ).toHaveLength(2)
+    await wrapper
+      .findAll('[data-action="remove-provided-by"]')[1]
+      .trigger('click')
+    expect(
+      wrapper.findAll('[data-group="components"] [data-provided-by-row]'),
+    ).toHaveLength(1)
+  })
+
+  it('disables the provided_by editor while the rule is off', async () => {
+    const wrapper = await mountFixer()
+    expect(
+      wrapper.find('[data-provided-by-field]').attributes('disabled'),
+    ).toBeUndefined()
+    await wrapper.find(rule('components.add_provided_by')).setValue(false)
+    expect(
+      wrapper.find('[data-provided-by-field]').attributes('disabled'),
+    ).toBeDefined()
+    expect(
+      wrapper.find('[data-provided-by-value]').attributes('disabled'),
+    ).toBeDefined()
+    expect(
+      wrapper.find('[data-provided-by-name]').attributes('disabled'),
+    ).toBeDefined()
+    expect(
+      wrapper.find('[data-action="add-provided-by"]').attributes('disabled'),
+    ).toBeDefined()
+    expect(
+      wrapper.find('[data-action="remove-provided-by"]').attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  it('keeps provided_by values when the rule is turned off', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-provided-by-name]').setValue('Vendor SZI')
+    await wrapper.find(rule('components.add_provided_by')).setValue(false)
+    expect(
+      (wrapper.find('[data-provided-by-name]').element as HTMLInputElement).value,
+    ).toBe('Vendor SZI')
+  })
+
+  it('normalizes provided_by rows and drops incomplete ones', async () => {
+    getFixOptionsMock.mockResolvedValue({
+      options: {
+        ...cloneOptions(),
+        components: {
+          ...cloneOptions().components,
+          provided_by_patterns: [
+            { field: ' name ', pattern: ' vendor ', provided_by: ' SZI ' },
+            { field: '', pattern: 'x', provided_by: 'ignored' },
+            { field: 'purl', pattern: 'pkg:deb/astra', provided_by: '' },
+          ],
+        },
+      },
+    })
+    const wrapper = await mountFixer()
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.components.provided_by_patterns).toEqual([
+      { field: 'name', pattern: 'vendor', provided_by: 'SZI' },
+    ])
+  })
+
+  it('sends provided_by options with the fix request', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-provided-by-name]').setValue('Vendor SZI')
+    await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+    const sent = fixSbomMock.mock.calls[0][1] as SbomFixOptions
+    expect(sent.components.provided_by_patterns).toEqual([
+      {
+        field: 'purl',
+        pattern: 'pkg:deb/astra',
+        provided_by: 'Vendor SZI',
+      },
+    ])
+  })
+
+  it('restores the Astra provided_by row on reset', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-provided-by-field]').setValue('name')
+    await wrapper.find('.reset-defaults').trigger('click')
+    const row = wrapper.find('[data-group="components"] [data-provided-by-row]')
+    expect(
+      (row.find('[data-provided-by-field]').element as HTMLInputElement).value,
+    ).toBe('purl')
+    expect(
+      (row.find('[data-provided-by-name]').element as HTMLInputElement).value,
+    ).toContain('Astra Linux Special Edition')
+  })
+
+  it('clears the Saved status when a provided_by row changes', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).toContain('Saved')
+    await wrapper.find('[data-provided-by-name]').setValue('Vendor SZI')
+    await flushPromises()
+    expect(wrapper.find('.save-status').text()).not.toContain('Saved')
   })
 })

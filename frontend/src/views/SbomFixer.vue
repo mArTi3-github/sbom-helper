@@ -101,29 +101,45 @@
           </div>
         </div>
         <div class="group-options">
-          <div
-            v-for="rule in COMPONENTS_RULES"
-            :key="rule.id"
-            class="rule-row"
-            :data-rule-row="rule.id"
-          >
-            <label class="rule-label">
-              <input v-model="options.components[rule.key]" type="checkbox" :data-rule="rule.id" />
-              <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
-            </label>
-            <RuleHelp
-              :rule-id="rule.id"
-              :description="t(`sbomFixer.help.${rule.id}`)"
-              :before="rule.example.before"
-              :after="rule.example.after"
-              :before-label="t('sbomFixer.exampleBefore')"
-              :after-label="t('sbomFixer.exampleAfter')"
-              :rule-title="t(`sbomFixer.rules.${rule.id}`)"
-              :open="openHelpId === rule.id"
-              @toggle="toggleHelp(rule.id)"
-              @close="openHelpId = null"
-            />
-          </div>
+          <template v-for="rule in COMPONENTS_RULES" :key="rule.id">
+            <div class="rule-row" :data-rule-row="rule.id">
+              <label class="rule-label">
+                <input v-model="options.components[rule.key]" type="checkbox" :data-rule="rule.id" />
+                <span>{{ t(`sbomFixer.rules.${rule.id}`) }}</span>
+              </label>
+              <RuleHelp
+                :rule-id="rule.id"
+                :description="t(`sbomFixer.help.${rule.id}`)"
+                :before="rule.example.before"
+                :after="rule.example.after"
+                :before-label="t('sbomFixer.exampleBefore')"
+                :after-label="t('sbomFixer.exampleAfter')"
+                :rule-title="t(`sbomFixer.rules.${rule.id}`)"
+                :open="openHelpId === rule.id"
+                @toggle="toggleHelp(rule.id)"
+                @close="openHelpId = null"
+              />
+            </div>
+            <div
+              v-if="rule.key === 'add_provided_by'"
+              class="pattern-rows"
+              data-provided-by-editor
+            >
+              <div
+                v-for="(row, idx) in providedByRows"
+                :key="idx"
+                class="pattern-row"
+                data-provided-by-row
+              >
+                <input v-model="row.field" type="text" class="pattern-input" data-provided-by-field :placeholder="t('sbomFixer.providedBy.fieldPlaceholder')" :disabled="!options.components.add_provided_by" :aria-label="t('sbomFixer.providedBy.fieldPlaceholder')" />
+                <span class="pattern-label">{{ t('sbomFixer.providedBy.contains') }}</span>
+                <input v-model="row.pattern" type="text" class="pattern-input" data-provided-by-value :placeholder="t('sbomFixer.providedBy.valuePlaceholder')" :disabled="!options.components.add_provided_by" :aria-label="t('sbomFixer.providedBy.valuePlaceholder')" />
+                <input v-model="row.provided_by" type="text" class="pattern-input" data-provided-by-name :placeholder="t('sbomFixer.providedBy.namePlaceholder')" :disabled="!options.components.add_provided_by" :aria-label="t('sbomFixer.providedBy.namePlaceholder')" />
+                <button type="button" class="btn-delete" data-action="remove-provided-by" :disabled="!options.components.add_provided_by" :aria-label="t('sbomFixer.providedBy.removeRow')" @click="removeProvidedByRow(idx)">✕</button>
+              </div>
+              <button type="button" class="btn btn-small" data-action="add-provided-by" :disabled="!options.components.add_provided_by" @click="addProvidedByRow">{{ t('sbomFixer.providedBy.addRow') }}</button>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -369,6 +385,7 @@ import type {
   FstecField,
   IgnorePatternItem,
   OptionalFieldInfo,
+  ProvidedByPatternItem,
   SbomFixIssue,
   SbomFixOptions,
   SbomFixResponse,
@@ -413,6 +430,8 @@ function defaultFixOptions(): SbomFixOptions {
       filter_external_references: true,
       filter_properties: true,
       fill_missing_gost_properties: false,
+      add_provided_by: true,
+      provided_by_patterns: [defaultProvidedByRow()],
     },
     licenses: {
       filter_non_proprietary: false,
@@ -426,13 +445,30 @@ function defaultFixOptions(): SbomFixOptions {
   }
 }
 
-const options = reactive<SbomFixOptions>(defaultFixOptions())
-
 function emptyPatternRow(): IgnorePatternItem {
   return { field: '', pattern: '' }
 }
 
 const patternRows = ref<IgnorePatternItem[]>([emptyPatternRow()])
+
+const DEFAULT_PROVIDED_BY_PATTERN: ProvidedByPatternItem = {
+  field: 'purl',
+  pattern: 'pkg:deb/astra',
+  provided_by:
+    'Операционная система специального назначения "Astra Linux Special Edition"',
+}
+
+function defaultProvidedByRow(): ProvidedByPatternItem {
+  return { ...DEFAULT_PROVIDED_BY_PATTERN }
+}
+
+function emptyProvidedByRow(): ProvidedByPatternItem {
+  return { field: '', pattern: '', provided_by: '' }
+}
+
+const providedByRows = ref<ProvidedByPatternItem[]>([defaultProvidedByRow()])
+
+const options = reactive<SbomFixOptions>(defaultFixOptions())
 
 function applyOptions(next: SbomFixOptions): void {
   options.reorder = next.reorder
@@ -442,7 +478,13 @@ function applyOptions(next: SbomFixOptions): void {
   options.add_timestamp = next.add_timestamp
   options.add_manufacturer = next.add_manufacturer
   options.manufacturer = next.manufacturer
-  options.components = { ...options.components, ...next.components }
+  options.components = {
+    ...options.components,
+    ...next.components,
+    provided_by_patterns: [
+      ...(next.components.provided_by_patterns ?? []),
+    ],
+  }
   options.licenses = {
     filter_non_proprietary: next.licenses.filter_non_proprietary,
     add_proprietary: next.licenses.add_proprietary,
@@ -453,6 +495,11 @@ function applyOptions(next: SbomFixOptions): void {
   const patterns = next.licenses.add_patterns ?? []
   patternRows.value =
     patterns.length > 0 ? patterns.map((row) => ({ ...row })) : [emptyPatternRow()]
+  const providedByPatterns = next.components.provided_by_patterns ?? []
+  providedByRows.value =
+    providedByPatterns.length > 0
+      ? providedByPatterns.map((row) => ({ ...row }))
+      : [emptyProvidedByRow()]
 }
 
 function plainOptions(): SbomFixOptions {
@@ -473,9 +520,31 @@ function normalizedPatterns(): IgnorePatternItem[] {
     .filter((row) => row.field !== '' && row.pattern !== '')
 }
 
+function addProvidedByRow(): void {
+  providedByRows.value.push(emptyProvidedByRow())
+}
+
+function removeProvidedByRow(index: number): void {
+  providedByRows.value.splice(index, 1)
+}
+
+function normalizedProvidedByPatterns(): ProvidedByPatternItem[] {
+  return providedByRows.value
+    .map((row) => ({
+      field: row.field.trim(),
+      pattern: row.pattern.trim(),
+      provided_by: row.provided_by.trim(),
+    }))
+    .filter(
+      (row) =>
+        row.field !== '' && row.pattern !== '' && row.provided_by !== '',
+    )
+}
+
 function withNormalizedPatterns(): SbomFixOptions {
   const next = plainOptions()
   next.licenses.add_patterns = normalizedPatterns()
+  next.components.provided_by_patterns = normalizedProvidedByPatterns()
   return next
 }
 
@@ -650,10 +719,24 @@ watch(
   { deep: true },
 )
 
+watch(
+  providedByRows,
+  () => {
+    if (saveStatus.value === 'saving') {
+      changedWhileSaving = true
+    } else {
+      saveStatus.value = 'idle'
+      saveError.value = null
+    }
+  },
+  { deep: true },
+)
+
 function restoreDefaults(): void {
   const keep = fieldCatalog.value?.default_keep ?? options.optional_fields.keep
   applyOptions(defaultFixOptions())
   patternRows.value = [emptyPatternRow()]
+  providedByRows.value = [defaultProvidedByRow()]
   options.optional_fields.keep = keep
   saveStatus.value = 'idle'
   saveError.value = null
