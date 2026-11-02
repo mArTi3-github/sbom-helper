@@ -6,6 +6,7 @@ import logging
 import pytest
 
 from purl_resolver.sbom.fixer import (
+    ComponentsFixOptions,
     LicensePatternItem,
     LicensesFixOptions,
     SbomFixOptions,
@@ -128,3 +129,26 @@ def test_old_file_without_licenses_block_uses_defaults(tmp_path):
     loaded = SbomFixOptionsStore(path).load()
     assert loaded.reorder is False
     assert loaded.licenses == LicensesFixOptions()
+
+
+def test_save_load_roundtrip_including_leaf_removal_flags(tmp_path):
+    store = SbomFixOptionsStore(tmp_path / "options.json")
+    options = SbomFixOptions(
+        components=ComponentsFixOptions(
+            remove_leaf_missing_purl=True,
+            remove_leaf_invalid_purl=True,
+            remove_leaf_missing_version=True,
+        )
+    )
+    store.save(options)
+    assert store.load() == options
+
+
+def test_old_file_without_leaf_flags_uses_disabled_defaults(tmp_path):
+    path = tmp_path / "old.json"
+    path.write_text('{"components": {"filter_properties": false}}', encoding="utf-8")
+    loaded = SbomFixOptionsStore(path).load()
+    assert loaded.components.filter_properties is False
+    assert loaded.components.remove_leaf_missing_purl is False
+    assert loaded.components.remove_leaf_invalid_purl is False
+    assert loaded.components.remove_leaf_missing_version is False

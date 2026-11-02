@@ -63,6 +63,9 @@ RULE_IDS: tuple[str, ...] = (
     "increment_version",
     "add_timestamp",
     "add_manufacturer",
+    "components.remove_leaf_missing_purl",
+    "components.remove_leaf_invalid_purl",
+    "components.remove_leaf_missing_version",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
@@ -73,6 +76,9 @@ RULE_IDS: tuple[str, ...] = (
 
 
 class ComponentsFixOptions(BaseModel):
+    remove_leaf_missing_purl: bool = False
+    remove_leaf_invalid_purl: bool = False
+    remove_leaf_missing_version: bool = False
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False

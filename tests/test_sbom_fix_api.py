@@ -382,6 +382,24 @@ def test_save_options_rejects_non_list_patterns(client):
     assert response.json()["error"] == "invalid_options"
 
 
+def test_fix_options_endpoint_returns_leaf_flags_disabled(client):
+    response = client.get("/api/v1/sbom/fix/options")
+    assert response.status_code == 200
+    components = response.json()["options"]["components"]
+    assert components["remove_leaf_missing_purl"] is False
+    assert components["remove_leaf_invalid_purl"] is False
+    assert components["remove_leaf_missing_version"] is False
+
+
+def test_fix_options_endpoint_rejects_non_boolean_leaf_flag(client):
+    response = client.post(
+        "/api/v1/sbom/fix/options",
+        json={"options": {"components": {"remove_leaf_missing_purl": "maybe"}}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_options"
+
+
 def test_fix_endpoint_applies_license_options(client):
     sbom = make_sbom()
     sbom["components"][0]["name"] = "vendor-lib"

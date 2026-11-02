@@ -26,12 +26,23 @@ NEW_RULE_IDS = (
     "increment_version",
     "add_timestamp",
     "add_manufacturer",
+    "components.remove_leaf_missing_purl",
+    "components.remove_leaf_invalid_purl",
+    "components.remove_leaf_missing_version",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
     "licenses.filter_non_proprietary",
     "licenses.add_proprietary",
     "licenses.remove_proprietary_source_references",
+)
+
+DEFAULT_RULE_IDS = tuple(
+    rule
+    for rule in NEW_RULE_IDS
+    if not rule.startswith("licenses.")
+    and rule != "components.fill_missing_gost_properties"
+    and not rule.startswith("components.remove_leaf_")
 )
 
 
@@ -55,6 +66,9 @@ def test_defaults_expose_flat_base_options():
     assert o.add_manufacturer is True
     assert o.manufacturer == "Positive Technologies"
     assert o.components.fill_missing_gost_properties is False
+    assert o.components.remove_leaf_missing_purl is False
+    assert o.components.remove_leaf_invalid_purl is False
+    assert o.components.remove_leaf_missing_version is False
     assert o.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)
     for removed in ("root", "metadata"):
         assert not hasattr(o, removed)
@@ -67,17 +81,17 @@ def test_default_stats_contain_only_enabled_rules():
         {"bomFormat": "CycloneDX", "specVersion": "1.7", "version": 1},
         SbomFixOptions(),
     )
-    assert [stat.rule_id for stat in result.stats] == [
-        rule
-        for rule in NEW_RULE_IDS
-        if rule != "components.fill_missing_gost_properties"
-        and not rule.startswith("licenses.")
-    ]
+    assert [stat.rule_id for stat in result.stats] == list(DEFAULT_RULE_IDS)
 
 
-def test_all_enabled_rules_yield_eleven_stats_in_canonical_order():
+def test_all_enabled_rules_yield_fourteen_stats_in_canonical_order():
     options = SbomFixOptions(
-        components={"fill_missing_gost_properties": True},
+        components={
+            "remove_leaf_missing_purl": True,
+            "remove_leaf_invalid_purl": True,
+            "remove_leaf_missing_version": True,
+            "fill_missing_gost_properties": True,
+        },
         licenses={
             "filter_non_proprietary": True,
             "add_proprietary": True,
@@ -126,12 +140,7 @@ def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
     assert result.changed is False
     assert len(result.stats) == 7
     assert all(stat.count == 0 for stat in result.stats)
-    assert [stat.rule_id for stat in result.stats] == [
-        rule
-        for rule in NEW_RULE_IDS
-        if rule != "components.fill_missing_gost_properties"
-        and not rule.startswith("licenses.")
-    ]
+    assert [stat.rule_id for stat in result.stats] == list(DEFAULT_RULE_IDS)
 
 
 @pytest.mark.parametrize(
@@ -1968,7 +1977,7 @@ def test_licenses_options_default_to_disabled():
 
 
 def test_license_rule_ids_come_last_in_execution_order():
-    assert len(RULE_IDS) == 11
+    assert len(RULE_IDS) == 14
     assert RULE_IDS[-3:] == (
         "licenses.filter_non_proprietary",
         "licenses.add_proprietary",
