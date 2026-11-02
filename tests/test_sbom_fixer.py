@@ -524,6 +524,21 @@ def _stats(result):
     return {stat.rule_id: stat.count for stat in result.stats}
 
 
+def _leaf_options(**flags) -> SbomFixOptions:
+    return SbomFixOptions(
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+        components={
+            "filter_external_references": False,
+            "filter_properties": False,
+            **flags,
+        },
+    )
+
+
 def test_set_spec_version_replaces_value_and_counts_one():
     data = {"bomFormat": "CycloneDX", "specVersion": "1.6"}
     result = fix_sbom(data, SbomFixOptions(spec_version="1.7"))
@@ -1013,6 +1028,210 @@ def test_filter_properties_counts_removed_elements_across_tree():
     }
     result = fix_sbom(data, SbomFixOptions())
     assert _stats(result)["components.filter_properties"] == 3
+
+
+@pytest.mark.parametrize("purl", [None, "", 5, ["pkg:pypi/a@1"]])
+def test_remove_leaf_missing_purl_removes_null_empty_and_non_string(purl):
+    data = {"components": [{"name": "a", "version": "1", "purl": purl}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert result.fixed_sbom["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+
+
+def test_remove_leaf_missing_purl_removes_absent_purl():
+    data = {"components": [{"name": "a", "version": "1"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert result.fixed_sbom["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+
+
+def test_remove_leaf_missing_purl_keeps_valid_purl():
+    data = {"components": [{"name": "a", "version": "1", "purl": "pkg:pypi/a@1"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert result.fixed_sbom["components"][0]["purl"] == "pkg:pypi/a@1"
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 0
+
+
+def test_remove_leaf_missing_purl_works_at_all_levels_and_preserves_containers():
+    data = {"components": [{
+        "name": "parent",
+        "purl": "pkg:pypi/parent@1",
+        "version": "1",
+        "components": [{
+            "name": "child",
+            "purl": "pkg:pypi/child@1",
+            "version": "1",
+            "components": [{"name": "grandchild"}],
+        }],
+    }]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    parent = result.fixed_sbom["components"][0]
+    assert parent["name"] == "parent"
+    assert parent["components"][0]["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+
+
+def test_remove_leaf_missing_purl_treats_empty_components_array_as_leaf():
+    data = {"components": [
+        {"name": "no-purl", "components": []},
+        {"name": "valid", "purl": "pkg:pypi/a@1", "components": []},
+    ]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert [c["name"] for c in result.fixed_sbom["components"]] == ["valid"]
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+
+
+def test_remove_leaf_missing_purl_preserves_non_objects():
+    data = {"components": ["not-an-object", None, {"name": "a"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert result.fixed_sbom["components"] == ["not-an-object", None]
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+
+
+def test_leaf_rules_never_remove_containers():
+    container = {
+        "name": "container",
+        "components": [{"name": "child", "purl": "pkg:pypi/child@1", "version": "1"}],
+    }
+    data = {"components": [container]}
+    result = fix_sbom(
+        data,
+        _leaf_options(
+            remove_leaf_missing_purl=True,
+            remove_leaf_missing_version=True,
+        ),
+    )
+    assert result.fixed_sbom["components"][0]["name"] == "container"
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 0
+    assert _stats(result)["components.remove_leaf_missing_version"] == 0
+
+
+def test_container_is_not_rechecked_after_children_removed():
+    data = {"components": [{
+        "name": "container",
+        "components": [{"name": "child"}],
+    }]}
+    result = fix_sbom(
+        data,
+        _leaf_options(remove_leaf_missing_purl=True),
+    )
+    parent = result.fixed_sbom["components"][0]
+    assert parent["name"] == "container"
+    assert parent["components"] == []
+
+
+def test_remove_leaf_invalid_purl_removes_invalid_keeps_valid():
+    data = {"components": [
+        {"name": "bad", "purl": "not-a-purl", "version": "1"},
+        {"name": "good", "purl": "pkg:pypi/a@1", "version": "1"},
+    ]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_invalid_purl=True))
+    assert [c["name"] for c in result.fixed_sbom["components"]] == ["good"]
+    assert _stats(result)["components.remove_leaf_invalid_purl"] == 1
+
+
+@pytest.mark.parametrize("purl", [None, "", 5])
+def test_remove_leaf_invalid_purl_ignores_missing_and_empty(purl):
+    data = {"components": [{"name": "a", "version": "1", "purl": purl}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_invalid_purl=True))
+    assert result.fixed_sbom["components"] == data["components"]
+    assert _stats(result)["components.remove_leaf_invalid_purl"] == 0
+
+
+def test_remove_leaf_invalid_purl_ignores_absent_purl():
+    data = {"components": [{"name": "a", "version": "1"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_invalid_purl=True))
+    assert result.fixed_sbom["components"] == data["components"]
+    assert _stats(result)["components.remove_leaf_invalid_purl"] == 0
+
+
+@pytest.mark.parametrize("version", [None, "", 5, ["1"]])
+def test_remove_leaf_missing_version_removes_null_empty_and_non_string(version):
+    data = {"components": [{"name": "a", "purl": "pkg:pypi/a@1", "version": version}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_version=True))
+    assert result.fixed_sbom["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_version"] == 1
+
+
+def test_remove_leaf_missing_version_removes_absent_version():
+    data = {"components": [{"name": "a", "purl": "pkg:pypi/a@1"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_version=True))
+    assert result.fixed_sbom["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_version"] == 1
+
+
+def test_remove_leaf_missing_version_keeps_non_empty():
+    data = {"components": [{"name": "a", "purl": "pkg:pypi/a@1", "version": "1.0"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_version=True))
+    assert result.fixed_sbom["components"][0]["version"] == "1.0"
+    assert _stats(result)["components.remove_leaf_missing_version"] == 0
+
+
+def test_leaf_rules_first_match_wins():
+    data = {"components": [{"name": "a"}]}
+    result = fix_sbom(
+        data,
+        _leaf_options(
+            remove_leaf_missing_purl=True,
+            remove_leaf_missing_version=True,
+        ),
+    )
+    assert result.fixed_sbom["components"] == []
+    assert _stats(result)["components.remove_leaf_missing_purl"] == 1
+    assert _stats(result)["components.remove_leaf_missing_version"] == 0
+
+
+def test_leaf_removal_runs_before_other_component_rules():
+    data = {"components": [{
+        "name": "a",
+        "externalReferences": [{"type": "website", "url": "https://example.com"}],
+    }]}
+    result = fix_sbom(
+        data,
+        SbomFixOptions(
+            reorder=False,
+            set_spec_version=False,
+            increment_version=False,
+            add_timestamp=False,
+            add_manufacturer=False,
+            components={
+                "remove_leaf_missing_purl": True,
+                "filter_external_references": True,
+            },
+        ),
+    )
+    assert result.fixed_sbom["components"] == []
+    assert _stats(result)["components.filter_external_references"] == 0
+
+
+def test_removed_components_do_not_appear_in_issues():
+    data = {"bomFormat": "CycloneDX", "components": [{"name": "a"}]}
+    result = fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert result.fixed_sbom["components"] == []
+    assert not [i for i in result.issues if i.path == "$.components[0]"]
+
+
+def test_leaf_rules_do_not_touch_metadata_component():
+    data = {
+        "metadata": {"component": {"name": "app"}},
+        "components": [{"name": "a", "purl": "pkg:pypi/a@1", "version": "1"}],
+    }
+    result = fix_sbom(
+        data,
+        _leaf_options(
+            remove_leaf_missing_purl=True,
+            remove_leaf_missing_version=True,
+        ),
+    )
+    assert result.fixed_sbom["metadata"]["component"] == {"name": "app"}
+    assert len(result.fixed_sbom["components"]) == 1
+
+
+def test_leaf_rules_do_not_mutate_input():
+    data = {"components": [{"name": "a"}]}
+    before = copy.deepcopy(data)
+    fix_sbom(data, _leaf_options(remove_leaf_missing_purl=True))
+    assert data == before
 
 
 def test_fill_gost_properties_creates_list_when_absent():

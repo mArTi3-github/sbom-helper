@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, Field, field_validator
 
+from ..purl_utils import PurlValidationError, validate
 from .optional_fields import DEFAULT_KEEP_FIELDS, normalize_keep, remove_optional_fields
 
 SPEC_VERSION_PATTERN = re.compile(r"^\d+\.\d+$")
@@ -284,6 +285,88 @@ def _walk_components(root: dict, callback: Callable[[dict], None]) -> None:
 
 def _is_non_empty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value)
+
+
+def _is_leaf_component(component: dict) -> bool:
+    nested = component.get("components")
+    return not (isinstance(nested, list) and nested)
+
+
+def _collect_leaf_ids(components: list) -> set[int]:
+    leaf_ids: set[int] = set()
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        if _is_leaf_component(component):
+            leaf_ids.add(id(component))
+        else:
+            leaf_ids |= _collect_leaf_ids(component["components"])
+    return leaf_ids
+
+
+def _remove_leaf_components(
+    components: list,
+    leaf_ids: set[int],
+    predicate: Callable[[dict], bool],
+) -> tuple[list, int]:
+    kept: list = []
+    removed = 0
+    for component in components:
+        if isinstance(component, dict):
+            nested = component.get("components")
+            if isinstance(nested, list) and nested:
+                new_nested, nested_removed = _remove_leaf_components(
+                    nested, leaf_ids, predicate
+                )
+                component["components"] = new_nested
+                removed += nested_removed
+            if id(component) in leaf_ids and predicate(component):
+                removed += 1
+                continue
+        kept.append(component)
+    return kept, removed
+
+
+def _has_missing_purl(component: dict) -> bool:
+    return not _is_non_empty_string(component.get("purl"))
+
+
+def _has_invalid_purl(component: dict) -> bool:
+    purl = component.get("purl")
+    if not _is_non_empty_string(purl):
+        return False
+    try:
+        validate(purl)
+    except PurlValidationError:
+        return True
+    return False
+
+
+def _has_missing_version(component: dict) -> bool:
+    return not _is_non_empty_string(component.get("version"))
+
+
+def _apply_leaf_removals(
+    data: dict,
+    options: SbomFixOptions,
+    counts: dict[str, int],
+) -> None:
+    components = data.get("components")
+    if not isinstance(components, list):
+        return
+    leaf_ids = _collect_leaf_ids(components)
+    for rule_id, predicate in (
+        ("components.remove_leaf_missing_purl", _has_missing_purl),
+        ("components.remove_leaf_invalid_purl", _has_invalid_purl),
+        ("components.remove_leaf_missing_version", _has_missing_version),
+    ):
+        if not _rule_enabled(rule_id, options):
+            continue
+        components, removed = _remove_leaf_components(
+            components, leaf_ids, predicate
+        )
+        counts[rule_id] = counts.get(rule_id, 0) + removed
+    data["components"] = components
 
 
 def _missing_gost_names(properties: list) -> list[str]:
@@ -621,6 +704,7 @@ def _apply_components_rules(
     options: SbomFixOptions,
     counts: dict[str, int],
 ) -> None:
+    _apply_leaf_removals(data, options, counts)
     filter_external_references = _rule_enabled(
         "components.filter_external_references", options
     )
