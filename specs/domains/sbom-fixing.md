@@ -2,20 +2,20 @@
 
 ## Description
 
-Synchronous normalization of a CycloneDX SBOM JSON document. The domain applies an explicitly selected subset of 14 named static rules plus an analysis-driven removal of optional fields, returns the fixed document together with per-rule statistics and a report of the defects that remain after the fixes were applied. It targets a fixed catalogue of formal defects (fields removed, `specVersion` set to `1.7`, external reference and property filters, leaf components without a usable `purl` or `version`, optional GOST properties, missing `manufacturer`, non-proprietary license entries, missing proprietary licenses, and proprietary source references), not full FSTEC methodology compliance — producing a fully compliant SBOM is another service's responsibility. Removal of optional fields is a cosmetic cleanup of additional CycloneDX fields not described in the FSTEC tables, not a compliance pass. No database or background queue is involved. See `docs/superpowers/specs/2026-10-26-sbom-fixer-design.md`, `docs/superpowers/specs/2026-10-29-sbom-fixer-optional-fields-design.md`, `docs/superpowers/specs/2026-11-01-sbom-fixer-base-fixes-group-design.md`, `docs/superpowers/specs/2026-11-01-sbom-fixer-licenses-design.md` and `docs/superpowers/specs/2026-11-02-sbom-fixer-leaf-component-removal-design.md` for the design rationale.
+Synchronous normalization of a CycloneDX SBOM JSON document. The domain applies an explicitly selected subset of 15 named static rules plus an analysis-driven removal of optional fields, returns the fixed document together with per-rule statistics and a report of the defects that remain after the fixes were applied. It targets a fixed catalogue of formal defects (fields removed, `specVersion` set to `1.7`, external reference and property filters, leaf components without a usable `purl` or `version`, optional GOST properties, a missing `GOST:provided_by` provenance property, missing `manufacturer`, non-proprietary license entries, missing proprietary licenses, and proprietary source references), not full FSTEC methodology compliance — producing a fully compliant SBOM is another service's responsibility. Removal of optional fields is a cosmetic cleanup of additional CycloneDX fields not described in the FSTEC tables, not a compliance pass. No database or background queue is involved. See `docs/superpowers/specs/2026-10-26-sbom-fixer-design.md`, `docs/superpowers/specs/2026-10-29-sbom-fixer-optional-fields-design.md`, `docs/superpowers/specs/2026-11-01-sbom-fixer-base-fixes-group-design.md`, `docs/superpowers/specs/2026-11-01-sbom-fixer-licenses-design.md`, `docs/superpowers/specs/2026-11-02-sbom-fixer-leaf-component-removal-design.md` and `docs/superpowers/specs/2026-11-02-sbom-fixer-provided-by-design.md` for the design rationale.
 
 ## Key Files
 
-- `src/purl_resolver/sbom/fixer.py` — option models, the 14 static rules (including the leaf-removal helpers, the `licenses.*` predicate, and the traversal helpers), `fix_sbom()` orchestrator, `FixStat`, `FixIssue`, `SbomFixResult`, and the issue collector
+- `src/purl_resolver/sbom/fixer.py` — option models, the 15 static rules (including the leaf-removal helpers, the `licenses.*` predicate, the `provided_by` matcher, and the traversal helpers), `fix_sbom()` orchestrator, `FixStat`, `FixIssue`, `SbomFixResult`, and the issue collector
 - `src/purl_resolver/sbom/optional_fields.py` — FSTEC field catalog (`FSTEC_FIELDS`, `FSTEC_PATHS`), the keep list (`DEFAULT_KEEP_FIELDS`), path grammar (`FIELD_PATH_PATTERN`), `normalize_keep`/`invalid_keep_entries`/`canonical_sort_key`, and the analysis/removal functions (`analyze_fields`, `remove_optional_fields`)
-- `src/purl_resolver/sbom/__init__.py` — public exports: `fix_sbom`, `SbomFixOptions`, `SbomFixResult`, `FixStat`, `FixIssue`, `OptionalFieldsFixOptions`, `LicensePatternItem`, `LicensesFixOptions`
+- `src/purl_resolver/sbom/__init__.py` — public exports: `fix_sbom`, `SbomFixOptions`, `SbomFixResult`, `FixStat`, `FixIssue`, `OptionalFieldsFixOptions`, `LicensePatternItem`, `LicensesFixOptions`, `ProvidedByPatternItem`
 - `src/purl_resolver/sbom/parser.py` — `CycloneDXParser` / `SbomParseError`; validates the root object and `bomFormat == "CycloneDX"` before fixing
 - `src/purl_resolver/sbom_fix_options_store.py` — `SbomFixOptionsStore`; JSON-file persistence of the option set
 - `src/purl_resolver/routes/sbom_fix.py` — `POST /api/v1/sbom/fix`, `GET/POST /api/v1/sbom/fix/options`, `GET /api/v1/sbom/fix/field-catalog`, `POST /api/v1/sbom/fix/analyze`
 - `src/purl_resolver/router.py` — includes the `sbom_fix` sub-router
 - `src/purl_resolver/main.py` — creates `app.state.sbom_fix_options_store = SbomFixOptionsStore()` in the lifespan
 - `frontend/src/views/SbomFixer.vue` — Fix SBOM page
-- `frontend/src/views/sbomFixerRules.ts` — catalog of the 14 static rules (`BASE_RULES` with 5 entries, `COMPONENTS_RULES` with 6, `LICENSES_RULES` with 3; rule id, option key, before/after JSON examples) that drives the rule rows of the page
+- `frontend/src/views/sbomFixerRules.ts` — catalog of the 15 static rules (`BASE_RULES` with 5 entries, `COMPONENTS_RULES` with 7, `LICENSES_RULES` with 3; rule id, option key, before/after JSON examples) that drives the rule rows of the page
 - `frontend/src/components/RuleHelp.vue` — inline rule help: "(i)" button and a panel with the rule description and before/after snippets
 - `frontend/src/api/sbom.ts` — `fixSbom()`, `getFixOptions()`, `saveFixOptions()`, `analyzeSbom()`, `getFieldCatalog()`
 - `frontend/src/types/api.ts` — `SbomFixOptions`, `SbomFixStat`, `SbomFixIssue`, `SbomFixResponse`, `SbomFixOptionsResponse`, `LicensesFixOptions`, `OptionalFieldsFixOptions`, `OptionalFieldStatus`, `OptionalFieldInfo`, `FstecField`, `FieldCatalogResponse`
@@ -38,6 +38,10 @@ COMPONENT_PRIORITY = ("type", "name", "version", "purl",
                       "externalReferences", "properties", "components")
 ALLOWED_EXTERNAL_REFERENCE_TYPES = ("vcs", "source-distribution")
 PROPRIETARY_LICENSE_NAME = "Proprietary"
+PROVIDED_BY_PROPERTY_NAME = "GOST:provided_by"
+DEFAULT_PROVIDED_BY_VALUE = (
+    'Операционная система специального назначения "Astra Linux Special Edition"'
+)
 GOST_PROPERTY_PREFIX = "GOST:"
 REQUIRED_GOST_PROPERTIES = (("GOST:attack_surface", "no"),
                             ("GOST:security_function", "no"))
@@ -54,10 +58,23 @@ RULE_IDS = (
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
+    "components.add_provided_by",
     "licenses.filter_non_proprietary",
     "licenses.add_proprietary",
     "licenses.remove_proprietary_source_references",
 )
+
+class ProvidedByPatternItem(BaseModel):
+    field: str = ""
+    pattern: str = ""
+    provided_by: str = ""
+
+def _default_provided_by_patterns() -> list[ProvidedByPatternItem]:
+    return [ProvidedByPatternItem(
+        field="purl",
+        pattern="pkg:deb/astra",
+        provided_by=DEFAULT_PROVIDED_BY_VALUE,
+    )]
 
 class ComponentsFixOptions(BaseModel):
     remove_leaf_missing_purl: bool = False      # opt-in
@@ -66,6 +83,9 @@ class ComponentsFixOptions(BaseModel):
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False  # opt-in
+    add_provided_by: bool = True
+    provided_by_patterns: list[ProvidedByPatternItem] = Field(
+        default_factory=_default_provided_by_patterns)
 
 class LicensePatternItem(BaseModel):
     field: str = ""
@@ -142,7 +162,7 @@ def analyze_fields(data) -> list[FieldInfo]
 def remove_optional_fields(data, paths, keep) -> dict[str, int]
 ```
 
-Default set: every static option is `True` except `components.fill_missing_gost_properties`, the three `components.remove_leaf_*` flags, and the three `licenses.*` flags (`False`); `licenses.add_patterns` is empty; `spec_version` is `"1.7"`; `manufacturer` is `"Positive Technologies"`; `optional_fields.keep` equals `DEFAULT_KEEP_FIELDS`.
+Default set: every static option is `True` except `components.fill_missing_gost_properties`, the three `components.remove_leaf_*` flags, and the three `licenses.*` flags (`False`); `components.add_provided_by` is `True` and `components.provided_by_patterns` holds one Astra row (`purl` / `pkg:deb/astra` / `Операционная система специального назначения "Astra Linux Special Edition"`); `licenses.add_patterns` is empty; `spec_version` is `"1.7"`; `manufacturer` is `"Positive Technologies"`; `optional_fields.keep` equals `DEFAULT_KEEP_FIELDS`.
 
 ## White Lists
 
@@ -192,7 +212,8 @@ sbom/fixer.py::fix_sbom(data, options, now=None, remove_fields=())
   |  4. metadata rules: add timestamp; metadata.component: add manufacturer
   |  5. components rules (recursive pre-order): remove leaf components missing a purl,
   |     with an invalid purl, or missing a version (leaf set computed once first);
-  |     then filter externalReferences/properties; then fill GOST properties
+  |     then filter externalReferences/properties; then fill GOST properties;
+  |     then add GOST:provided_by from matching pattern rows
   |  6. licenses rules (recursive pre-order): filter non-proprietary licenses,
   |     add Proprietary, remove proprietary source references
   |  7. reorder rule LAST: root -> metadata -> metadata.component -> all components
@@ -234,13 +255,20 @@ Rules mutate a deep copy and never create issues; all issues come from a separat
 | 9 | `components.filter_external_references` | on | Keep only array items whose `type` is exactly `vcs` or `source-distribution`; empty arrays stay empty | Number of removed items |
 | 10 | `components.filter_properties` | on | Keep only array items whose `name` is a string starting exactly with `GOST:` (case-sensitive) | Number of removed items |
 | 11 | `components.fill_missing_gost_properties` | **off** | Create `properties: []` when absent/`null`; add missing `{"name": "GOST:attack_surface", "value": "no"}` and `{"name": "GOST:security_function", "value": "no"}`; leave non-array `properties` untouched | Number of added properties |
-| 12 | `licenses.filter_non_proprietary` | **off** | Keep only entries where the entry is an object whose `license` is an object with `name` exactly `Proprietary`; when at least one entry is removed and none remain, delete the `licenses` key; a non-list `licenses` and an already-empty array are left unchanged | Number of removed license entries |
-| 13 | `licenses.add_proprietary` | **off** | For components matching at least one `licenses.add_patterns` pair (top-level field exists and is not `null`, pattern is a case-sensitive substring of `str(value)`; blank pairs ignored): append `{"license": {"name": "Proprietary"}}` unless already present; absent/`null` `licenses` becomes `[]`, non-list `licenses` is skipped, existing entries are preserved | Number of components that received an entry |
-| 14 | `licenses.remove_proprietary_source_references` | **off** | For components with a proprietary license: remove `externalReferences` items whose `type` is exactly `vcs` or `source-distribution`; other items are preserved; an emptied array stays `[]` and the key is never removed; a non-list `externalReferences` is skipped | Number of removed reference entries |
+| 12 | `components.add_provided_by` | on | For components matching the first active `components.provided_by_patterns` row (top-level field exists and is not `null`; `pattern` is a case-sensitive substring of `str(value)`; rows with any blank field are ignored): write `{"name": "GOST:provided_by", "value": <row name>}` into the first existing `GOST:provided_by` entry with an empty value, otherwise append it; components with any filled `GOST:provided_by` value are skipped; absent/`null` `properties` becomes `[]`, a non-list `properties` is skipped, and `metadata.component` is never touched | Number of components that received a value |
+| 13 | `licenses.filter_non_proprietary` | **off** | Keep only entries where the entry is an object whose `license` is an object with `name` exactly `Proprietary`; when at least one entry is removed and none remain, delete the `licenses` key; a non-list `licenses` and an already-empty array are left unchanged | Number of removed license entries |
+| 14 | `licenses.add_proprietary` | **off** | For components matching at least one `licenses.add_patterns` pair (top-level field exists and is not `null`, pattern is a case-sensitive substring of `str(value)`; blank pairs ignored): append `{"license": {"name": "Proprietary"}}` unless already present; absent/`null` `licenses` becomes `[]`, non-list `licenses` is skipped, existing entries are preserved | Number of components that received an entry |
+| 15 | `licenses.remove_proprietary_source_references` | **off** | For components with a proprietary license: remove `externalReferences` items whose `type` is exactly `vcs` or `source-distribution`; other items are preserved; an emptied array stays `[]` and the key is never removed; a non-list `externalReferences` is skipped | Number of removed reference entries |
 
 A leaf is a component whose own `components` value is absent, `null`, not an array, or an empty array; a component with a non-empty `components` array is a container and is never removed by rules 6–8. The leaf set is computed once before the removal phase, so a container whose children were removed in the same run is not removed and is not re-checked.
 
 The former fixed field-removal options and the supplier-to-manufacturer rename rule no longer exist. Removal is now analysis-driven via the `optional_fields.remove` pseudo-rule described below; the full list of removed options is recorded in the historical design doc.
+
+**`components.add_provided_by`.** Rows come from `options.components.provided_by_patterns`; a row is active when all three values (`field`, `pattern`, `provided_by`) are non-empty after trimming, and rows with any blank field are ignored. An empty active set leaves the rule enabled but yields `count = 0` for every component. `field` is read only at the top level of the component object (`component.get(field)`); a missing or `null` field never matches, otherwise `pattern` matches as a case-sensitive substring of `str(value)`. Rows are evaluated top-down and the first active match supplies `provided_by`; later rows are not considered for that component.
+
+The rule walks the root `components[]` tree (each root component plus its nested `components`, pre-order) and never touches `metadata.component` or its nested tree. A component is skipped entirely when any element of its `properties[]` named `GOST:provided_by` already has a filled value — a string that is non-empty after trimming; absent `value`, `null`, `""`, whitespace-only strings, numbers, objects, and arrays all count as empty. When an entry with that name exists but has an empty value, the value is written into the first such entry and the array position is preserved; otherwise the entry is appended. A missing or `null` `properties` becomes `[]` only after a row matches, so no property is created without a match; a `properties` value that is present but not a list is skipped without overwriting. The `count` is the number of components that received a value (at most one per component regardless of how many rows matched).
+
+`_apply_components_rules` applies `components.add_provided_by` after `components.fill_missing_gost_properties`, so a `properties` array created by the fill rule is available, and before `_apply_licenses_rules`. Issue collection runs on the final document, so a component that received `GOST:provided_by` in the same run is exempt from `component.missing_source_reference`.
 
 ### License rules (`licenses.*`)
 
@@ -269,10 +297,11 @@ The whole key is removed (with a value of any shape, including empty array/objec
 
 Notes:
 
-- All `components.*` rules (6–11) apply only to the root `components[]` tree (each root component plus its nested `components`, walked pre-order); `metadata.component` and its nested components are outside this tree and are never touched by these rules.
-- The three `components.remove_leaf_*` rules (6–8) run first within `_apply_components_rules`, in the order missing purl → invalid purl → missing version, before rules 9–11. Each rule rebuilds the nested arrays throughout the tree and removes only components from the leaf set computed once before the phase, so a component removed by an earlier rule is never counted by a later one and a container never becomes a leaf mid-run.
-- All `licenses.*` rules (12–14) share the same `components[]`-only scope and never touch `metadata.component` or its nested components.
-- `components.filter_properties` runs before `components.fill_missing_gost_properties`, so non-GOST properties are removed and then missing GOST properties are appended.
+- All `components.*` rules (6–12) apply only to the root `components[]` tree (each root component plus its nested `components`, walked pre-order); `metadata.component` and its nested components are outside this tree and are never touched by these rules.
+- The three `components.remove_leaf_*` rules (6–8) run first within `_apply_components_rules`, in the order missing purl → invalid purl → missing version, before rules 9–12. Each rule rebuilds the nested arrays throughout the tree and removes only components from the leaf set computed once before the phase, so a component removed by an earlier rule is never counted by a later one and a container never becomes a leaf mid-run.
+- All `licenses.*` rules (13–15) share the same `components[]`-only scope and never touch `metadata.component` or its nested components.
+- `components.filter_properties` runs before `components.fill_missing_gost_properties`, so non-GOST properties are removed and then missing GOST properties are appended; `components.add_provided_by` runs after the fill and its `GOST:provided_by` entry always survives the property filter.
+- `components.add_provided_by` runs before the `licenses.*` rules and issue collection, so a component that received the property in the same run is exempt from `component.missing_source_reference`; the license rules still act on their own fields independently.
 - The license rules run after the `components.*` rules and before `reorder`, so a proprietary entry added in the same run immediately makes the component eligible for reference removal, and issue collection sees the final `licenses` and `externalReferences`.
 - The `reorder` rule (rule 1) runs after every mutation so the final key order reflects the final set of fields.
 - Removal runs before `add_manufacturer`, so a manufacturer added in the same run cannot be removed by it.
@@ -283,7 +312,7 @@ Every static rule is documented in the UI by an inline help panel that shows the
 
 - `stats` is a list of `{"rule_id": str, "count": int}` for the enabled static rules in `RULE_IDS` order, followed by one removal row per accepted path.
 - It contains **all enabled static rules**, including entries with `count == 0`.
-- `reorder` is a single row regardless of how many objects it reordered; its `count` is the number of objects whose key order changed. The three `licenses.*` rows use their own units: removed license entries (`licenses.filter_non_proprietary`), components that received a proprietary entry (`licenses.add_proprietary`), and removed reference entries (`licenses.remove_proprietary_source_references`). The three `components.remove_leaf_*` rows count removed leaf components. With defaults there are 7 static rows (the 14 rules minus the four existing opt-in rules — `components.fill_missing_gost_properties` and the three `licenses.*` rules — and the three new opt-in `components.remove_leaf_*` rules).
+- `reorder` is a single row regardless of how many objects it reordered; its `count` is the number of objects whose key order changed. `components.add_provided_by` counts components that received a value (added or filled), not the number of matching rows. The three `licenses.*` rows use their own units: removed license entries (`licenses.filter_non_proprietary`), components that received a proprietary entry (`licenses.add_proprietary`), and removed reference entries (`licenses.remove_proprietary_source_references`). The three `components.remove_leaf_*` rows count removed leaf components. With defaults there are 8 static rows (the 15 rules minus the four existing opt-in rules — `components.fill_missing_gost_properties` and the three `licenses.*` rules — and the three new opt-in `components.remove_leaf_*` rules).
 - Disabled rules are omitted.
 - Removal rows use `{"rule_id": "optional_fields.remove", "count": int, "field": "<path>"}`; `field` is present only on removal rows, in canonical path order (`root` → `metadata` → `metadata.component` → `components[]`, alphabetically within a group), and is included even when `count == 0`.
 - `changed` is `true` iff at least one `stat.count > 0`.
@@ -348,7 +377,7 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 
 ## API Behavior
 
-`POST /api/v1/sbom/fix` — `multipart/form-data` with `file` (required CycloneDX JSON), optional `options` (JSON string), and optional `remove_fields` (JSON string holding an array of path strings). The endpoint never reads saved options itself; omitted `options` means built-in `SbomFixOptions()` defaults (including the three disabled `components.remove_leaf_*` rules, the disabled `components.fill_missing_gost_properties`, the three disabled `licenses.*` rules, and an empty `licenses.add_patterns`), and omitted `remove_fields` means an empty list. Response `200`:
+`POST /api/v1/sbom/fix` — `multipart/form-data` with `file` (required CycloneDX JSON), optional `options` (JSON string), and optional `remove_fields` (JSON string holding an array of path strings). The endpoint never reads saved options itself; omitted `options` means built-in `SbomFixOptions()` defaults (including the three disabled `components.remove_leaf_*` rules, the disabled `components.fill_missing_gost_properties`, the enabled `components.add_provided_by` with its single Astra row, the three disabled `licenses.*` rules, and an empty `licenses.add_patterns`), and omitted `remove_fields` means an empty list. Response `200`:
 
 ```json
 {
@@ -379,9 +408,9 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 | File exceeds `sbom_settings.max_file_size` | 413 | `file_too_large` (+ `max_size_mb`) |
 | Missing `file` field | 422 | standard FastAPI/Pydantic response |
 
-`GET /api/v1/sbom/fix/options` — returns `200 {"options": {...}}`; unreadable/corrupt file yields built-in defaults with a logged warning (still 200). The response includes `optional_fields.keep` and the `licenses` block.
+`GET /api/v1/sbom/fix/options` — returns `200 {"options": {...}}`; unreadable/corrupt file yields built-in defaults with a logged warning (still 200). The response includes `optional_fields.keep`, the `licenses` block, and `components.add_provided_by` / `components.provided_by_patterns`.
 
-`POST /api/v1/sbom/fix/options` — body `{"options": {...}}`; validates via `SbomFixOptions.model_validate`; returns `200 {"status": "saved"}`. A `keep` array containing a non-empty entry outside the path grammar or a list-1 path yields `400 invalid_options` whose `detail` names the offending entries (strict check runs before model validation). An `add_patterns` value or element of the wrong type fails Pydantic validation and yields `400 invalid_options` through the same path. Malformed JSON, missing `options` key, or validation failure → `400 invalid_options` (+ `detail`); write failure → `500 options_save_failed`. In fix and on settings load, invalid `keep` entries are dropped tolerantly without error; an absent `licenses` block loads with the three flags `false` and an empty pattern list, and an absent `components.remove_leaf_*` key loads with `false`.
+`POST /api/v1/sbom/fix/options` — body `{"options": {...}}`; validates via `SbomFixOptions.model_validate`; returns `200 {"status": "saved"}`. A `keep` array containing a non-empty entry outside the path grammar or a list-1 path yields `400 invalid_options` whose `detail` names the offending entries (strict check runs before model validation). An `add_patterns` value or element of the wrong type fails Pydantic validation and yields `400 invalid_options` through the same path. Malformed JSON, missing `options` key, or validation failure → `400 invalid_options` (+ `detail`); write failure → `500 options_save_failed`. In fix and on settings load, invalid `keep` entries are dropped tolerantly without error; an absent `licenses` block loads with the three flags `false` and an empty pattern list, and an absent `components.remove_leaf_*` key loads with `false`. An options file without `components.add_provided_by` and `components.provided_by_patterns` loads with the rule enabled and the Astra default row; an explicitly saved empty `provided_by_patterns` list stays empty. A `provided_by_patterns` value or element of the wrong type fails Pydantic validation and yields `400 invalid_options`; rows with any blank field are allowed in the saved options and ignored by the rule.
 
 ## Invariants
 
@@ -399,10 +428,13 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 - The `group` field is modified nowhere except by `optional_fields.remove` when the user drops it from list 2.
 - `components[].hashes` removal removes only the component's own `hashes`; `hashes` inside `externalReferences[]` are preserved.
 - `components.fill_missing_gost_properties` applies only to `components[]` items, never to `metadata.component`.
+- `components.add_provided_by` applies only to `components[]` items at all nesting levels, never to `metadata.component`; it writes at most one `GOST:provided_by` entry per component and never creates a duplicate.
+- A filled `GOST:provided_by` value (a non-empty trimmed string) is never overwritten; an empty or non-string value is filled in place in the first matching entry. A non-list `properties` value is left untouched.
+- `components.add_provided_by` runs after `components.fill_missing_gost_properties` and before the `licenses.*` rules; a component that received the property in the same run is exempt from `component.missing_source_reference`.
 - The leaf-removal rules (6–8) remove only leaf components: a component with a non-empty `components` array is always kept, and non-object array items are always kept.
 - The leaf set is computed once before any removal; a container whose children were removed in the same run stays in the document and is not re-checked.
 - `components.remove_leaf_invalid_purl` skips absent, `null`, empty, and non-string `purl` values; those are removed only by `components.remove_leaf_missing_purl`.
-- Components removed by rules 6–8 are absent from the statistics of rules 9–14 and from `issues`.
+- Components removed by rules 6–8 are absent from the statistics of rules 9–15 and from `issues`.
 - The leaf-removal rules never touch `metadata.component` or its nested tree.
 - When leaf removal empties a `components` array, the key remains with value `[]`.
 - The proprietary predicate is exact and case-sensitive: only an object entry with `license.name == "Proprietary"` counts; `license.id` and `expression` never do.
@@ -410,7 +442,8 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 - `licenses.add_proprietary` never duplicates an existing proprietary entry and never overwrites an existing entry or a non-list `licenses` value.
 - `licenses.remove_proprietary_source_references` keeps `externalReferences` as an array, possibly `[]`, and never deletes the key.
 - The `licenses.*` rules run after `components.*` and before `reorder`; a proprietary entry added in a run makes the same component eligible for reference removal in that run.
-- The `licenses` options block defaults to three `false` flags and an empty `add_patterns` list; the three `components.remove_leaf_*` flags default to `false`; an options file without the `licenses` block or those `components` keys loads with those defaults.
+- The `licenses` options block defaults to three `false` flags and an empty `add_patterns` list; the three `components.remove_leaf_*` flags default to `false`; `components.add_provided_by` defaults to `true` with one Astra pattern row; an options file without the `licenses` block or those `components` keys loads with those defaults, while an explicitly saved empty `provided_by_patterns` list stays empty.
+- A `components.add_provided_by` row is active only when all three trimmed values are non-empty; an empty active set keeps the rule enabled but always reports `count = 0`.
 - Unexpected field types never raise and never produce HTTP 500; the affected rule skips the node and the collector reports an `invalid_*` issue.
 - A structurally invalid SBOM is not silently reported as fixed — remaining defects appear in `issues`.
 - No PostgreSQL and no background queue are required; the operation is synchronous and stateless apart from the options file.
@@ -421,8 +454,8 @@ Known side effect: removing `components[].licenses` can surface `component.missi
 `SbomFixOptionsStore` (in `sbom_fix_options_store.py`, instantiated once in `main.py`):
 
 - File path default: `./data/sbom_fix_options.json`; the constructor accepts an override `path` (used by tests).
-- `load() → SbomFixOptions`: missing file → built-in defaults; corrupt JSON, I/O error, or Pydantic validation failure → log warning and return built-in defaults; a partial JSON object is completed by Pydantic field defaults. The persisted JSON is flat: `reorder`, `set_spec_version`, `spec_version`, `increment_version`, `add_timestamp`, `add_manufacturer`, `manufacturer`, plus the nested `components`, `licenses`, and `optional_fields` objects. An options file without the `licenses` block loads with the block defaults (three `false` flags, empty `add_patterns`) through the same field defaults; an options file without the three `components.remove_leaf_*` keys loads with those flags `false`. Legacy keys — the former nested `root`, `metadata`, and `metadata.component` objects with their per-object `reorder` flags, the former `remove_*` options, and the supplier rename rule — are unknown fields to Pydantic and are silently ignored; there is no migration code or compatibility branch.
+- `load() → SbomFixOptions`: missing file → built-in defaults; corrupt JSON, I/O error, or Pydantic validation failure → log warning and return built-in defaults; a partial JSON object is completed by Pydantic field defaults. The persisted JSON is flat: `reorder`, `set_spec_version`, `spec_version`, `increment_version`, `add_timestamp`, `add_manufacturer`, `manufacturer`, plus the nested `components`, `licenses`, and `optional_fields` objects. An options file without the `licenses` block loads with the block defaults (three `false` flags, empty `add_patterns`) through the same field defaults; an options file without the three `components.remove_leaf_*` keys loads with those flags `false`; an options file without `components.add_provided_by` and `components.provided_by_patterns` loads with the rule enabled and the Astra default row, while an explicitly saved empty `provided_by_patterns` list stays empty. Legacy keys — the former nested `root`, `metadata`, and `metadata.component` objects with their per-object `reorder` flags, the former `remove_*` options, and the supplier rename rule — are unknown fields to Pydantic and are silently ignored; there is no migration code or compatibility branch.
 - `save(options) → None`: creates the parent directory, writes JSON with `indent=2`, `ensure_ascii=False`, and a trailing newline.
-- The whole option object (including `spec_version`, `manufacturer`, `licenses`, and `optional_fields.keep`) is persisted. No database is used. The store is exposed to routes via `request.app.state.sbom_fix_options_store`.
+- The whole option object (including `spec_version`, `manufacturer`, `components.provided_by_patterns`, `licenses`, and `optional_fields.keep`) is persisted. No database is used. The store is exposed to routes via `request.app.state.sbom_fix_options_store`.
 
 Upload limit: `sbom_settings.max_file_size` (environment `SBOM_MAX_FILE_SIZE`, default 200 MB).
