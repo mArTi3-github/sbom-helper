@@ -12,7 +12,9 @@ from purl_resolver.sbom.fixer import (
     OptionalFieldsFixOptions,
     ProvidedByPatternItem,
     SbomFixOptions,
+    _add_provided_by,
     _collect_component_issues,
+    _field_contains_pattern,
     _fill_gost_properties,
     _filter_external_references,
     _filter_properties,
@@ -2260,6 +2262,86 @@ def test_provided_by_pattern_item_defaults_are_empty_strings():
     assert item.field == ""
     assert item.pattern == ""
     assert item.provided_by == ""
+
+
+def test_field_contains_pattern_is_case_sensitive_and_skips_null():
+    assert _field_contains_pattern(
+        {"purl": "pkg:deb/astra/x"}, "purl", "pkg:deb/astra"
+    )
+    assert not _field_contains_pattern(
+        {"purl": "pkg:deb/Astra/x"}, "purl", "pkg:deb/astra"
+    )
+    assert not _field_contains_pattern({"purl": None}, "purl", "pkg:deb/astra")
+    assert not _field_contains_pattern({}, "purl", "pkg:deb/astra")
+
+
+def test_add_provided_by_appends_property_for_matching_purl():
+    component = {"purl": "pkg:deb/astra/astra-utils@1.0"}
+    patterns = [("purl", "pkg:deb/astra", "Astra Linux SE")]
+    assert _add_provided_by(component, patterns) == 1
+    assert component["properties"] == [
+        {"name": "GOST:provided_by", "value": "Astra Linux SE"}
+    ]
+
+
+def test_add_provided_by_uses_first_matching_pattern():
+    component = {
+        "purl": "pkg:deb/astra/astra-utils@1.0",
+        "name": "astra-utils",
+    }
+    patterns = [
+        ("purl", "pkg:deb/astra", "Astra Linux SE"),
+        ("name", "astra", "Other SZI"),
+    ]
+    assert _add_provided_by(component, patterns) == 1
+    assert component["properties"][0]["value"] == "Astra Linux SE"
+
+
+def test_add_provided_by_keeps_existing_filled_value():
+    component = {
+        "purl": "pkg:deb/astra/x",
+        "properties": [{"name": "GOST:provided_by", "value": "Manual"}],
+    }
+    assert _add_provided_by(
+        component, [("purl", "pkg:deb/astra", "Astra")]
+    ) == 0
+    assert component["properties"] == [
+        {"name": "GOST:provided_by", "value": "Manual"}
+    ]
+
+
+@pytest.mark.parametrize("value", ["", "   ", None, 5, ["x"]])
+def test_add_provided_by_fills_empty_existing_value_in_place(value):
+    component = {
+        "purl": "pkg:deb/astra/x",
+        "properties": [
+            {"name": "other", "value": 1},
+            {"name": "GOST:provided_by", "value": value},
+        ],
+    }
+    assert _add_provided_by(
+        component, [("purl", "pkg:deb/astra", "Astra")]
+    ) == 1
+    assert component["properties"] == [
+        {"name": "other", "value": 1},
+        {"name": "GOST:provided_by", "value": "Astra"},
+    ]
+
+
+def test_add_provided_by_does_not_create_properties_without_match():
+    component = {"purl": "pkg:npm/x@1"}
+    assert _add_provided_by(
+        component, [("purl", "pkg:deb/astra", "Astra")]
+    ) == 0
+    assert "properties" not in component
+
+
+def test_add_provided_by_skips_non_list_properties():
+    component = {"purl": "pkg:deb/astra/x", "properties": "bad"}
+    assert _add_provided_by(
+        component, [("purl", "pkg:deb/astra", "Astra")]
+    ) == 0
+    assert component["properties"] == "bad"
 
 
 def _license_options(**licenses) -> SbomFixOptions:

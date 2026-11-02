@@ -694,14 +694,60 @@ def _filter_non_proprietary_licenses(component: dict) -> int:
     return removed
 
 
+def _field_contains_pattern(component: dict, field: str, pattern: str) -> bool:
+    value = component.get(field)
+    return value is not None and pattern in str(value)
+
+
 def _matches_license_patterns(
     component: dict, patterns: list[tuple[str, str]]
 ) -> bool:
-    for name, pattern in patterns:
-        value = component.get(name)
-        if value is not None and pattern in str(value):
-            return True
+    return any(
+        _field_contains_pattern(component, name, pattern)
+        for name, pattern in patterns
+    )
+
+
+def _first_matching_provided_by(
+    component: dict, patterns: list[tuple[str, str, str]]
+) -> str | None:
+    for field, pattern, provided_by in patterns:
+        if _field_contains_pattern(component, field, pattern):
+            return provided_by
+    return None
+
+
+def _has_filled_provided_by(properties: list) -> bool:
+    for prop in properties:
+        if isinstance(prop, dict) and prop.get("name") == PROVIDED_BY_PROPERTY_NAME:
+            value = prop.get("value")
+            if isinstance(value, str) and value.strip():
+                return True
     return False
+
+
+def _add_provided_by(
+    component: dict, patterns: list[tuple[str, str, str]]
+) -> int:
+    if not patterns:
+        return 0
+    properties = component.get("properties")
+    if isinstance(properties, list) and _has_filled_provided_by(properties):
+        return 0
+    value = _first_matching_provided_by(component, patterns)
+    if value is None:
+        return 0
+    if properties is None:
+        properties = []
+        component["properties"] = properties
+    elif not isinstance(properties, list):
+        return 0
+    for prop in properties:
+        if isinstance(prop, dict) and prop.get("name") == PROVIDED_BY_PROPERTY_NAME:
+            prop["value"] = value
+            return 1
+    properties.append({"name": PROVIDED_BY_PROPERTY_NAME, "value": value})
+    return 1
 
 
 def _add_proprietary_license(
