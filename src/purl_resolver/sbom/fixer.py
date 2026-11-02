@@ -51,6 +51,11 @@ ALLOWED_EXTERNAL_REFERENCE_TYPES: tuple[str, ...] = (
 
 PROPRIETARY_LICENSE_NAME = "Proprietary"
 
+PROVIDED_BY_PROPERTY_NAME = "GOST:provided_by"
+DEFAULT_PROVIDED_BY_VALUE = (
+    'Операционная система специального назначения "Astra Linux Special Edition"'
+)
+
 GOST_PROPERTY_PREFIX = "GOST:"
 
 REQUIRED_GOST_PROPERTIES: tuple[tuple[str, str], ...] = (
@@ -76,6 +81,22 @@ RULE_IDS: tuple[str, ...] = (
 )
 
 
+class ProvidedByPatternItem(BaseModel):
+    field: str = ""
+    pattern: str = ""
+    provided_by: str = ""
+
+
+def _default_provided_by_patterns() -> list[ProvidedByPatternItem]:
+    return [
+        ProvidedByPatternItem(
+            field="purl",
+            pattern="pkg:deb/astra",
+            provided_by=DEFAULT_PROVIDED_BY_VALUE,
+        )
+    ]
+
+
 class ComponentsFixOptions(BaseModel):
     remove_leaf_missing_purl: bool = False
     remove_leaf_invalid_purl: bool = False
@@ -83,6 +104,10 @@ class ComponentsFixOptions(BaseModel):
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False
+    add_provided_by: bool = True
+    provided_by_patterns: list[ProvidedByPatternItem] = Field(
+        default_factory=_default_provided_by_patterns
+    )
 
 
 class LicensePatternItem(BaseModel):

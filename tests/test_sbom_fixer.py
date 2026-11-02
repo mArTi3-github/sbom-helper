@@ -6,9 +6,11 @@ from pydantic import ValidationError
 
 from purl_resolver.sbom.fixer import (
     RULE_IDS,
+    ComponentsFixOptions,
     FixIssue,
     LicensePatternItem,
     OptionalFieldsFixOptions,
+    ProvidedByPatternItem,
     SbomFixOptions,
     _collect_component_issues,
     _fill_gost_properties,
@@ -2236,6 +2238,28 @@ def test_license_pattern_item_defaults_are_empty_strings():
     item = LicensePatternItem()
     assert item.field == ""
     assert item.pattern == ""
+
+
+def test_components_provided_by_defaults():
+    options = SbomFixOptions()
+    assert isinstance(options.components, ComponentsFixOptions)
+    assert options.components.add_provided_by is True
+    assert options.components.provided_by_patterns == [
+        ProvidedByPatternItem(
+            field="purl",
+            pattern="pkg:deb/astra",
+            provided_by=(
+                'Операционная система специального назначения "Astra Linux Special Edition"'
+            ),
+        )
+    ]
+
+
+def test_provided_by_pattern_item_defaults_are_empty_strings():
+    item = ProvidedByPatternItem()
+    assert item.field == ""
+    assert item.pattern == ""
+    assert item.provided_by == ""
 
 
 def _license_options(**licenses) -> SbomFixOptions:

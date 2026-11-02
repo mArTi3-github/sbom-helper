@@ -9,6 +9,7 @@ from purl_resolver.sbom.fixer import (
     ComponentsFixOptions,
     LicensePatternItem,
     LicensesFixOptions,
+    ProvidedByPatternItem,
     SbomFixOptions,
 )
 from purl_resolver.sbom.optional_fields import DEFAULT_KEEP_FIELDS
@@ -152,3 +153,38 @@ def test_old_file_without_leaf_flags_uses_disabled_defaults(tmp_path):
     assert loaded.components.remove_leaf_missing_purl is False
     assert loaded.components.remove_leaf_invalid_purl is False
     assert loaded.components.remove_leaf_missing_version is False
+
+
+def test_save_load_roundtrip_including_provided_by(tmp_path):
+    store = SbomFixOptionsStore(tmp_path / "options.json")
+    options = SbomFixOptions(
+        components=ComponentsFixOptions(
+            add_provided_by=False,
+            provided_by_patterns=[
+                ProvidedByPatternItem(
+                    field="name", pattern="vendor", provided_by="Vendor SZI"
+                )
+            ],
+        )
+    )
+    store.save(options)
+    assert store.load() == options
+
+
+def test_old_file_without_provided_by_uses_defaults(tmp_path):
+    path = tmp_path / "old.json"
+    path.write_text(
+        '{"components": {"filter_properties": false}}', encoding="utf-8"
+    )
+    loaded = SbomFixOptionsStore(path).load()
+    assert loaded.components.filter_properties is False
+    assert loaded.components.add_provided_by is True
+    assert loaded.components.provided_by_patterns == [
+        ProvidedByPatternItem(
+            field="purl",
+            pattern="pkg:deb/astra",
+            provided_by=(
+                'Операционная система специального назначения "Astra Linux Special Edition"'
+            ),
+        )
+    ]

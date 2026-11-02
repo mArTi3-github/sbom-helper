@@ -391,6 +391,55 @@ def test_fix_options_endpoint_returns_leaf_flags_disabled(client):
     assert components["remove_leaf_missing_version"] is False
 
 
+def test_fix_options_endpoint_returns_provided_by_defaults(client):
+    response = client.get("/api/v1/sbom/fix/options")
+    assert response.status_code == 200
+    components = response.json()["options"]["components"]
+    assert components["add_provided_by"] is True
+    assert components["provided_by_patterns"] == [
+        {
+            "field": "purl",
+            "pattern": "pkg:deb/astra",
+            "provided_by": (
+                'Операционная система специального назначения "Astra Linux Special Edition"'
+            ),
+        }
+    ]
+
+
+def test_save_options_roundtrips_provided_by_patterns(client):
+    payload = {
+        "options": {
+            "components": {
+                "add_provided_by": False,
+                "provided_by_patterns": [
+                    {
+                        "field": "name",
+                        "pattern": "vendor",
+                        "provided_by": "Vendor SZI",
+                    }
+                ],
+            }
+        }
+    }
+    response = client.post("/api/v1/sbom/fix/options", json=payload)
+    assert response.status_code == 200
+    components = client.get("/api/v1/sbom/fix/options").json()["options"]["components"]
+    assert components["add_provided_by"] is False
+    assert components["provided_by_patterns"] == [
+        {"field": "name", "pattern": "vendor", "provided_by": "Vendor SZI"}
+    ]
+
+
+def test_save_options_rejects_non_list_provided_by_patterns(client):
+    response = client.post(
+        "/api/v1/sbom/fix/options",
+        json={"options": {"components": {"provided_by_patterns": "purl"}}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_options"
+
+
 def test_fix_options_endpoint_rejects_non_boolean_leaf_flag(client):
     response = client.post(
         "/api/v1/sbom/fix/options",
