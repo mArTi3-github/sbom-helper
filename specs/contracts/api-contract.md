@@ -117,7 +117,7 @@ Serve the Fix SBOM web UI page (Vue SPA route).
 
 #### Response (200)
 
-Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, fix options in four sections (basic fixes, `components[]` edits, component license edits with an inline pattern editor, and optional-fields whitelist, the latter with its own analysis controls), master checkboxes for the basic, `components[]`, and license sections, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
+Content-Type: `text/html`. Returns `index.html` (SPA fallback). Vue Router mounts `SbomFixer.vue` with file upload, fix options in four sections (basic fixes, `components[]` edits with an inline provided_by pattern editor, component license edits with an inline pattern editor, and optional-fields whitelist, the latter with its own analysis controls), master checkboxes for the basic, `components[]`, and license sections, save/reset options controls, status card, statistics and issues spoilers, and fixed-SBOM download.
 
 ---
 

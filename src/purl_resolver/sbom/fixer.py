@@ -442,7 +442,7 @@ def _is_source_reference_exempt(component: dict) -> bool:
         for prop in properties:
             if (
                 isinstance(prop, dict)
-                and prop.get("name") == "GOST:provided_by"
+                and prop.get("name") == PROVIDED_BY_PROPERTY_NAME
                 and _is_non_empty_string(prop.get("value"))
             ):
                 return True
@@ -713,8 +713,17 @@ def _first_matching_provided_by(
     component: dict, patterns: list[tuple[str, str, str]]
 ) -> str | None:
     for field_name, pattern, provided_by in patterns:
+        if not (
+            isinstance(field_name, str)
+            and field_name.strip()
+            and isinstance(pattern, str)
+            and pattern.strip()
+            and isinstance(provided_by, str)
+            and provided_by.strip()
+        ):
+            continue
         if _field_contains_pattern(component, field_name, pattern):
-            return provided_by
+            return provided_by.strip()
     return None
 
 

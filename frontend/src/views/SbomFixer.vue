@@ -481,9 +481,9 @@ function applyOptions(next: SbomFixOptions): void {
   options.components = {
     ...options.components,
     ...next.components,
-    provided_by_patterns: [
-      ...(next.components.provided_by_patterns ?? []),
-    ],
+    provided_by_patterns: (next.components.provided_by_patterns ?? []).map(
+      (row) => ({ ...row }),
+    ),
   }
   options.licenses = {
     filter_non_proprietary: next.licenses.filter_non_proprietary,
@@ -721,7 +721,8 @@ watch(
 
 watch(
   providedByRows,
-  () => {
+  (rows) => {
+    options.components.provided_by_patterns = rows.map((row) => ({ ...row }))
     if (saveStatus.value === 'saving') {
       changedWhileSaving = true
     } else {
@@ -736,7 +737,6 @@ function restoreDefaults(): void {
   const keep = fieldCatalog.value?.default_keep ?? options.optional_fields.keep
   applyOptions(defaultFixOptions())
   patternRows.value = [emptyPatternRow()]
-  providedByRows.value = [defaultProvidedByRow()]
   options.optional_fields.keep = keep
   saveStatus.value = 'idle'
   saveError.value = null
