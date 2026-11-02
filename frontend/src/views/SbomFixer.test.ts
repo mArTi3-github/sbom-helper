@@ -18,6 +18,9 @@ const defaultOptions: SbomFixOptions = {
   add_manufacturer: true,
   manufacturer: 'Positive Technologies',
   components: {
+    remove_leaf_missing_purl: false,
+    remove_leaf_invalid_purl: false,
+    remove_leaf_missing_version: false,
     filter_external_references: true,
     filter_properties: true,
     fill_missing_gost_properties: false,
@@ -201,7 +204,7 @@ describe('SbomFixer.vue', () => {
   it('renders help for every rule and no warning banner', async () => {
     const wrapper = await mountFixer()
     expect(wrapper.find('.warning-banner').exists()).toBe(false)
-    expect(wrapper.findAll('.rule-help-button')).toHaveLength(11)
+    expect(wrapper.findAll('.rule-help-button')).toHaveLength(14)
     for (const rule of ALL_FIX_RULES) {
       expect(wrapper.find(`[data-help-for="${rule.id}"]`).exists(), rule.id).toBe(true)
     }
@@ -349,6 +352,9 @@ describe('SbomFixer.vue', () => {
 
     await wrapper.find('.group-card[data-group="components"] .clear-all').trigger('click')
     for (const id of [
+      'components.remove_leaf_missing_purl',
+      'components.remove_leaf_invalid_purl',
+      'components.remove_leaf_missing_version',
       'components.filter_external_references',
       'components.filter_properties',
       'components.fill_missing_gost_properties',
@@ -359,12 +365,41 @@ describe('SbomFixer.vue', () => {
 
     await wrapper.find('.group-card[data-group="components"] .select-all').trigger('click')
     for (const id of [
+      'components.remove_leaf_missing_purl',
+      'components.remove_leaf_invalid_purl',
+      'components.remove_leaf_missing_version',
       'components.filter_external_references',
       'components.filter_properties',
       'components.fill_missing_gost_properties',
     ]) {
       expect((wrapper.find(rule(id)).element as HTMLInputElement).checked).toBe(true)
     }
+  })
+
+  it('renders six component rule rows with help', async () => {
+    const wrapper = await mountFixer()
+    const card = wrapper.find('.group-card[data-group="components"]')
+    expect(card.findAll('[data-rule-row]')).toHaveLength(6)
+    expect(card.findAll('.rule-help-button')).toHaveLength(6)
+  })
+
+  it('saves the three leaf removal flags as disabled by default', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.components.remove_leaf_missing_purl).toBe(false)
+    expect(saved.components.remove_leaf_invalid_purl).toBe(false)
+    expect(saved.components.remove_leaf_missing_version).toBe(false)
+  })
+
+  it('resets leaf removal flags to false', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find(rule('components.remove_leaf_missing_purl')).setValue(true)
+    await wrapper.find(rule('components.remove_leaf_missing_version')).setValue(true)
+    await wrapper.find('.reset-defaults').trigger('click')
+    expect((wrapper.find(rule('components.remove_leaf_missing_purl')).element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.find(rule('components.remove_leaf_missing_version')).element as HTMLInputElement).checked).toBe(false)
   })
 
   it('renders the licenses card with three rules and help', async () => {

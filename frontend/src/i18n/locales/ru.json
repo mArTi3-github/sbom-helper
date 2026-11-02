@@ -122,6 +122,9 @@
       "add_timestamp": "Добавить $.metadata.timestamp, если отсутствует",
       "add_manufacturer": "Добавить $.metadata.component.manufacturer, если отсутствует",
       "components": {
+        "remove_leaf_missing_purl": "Удалить компоненты-листья без PURL",
+        "remove_leaf_invalid_purl": "Удалить компоненты-листья с некорректным PURL",
+        "remove_leaf_missing_version": "Удалить компоненты-листья без version",
         "filter_external_references": "Оставить только VCS и source-distribution ссылки",
         "filter_properties": "Оставить только ГОСТ-свойства",
         "fill_missing_gost_properties": "Добавить недостающие ГОСТ-свойства"
@@ -148,6 +151,9 @@
       "add_timestamp": "Записывает metadata.timestamp с текущим временем UTC в формате YYYY-MM-DDTHH:MM:SSZ, только если поле отсутствует, равно null или пустой строке. Существующее непустое значение не перезаписывается.",
       "add_manufacturer": "Считает manufacturer отсутствующим, если это не объект или его name не является непустой строкой, и записывает объект с единственным полем name, равным значению из поля «Производитель». Существующий корректный manufacturer не меняется. Поле supplier не читается и не изменяется.",
       "components": {
+        "remove_leaf_missing_purl": "Удаляет только компоненты-листья, у которых purl отсутствует, равен null, пустой строке или не является строкой. Компонент с непустым массивом components сохраняется. Если после удаления массив опустел, он остаётся пустым []. metadata.component не затрагивается.",
+        "remove_leaf_invalid_purl": "Удаляет только компоненты-листья, у которых purl — непустая строка, отвергнутая спецификацией Package URL. Отсутствующий, null или пустой purl это правило не проверяет: для него есть правило «без PURL». Компонент с непустым массивом components сохраняется; опустевший массив остаётся []; metadata.component не затрагивается.",
+        "remove_leaf_missing_version": "Удаляет только компоненты-листья, у которых version отсутствует, равен null, пустой строке или не является строкой. Компонент с непустым массивом components сохраняется. Если после удаления массив опустел, он остаётся пустым []. metadata.component не затрагивается.",
         "filter_external_references": "Оставляет в externalReferences только элементы с type ровно vcs или source-distribution (с учётом регистра). Остальные типы (website, distribution, issue-tracker и т. п.) удаляются; если не осталось ничего, массив остаётся пустым. metadata.component не затрагивается.",
         "filter_properties": "Оставляет в properties только элементы, имя которых начинается ровно с GOST: (с учётом регистра). Остальные удаляются; пустой массив остаётся пустым. metadata.component не затрагивается.",
         "fill_missing_gost_properties": "Добавляет компоненту недостающие GOST:attack_surface и GOST:security_function со значением no в value. Если properties нет, создаёт массив; существующие свойства не меняет. metadata.component не затрагивается."

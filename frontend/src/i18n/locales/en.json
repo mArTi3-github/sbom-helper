@@ -122,6 +122,9 @@
       "add_timestamp": "Add $.metadata.timestamp if missing",
       "add_manufacturer": "Add $.metadata.component.manufacturer if missing",
       "components": {
+        "remove_leaf_missing_purl": "Remove leaf components without PURL",
+        "remove_leaf_invalid_purl": "Remove leaf components with invalid PURL",
+        "remove_leaf_missing_version": "Remove leaf components without version",
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
         "fill_missing_gost_properties": "Add missing GOST properties"
@@ -148,6 +151,9 @@
       "add_timestamp": "Writes metadata.timestamp with the current UTC time in YYYY-MM-DDTHH:MM:SSZ format, only if the field is missing, null, or an empty string. An existing non-empty value is not overwritten.",
       "add_manufacturer": "Treats manufacturer as missing when it is not an object or its name is not a non-empty string, and writes an object whose only field is name, set to the value from the \"Manufacturer\" field. An existing valid manufacturer is not changed. The supplier field is neither read nor changed.",
       "components": {
+        "remove_leaf_missing_purl": "Removes only leaf components whose purl is absent, null, an empty string, or not a string. A component with a non-empty components array is preserved. If the array becomes empty after removal, it stays []. metadata.component is not affected.",
+        "remove_leaf_invalid_purl": "Removes only leaf components whose purl is a non-empty string rejected by the Package URL specification. An absent, null, or empty purl is not checked here: the \"without PURL\" rule covers it. A component with a non-empty components array is preserved; an emptied array stays []; metadata.component is not affected.",
+        "remove_leaf_missing_version": "Removes only leaf components whose version is absent, null, an empty string, or not a string. A component with a non-empty components array is preserved. If the array becomes empty after removal, it stays []. metadata.component is not affected.",
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
         "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected."

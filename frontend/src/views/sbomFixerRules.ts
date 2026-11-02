@@ -120,6 +120,61 @@ export const BASE_RULES: readonly FixRule<BaseRuleKey>[] = [
 
 export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
   {
+    id: 'components.remove_leaf_missing_purl',
+    key: 'remove_leaf_missing_purl',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "vendor-tool",
+      "version": "1.0.0"
+    }
+  ]
+}`,
+      after: `{
+  "components": []
+}`,
+    },
+  },
+  {
+    id: 'components.remove_leaf_invalid_purl',
+    key: 'remove_leaf_invalid_purl',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "broken",
+      "version": "1.0.0",
+      "purl": "not-a-purl"
+    }
+  ]
+}`,
+      after: `{
+  "components": []
+}`,
+    },
+  },
+  {
+    id: 'components.remove_leaf_missing_version',
+    key: 'remove_leaf_missing_version',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "left-pad",
+      "purl": "pkg:npm/left-pad@1.3.0"
+    }
+  ]
+}`,
+      after: `{
+  "components": []
+}`,
+    },
+  },
+  {
     id: 'components.filter_external_references',
     key: 'filter_external_references',
     example: {

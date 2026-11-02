@@ -407,6 +407,9 @@ function defaultFixOptions(): SbomFixOptions {
     add_manufacturer: true,
     manufacturer: 'Positive Technologies',
     components: {
+      remove_leaf_missing_purl: false,
+      remove_leaf_invalid_purl: false,
+      remove_leaf_missing_version: false,
       filter_external_references: true,
       filter_properties: true,
       fill_missing_gost_properties: false,

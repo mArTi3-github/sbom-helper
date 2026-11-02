@@ -12,14 +12,14 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 
 const GROUPS = [
   { rules: BASE_RULES, prefix: '', size: 5, flat: true },
-  { rules: COMPONENTS_RULES, prefix: 'components.', size: 3, flat: false },
+  { rules: COMPONENTS_RULES, prefix: 'components.', size: 6, flat: false },
   { rules: LICENSES_RULES, prefix: 'licenses.', size: 3, flat: false },
 ]
 
 describe('sbomFixerRules catalog', () => {
-  it('covers all 11 rules with unique ids', () => {
-    expect(ALL_FIX_RULES).toHaveLength(11)
-    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(11)
+  it('covers all 14 rules with unique ids', () => {
+    expect(ALL_FIX_RULES).toHaveLength(14)
+    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(14)
     for (const rule of ALL_FIX_RULES) {
       expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
     }
@@ -51,7 +51,14 @@ describe('sbomFixerRules catalog', () => {
         }
       }
     }
-    expect(COMPONENTS_RULES[0].id).toBe('components.filter_external_references')
+    expect(COMPONENTS_RULES.map((rule) => rule.id)).toEqual([
+      'components.remove_leaf_missing_purl',
+      'components.remove_leaf_invalid_purl',
+      'components.remove_leaf_missing_version',
+      'components.filter_external_references',
+      'components.filter_properties',
+      'components.fill_missing_gost_properties',
+    ])
     expect(LICENSES_RULES.map((rule) => rule.id)).toEqual([
       'licenses.filter_non_proprietary',
       'licenses.add_proprietary',
