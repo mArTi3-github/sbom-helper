@@ -496,3 +496,69 @@ def test_fix_endpoint_applies_provided_by_options(client):
         if stat["rule_id"] == "components.add_provided_by"
     )
     assert stat["count"] == 1
+
+
+def test_fix_applies_selected_purl_case_mode(client):
+    sbom = make_sbom()
+    sbom["components"][0]["purl"] = (
+        "pkg:golang/GitHub.com/Masterminds/Semver@v3.0.0"
+    )
+    response = upload_fix(
+        client,
+        sbom,
+        options={
+            "components": {
+                "lowercase_purl": True,
+                "purl_case_mode": "sbom_checker",
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["fixed_sbom"]["components"][0]["purl"] == (
+        "pkg:golang/github.com/masterminds/semver@v3.0.0"
+    )
+
+
+def test_fix_with_purl_spec_mode_keeps_case_sensitive_golang_purl(client):
+    sbom = make_sbom()
+    sbom["components"][0]["purl"] = (
+        "pkg:golang/GitHub.com/Masterminds/Semver@v3.0.0"
+    )
+    response = upload_fix(
+        client,
+        sbom,
+        options={
+            "components": {
+                "lowercase_purl": True,
+                "purl_case_mode": "purl_spec",
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["fixed_sbom"]["components"][0]["purl"] == (
+        "pkg:golang/GitHub.com/Masterminds/Semver@v3.0.0"
+    )
+
+
+def test_options_roundtrip_includes_purl_case_fields(client):
+    options = SbomFixOptions(
+        components={
+            "lowercase_purl": False,
+            "purl_case_mode": "purl_spec",
+        }
+    )
+    assert client.post(
+        "/api/v1/sbom/fix/options", json={"options": options.model_dump()}
+    ).status_code == 200
+    body = client.get("/api/v1/sbom/fix/options").json()
+    assert body["options"]["components"]["lowercase_purl"] is False
+    assert body["options"]["components"]["purl_case_mode"] == "purl_spec"
+
+
+def test_save_options_rejects_invalid_purl_case_mode(client):
+    response = client.post(
+        "/api/v1/sbom/fix/options",
+        json={"options": {"components": {"purl_case_mode": "bad"}}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_options"

@@ -171,6 +171,29 @@ def test_save_load_roundtrip_including_provided_by(tmp_path):
     assert store.load() == options
 
 
+def test_save_load_roundtrip_including_purl_case_fields(tmp_path):
+    store = SbomFixOptionsStore(tmp_path / "options.json")
+    options = SbomFixOptions(
+        components=ComponentsFixOptions(
+            lowercase_purl=False,
+            purl_case_mode="purl_spec",
+        )
+    )
+    store.save(options)
+    assert store.load() == options
+
+
+def test_old_file_without_purl_case_fields_uses_defaults(tmp_path):
+    path = tmp_path / "old.json"
+    path.write_text(
+        '{"components": {"filter_properties": false}}', encoding="utf-8"
+    )
+    loaded = SbomFixOptionsStore(path).load()
+    assert loaded.components.filter_properties is False
+    assert loaded.components.lowercase_purl is True
+    assert loaded.components.purl_case_mode == "sbom_checker"
+
+
 def test_old_file_without_provided_by_uses_defaults(tmp_path):
     path = tmp_path / "old.json"
     path.write_text(
