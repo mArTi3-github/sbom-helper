@@ -124,3 +124,20 @@ def test_percent_encoded_uppercase_is_lowercased_and_suffix_is_verbatim():
         "pkg:deb/Ubuntu/OpenSSL%2DThing@3.0?Arch=AMD64#src%2FLib",
         "sbom_checker",
     ) == "pkg:deb/ubuntu/openssl-thing@3.0?Arch=AMD64#src%2FLib"
+
+
+def test_encoded_slash_stays_encoded_in_name_namespace_and_version():
+    assert lowercase_purl(
+        "pkg:generic/GitHub.com/Foo%2FBar@1",
+        "sbom_checker",
+    ) == "pkg:generic/github.com/foo%2Fbar@1"
+
+    assert lowercase_purl(
+        "pkg:deb/My%2FOrg/OpenSSL@3.0",
+        "sbom_checker",
+    ) == "pkg:deb/my%2Forg/openssl@3.0"
+
+    assert lowercase_purl(
+        "pkg:oci/Ubuntu@SHA256%2FABC",
+        "purl_spec",
+    ) == "pkg:oci/ubuntu@sha256%2Fabc"

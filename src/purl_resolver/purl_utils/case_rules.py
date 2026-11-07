@@ -110,7 +110,7 @@ def _has_upper(value: str | None) -> bool:
 
 
 def _lower(value: str) -> str:
-    return quote(unquote(value).lower())
+    return quote(unquote(value).lower()).replace("/", "%2F")
 
 
 def _lower_namespace(namespace: str) -> str:
