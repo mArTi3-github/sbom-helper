@@ -33,6 +33,7 @@ NEW_RULE_IDS = (
     "components.remove_leaf_missing_purl",
     "components.remove_leaf_invalid_purl",
     "components.remove_leaf_missing_version",
+    "components.lowercase_purl",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
@@ -74,6 +75,8 @@ def test_defaults_expose_flat_base_options():
     assert o.components.remove_leaf_missing_purl is False
     assert o.components.remove_leaf_invalid_purl is False
     assert o.components.remove_leaf_missing_version is False
+    assert o.components.lowercase_purl is True
+    assert o.components.purl_case_mode == "sbom_checker"
     assert o.optional_fields.keep == list(DEFAULT_KEEP_FIELDS)
     for removed in ("root", "metadata"):
         assert not hasattr(o, removed)
@@ -89,7 +92,7 @@ def test_default_stats_contain_only_enabled_rules():
     assert [stat.rule_id for stat in result.stats] == list(DEFAULT_RULE_IDS)
 
 
-def test_all_enabled_rules_yield_fifteen_stats_in_canonical_order():
+def test_all_enabled_rules_yield_sixteen_stats_in_canonical_order():
     options = SbomFixOptions(
         components={
             "remove_leaf_missing_purl": True,
@@ -144,7 +147,7 @@ def test_fix_sbom_copies_input_and_emits_zero_stats_for_enabled_rules():
     assert result.fixed_sbom == data
     assert result.fixed_sbom is not data
     assert result.changed is False
-    assert len(result.stats) == 8
+    assert len(result.stats) == 9
     assert all(stat.count == 0 for stat in result.stats)
     assert [stat.rule_id for stat in result.stats] == list(DEFAULT_RULE_IDS)
 
@@ -1259,6 +1262,163 @@ def test_leaf_rules_do_not_mutate_input():
     assert data == before
 
 
+def _case_options(mode="sbom_checker", enabled=True) -> SbomFixOptions:
+    return SbomFixOptions(
+        reorder=False,
+        set_spec_version=False,
+        increment_version=False,
+        add_timestamp=False,
+        add_manufacturer=False,
+        components={
+            "lowercase_purl": enabled,
+            "purl_case_mode": mode,
+            "filter_external_references": False,
+            "filter_properties": False,
+            "add_provided_by": False,
+        },
+    )
+
+
+def test_lowercase_purl_checker_mode_rules_and_stats():
+    data = {
+        "components": [
+            {
+                "type": "library",
+                "name": "a",
+                "purl": "pkg:golang/GitHub.com/Masterminds/Semver@v3.0.0",
+            },
+            {
+                "type": "library",
+                "name": "b",
+                "purl": "pkg:cpan/AUTHOR/DBI@1.0",
+            },
+            {
+                "type": "library",
+                "name": "c",
+                "purl": "pkg:vscode-extension/Microsoft/VSCode-Python@1.0.0",
+            },
+        ]
+    }
+    result = fix_sbom(data, _case_options("sbom_checker"))
+    assert result.fixed_sbom["components"][0]["purl"] == (
+        "pkg:golang/github.com/masterminds/semver@v3.0.0"
+    )
+    assert result.fixed_sbom["components"][1]["purl"] == "pkg:cpan/AUTHOR/DBI@1.0"
+    assert result.fixed_sbom["components"][2]["purl"] == (
+        "pkg:vscode-extension/microsoft/vscode-python@1.0.0"
+    )
+    assert _stats(result)["components.lowercase_purl"] == 2
+
+
+def test_lowercase_purl_purl_spec_mode_rules():
+    data = {
+        "components": [
+            {
+                "type": "library",
+                "name": "a",
+                "purl": "pkg:deb/Ubuntu/OpenSSL@3.0?Arch=AMD64#src/Lib",
+            },
+            {
+                "type": "library",
+                "name": "b",
+                "purl": "pkg:pypi/Django_X@1.0RC1",
+            },
+            {
+                "type": "library",
+                "name": "c",
+                "purl": "pkg:golang/GitHub.com/Masterminds/Semver@v3.0.0",
+            },
+            {
+                "type": "library",
+                "name": "d",
+                "purl": "pkg:npm/MyScope/Left-Pad@1.0.0",
+            },
+            {
+                "type": "library",
+                "name": "e",
+                "purl": "pkg:gem/Rails@7.0.0",
+            },
+        ]
+    }
+    result = fix_sbom(data, _case_options("purl_spec"))
+    assert result.fixed_sbom["components"][0]["purl"] == (
+        "pkg:deb/ubuntu/openssl@3.0?Arch=AMD64#src/Lib"
+    )
+    assert result.fixed_sbom["components"][1]["purl"] == "pkg:pypi/django_x@1.0rc1"
+    assert result.fixed_sbom["components"][2]["purl"] == (
+        "pkg:golang/GitHub.com/Masterminds/Semver@v3.0.0"
+    )
+    assert result.fixed_sbom["components"][3]["purl"] == (
+        "pkg:npm/MyScope/Left-Pad@1.0.0"
+    )
+    assert result.fixed_sbom["components"][4]["purl"] == "pkg:gem/Rails@7.0.0"
+    assert _stats(result)["components.lowercase_purl"] == 2
+
+
+def test_lowercase_purl_walks_nested_components_but_not_metadata_component():
+    data = {
+        "metadata": {
+            "component": {
+                "type": "application",
+                "name": "app",
+                "purl": "pkg:deb/Ubuntu/Metadata@1.0",
+            }
+        },
+        "components": [
+            {
+                "type": "library",
+                "name": "parent",
+                "purl": "pkg:deb/Ubuntu/Parent@1.0",
+                "components": [
+                    {
+                        "type": "library",
+                        "name": "child",
+                        "purl": "pkg:deb/Ubuntu/Child@1.0",
+                    }
+                ],
+            }
+        ],
+    }
+    result = fix_sbom(data, _case_options("sbom_checker"))
+    assert result.fixed_sbom["metadata"]["component"]["purl"] == (
+        "pkg:deb/Ubuntu/Metadata@1.0"
+    )
+    assert result.fixed_sbom["components"][0]["purl"] == "pkg:deb/ubuntu/parent@1.0"
+    assert result.fixed_sbom["components"][0]["components"][0]["purl"] == (
+        "pkg:deb/ubuntu/child@1.0"
+    )
+    assert _stats(result)["components.lowercase_purl"] == 2
+
+
+@pytest.mark.parametrize("purl", [None, "", "not-a-purl"])
+def test_lowercase_purl_skips_missing_empty_invalid_and_non_string(purl):
+    component = {"type": "library", "name": "a"}
+    if purl is not None:
+        component["purl"] = purl
+    component_non_string = {"type": "library", "name": "b", "purl": 123}
+    result = fix_sbom(
+        {"components": [component, component_non_string]},
+        _case_options("sbom_checker"),
+    )
+    for item in result.fixed_sbom["components"]:
+        assert item.get("purl") in (None, "", "not-a-purl", 123)
+    assert _stats(result)["components.lowercase_purl"] == 0
+
+
+def test_lowercase_purl_is_absent_from_stats_when_disabled():
+    data = {"components": [{"purl": "pkg:deb/Ubuntu/OpenSSL@3.0"}]}
+    result = fix_sbom(data, _case_options("sbom_checker", enabled=False))
+    assert result.fixed_sbom["components"][0]["purl"] == "pkg:deb/Ubuntu/OpenSSL@3.0"
+    assert "components.lowercase_purl" not in _stats(result)
+
+
+def test_lowercase_purl_does_not_mutate_input():
+    data = {"components": [{"purl": "pkg:deb/Ubuntu/OpenSSL@3.0"}]}
+    before = copy.deepcopy(data)
+    fix_sbom(data, _case_options("sbom_checker"))
+    assert data == before
+
+
 def test_fill_gost_properties_creates_list_when_absent():
     component = {"name": "a"}
     assert _fill_gost_properties(component) == 2
@@ -2221,7 +2381,7 @@ def test_licenses_options_default_to_disabled():
 
 
 def test_license_rule_ids_come_last_in_execution_order():
-    assert len(RULE_IDS) == 15
+    assert len(RULE_IDS) == 16
     assert RULE_IDS[-3:] == (
         "licenses.filter_non_proprietary",
         "licenses.add_proprietary",

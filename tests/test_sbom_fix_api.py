@@ -195,7 +195,7 @@ class TestFixSbom:
         assert data["fixed_sbom"]["metadata"]["component"]["manufacturer"] == {
             "name": "Acme"
         }
-        assert len(data["stats"]) == 8
+        assert len(data["stats"]) == 9
         assert all(set(item) == {"rule_id", "count"} for item in data["stats"])
         assert all(
             set(item) >= {"code", "path", "component", "details"}
@@ -214,7 +214,7 @@ class TestFixSbom:
         response = upload(client, make_sbom())
         assert response.status_code == 200
         data = response.json()
-        assert len(data["stats"]) == 8
+        assert len(data["stats"]) == 9
         assert data["changed"] is True
         assert data["fixed_sbom"]["specVersion"] == "1.7"
         assert data["fixed_sbom"]["version"] == 2

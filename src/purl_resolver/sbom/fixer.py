@@ -10,6 +10,7 @@ from typing import Any, Callable
 from pydantic import BaseModel, Field, field_validator
 
 from ..purl_utils import PurlValidationError, validate
+from ..purl_utils.case_rules import PurlCaseMode, lowercase_purl
 from .optional_fields import DEFAULT_KEEP_FIELDS, normalize_keep, remove_optional_fields
 
 SPEC_VERSION_PATTERN = re.compile(r"^\d+\.\d+$")
@@ -72,6 +73,7 @@ RULE_IDS: tuple[str, ...] = (
     "components.remove_leaf_missing_purl",
     "components.remove_leaf_invalid_purl",
     "components.remove_leaf_missing_version",
+    "components.lowercase_purl",
     "components.filter_external_references",
     "components.filter_properties",
     "components.fill_missing_gost_properties",
@@ -102,6 +104,8 @@ class ComponentsFixOptions(BaseModel):
     remove_leaf_missing_purl: bool = False
     remove_leaf_invalid_purl: bool = False
     remove_leaf_missing_version: bool = False
+    lowercase_purl: bool = True
+    purl_case_mode: PurlCaseMode = "sbom_checker"
     filter_external_references: bool = True
     filter_properties: bool = True
     fill_missing_gost_properties: bool = False
@@ -382,6 +386,17 @@ def _has_invalid_purl(component: dict) -> bool:
 
 def _has_missing_version(component: dict) -> bool:
     return not _is_non_empty_string(component.get("version"))
+
+
+def _lowercase_purl(component: dict, mode: PurlCaseMode) -> int:
+    purl = component.get("purl")
+    if not _is_non_empty_string(purl):
+        return 0
+    new_purl = lowercase_purl(purl, mode)
+    if new_purl is None:
+        return 0
+    component["purl"] = new_purl
+    return 1
 
 
 def _apply_leaf_removals(
@@ -803,6 +818,8 @@ def _apply_components_rules(
     counts: dict[str, int],
 ) -> None:
     _apply_leaf_removals(data, options, counts)
+    lowercase = _rule_enabled("components.lowercase_purl", options)
+    purl_case_mode = options.components.purl_case_mode
     filter_external_references = _rule_enabled(
         "components.filter_external_references", options
     )
@@ -822,6 +839,12 @@ def _apply_components_rules(
     )
 
     def apply(component: dict) -> None:
+        if lowercase:
+            counts["components.lowercase_purl"] = (
+                counts.get("components.lowercase_purl", 0)
+                + _lowercase_purl(component, purl_case_mode)
+            )
+
         external_references = component.get("externalReferences")
         if filter_external_references and isinstance(external_references, list):
             kept, removed = _filter_external_references(external_references)
