@@ -468,6 +468,7 @@ describe('SbomFixer.vue', () => {
     const panel = wrapper.find('[data-rule-row="components.lowercase_purl"] .rule-help-panel')
     expect(panel.text()).toContain('sbom-checker')
     expect(panel.text()).toContain('purl-spec')
+    expect(panel.text().toLowerCase()).toContain('some checker warnings')
   })
 
   it('renders the licenses card with three rules and help', async () => {

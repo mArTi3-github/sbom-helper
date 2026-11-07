@@ -405,7 +405,7 @@ Only evaluated when `metadata.component` is an object; empty strings and `null` 
 
 Codes for the same field are mutually exclusive (`missing_*` / `invalid_*` / `not_allowed`). When `externalReferences` is a non-array, only `invalid_external_references` is emitted, not `missing_source_reference`. Absent or `null` `properties` / `externalReferences` are treated as empty arrays for checking. Missing/invalid `metadata` suppresses `metadata.*` checks; missing/invalid `metadata.component` suppresses its nested checks.
 
-Known side effect: removing `components[].licenses` can surface `component.missing_source_reference` for proprietary components (the "Proprietary" license exemption disappears); removing `bom-ref` while `dependencies` is preserved can leave dangling references, which the section does not check or warn about. Likewise, deleting leaf components can leave `dependencies` / `compositions` / `vulnerabilities` entries pointing at removed components; pruning those references is out of scope.
+Known side effect: removing `components[].licenses` can surface `component.missing_source_reference` for proprietary components (the "Proprietary" license exemption disappears); removing `bom-ref` while `dependencies` is preserved can leave dangling references, which the section does not check or warn about. Likewise, deleting leaf components can leave `dependencies` / `compositions` / `vulnerabilities` entries pointing at removed components; pruning those references is out of scope. When `components.lowercase_purl` rewrites a component `purl`, root `dependencies[].ref` values are not rewritten, so a ref that exactly equals the old purl may become dangling; ref rewriting is a separate follow-up.
 
 ## API Behavior
 
