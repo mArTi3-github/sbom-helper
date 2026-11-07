@@ -21,6 +21,8 @@ const defaultOptions: SbomFixOptions = {
     remove_leaf_missing_purl: false,
     remove_leaf_invalid_purl: false,
     remove_leaf_missing_version: false,
+    lowercase_purl: true,
+    purl_case_mode: 'sbom_checker',
     filter_external_references: true,
     filter_properties: true,
     fill_missing_gost_properties: false,

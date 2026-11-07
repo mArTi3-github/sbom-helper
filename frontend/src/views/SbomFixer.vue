@@ -427,6 +427,8 @@ function defaultFixOptions(): SbomFixOptions {
       remove_leaf_missing_purl: false,
       remove_leaf_invalid_purl: false,
       remove_leaf_missing_version: false,
+      lowercase_purl: true,
+      purl_case_mode: 'sbom_checker',
       filter_external_references: true,
       filter_properties: true,
       fill_missing_gost_properties: false,
@@ -485,6 +487,9 @@ function applyOptions(next: SbomFixOptions): void {
       (row) => ({ ...row }),
     ),
   }
+  options.components.purl_case_mode =
+    next.components.purl_case_mode ?? 'sbom_checker'
+  options.components.lowercase_purl = next.components.lowercase_purl ?? true
   options.licenses = {
     filter_non_proprietary: next.licenses.filter_non_proprietary,
     add_proprietary: next.licenses.add_proprietary,

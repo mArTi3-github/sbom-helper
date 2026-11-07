@@ -125,6 +125,7 @@
         "remove_leaf_missing_purl": "Remove leaf components without PURL",
         "remove_leaf_invalid_purl": "Remove leaf components with invalid PURL",
         "remove_leaf_missing_version": "Remove leaf components without version",
+        "lowercase_purl": "Lowercase PURL",
         "filter_external_references": "Keep only VCS and source-distribution references",
         "filter_properties": "Keep only GOST properties",
         "fill_missing_gost_properties": "Add missing GOST properties",
@@ -153,6 +154,10 @@
       "addRow": "Add row",
       "removeRow": "Remove row"
     },
+    "purlCaseMode": {
+      "sbom_checker": "In accordance with sbom-checker requirements",
+      "purl_spec": "In accordance with purl-spec requirements"
+    },
     "help": {
       "reorder": "Sets the key order of the root object, metadata, metadata.component, and every component in the components[] tree to the canonical order. Root: bomFormat, specVersion, serialNumber, version, metadata, components, annotations. metadata: timestamp, component. metadata.component: type, name, version, manufacturer. Component: type, name, version, purl, externalReferences, properties, components. Other keys keep their original relative order. Component objects in the root components[] tree, including nested components, are reordered recursively, while the metadata.component.components subtree is not traversed.",
       "set_spec_version": "Writes the value of the \"Spec version\" field (1.7 by default) into specVersion, trimming whitespace; adds the field if it was absent. A value outside 1.6/1.7 can be set, but the resulting document will be flagged as non-conforming.",
@@ -163,6 +168,7 @@
         "remove_leaf_missing_purl": "Removes only leaf components whose purl is absent, null, an empty string, or not a string. A component with a non-empty components array is preserved. If the array becomes empty after removal, it stays []. metadata.component is not affected.",
         "remove_leaf_invalid_purl": "Removes only leaf components whose purl is a non-empty string rejected by the Package URL specification. An absent, null, empty, or non-string purl is not checked here: the \"without PURL\" rule covers it. A component with a non-empty components array is preserved; an emptied array stays []; metadata.component is not affected.",
         "remove_leaf_missing_version": "Removes only leaf components whose version is absent, null, an empty string, or not a string. A component with a non-empty components array is preserved. If the array becomes empty after removal, it stays []. metadata.component is not affected.",
+        "lowercase_purl": "The \"sbom-checker\" mode follows the lowercasing rules used by the sbom-checker.py script (packageurl-python 0.17.6 definitions + the 10 types from sbom_utils.py). Lowercased:\n• namespace — for all types except cpan (which requires uppercase), git, huggingface, maven, swid, swift;\n• name — for all types except cargo, cocoapods, cpan, cran, git, hackage, huggingface, julia, maven, nuget, opam, rpm, swid, swift, yocto;\n• version — only for vscode-extension.\nThe mode may lowercase case-sensitive identifiers (for example golang, npm, gem).\n\nThe \"purl-spec\" mode uses a snapshot of the official PURL specification as of 2026-11-07. Lowercased:\n• namespace — for alpm, apk, bitbucket, brew, composer, deb, github, hex, luarocks, qpkg, rpm, vscode-extension, yocto;\n• name — for alpm, apk, bitbucket, bitnami, brew, chrome-extension, composer, deb, github, hex, luarocks, oci, otp, pub, pypi, vscode-extension;\n• version — for huggingface, oci, pypi, vscode-extension.\nOther types are unchanged; the cpan namespace is unchanged.\n\nIn both modes the rule walks the entire components[] tree, does not touch metadata.component, skips missing, non-string and invalid PURLs, as well as unknown types. Only permitted fields are changed; qualifiers and subpath are preserved verbatim.",
         "filter_external_references": "Keeps only externalReferences entries whose type is exactly vcs or source-distribution (case-sensitive). Other types (website, distribution, issue-tracker, etc.) are removed; if nothing remains, the array stays empty. metadata.component is not affected.",
         "filter_properties": "Keeps only properties entries whose name starts exactly with GOST: (case-sensitive). The rest are removed; an empty array stays empty. metadata.component is not affected.",
         "fill_missing_gost_properties": "Adds the missing GOST:attack_surface and GOST:security_function properties with the value \"no\" to the component. Creates the array if properties is missing; existing properties are not changed. metadata.component is not affected.",

@@ -17,7 +17,10 @@ export type BaseRuleKey =
   | 'increment_version'
   | 'add_timestamp'
   | 'add_manufacturer'
-export type ComponentsRuleKey = Exclude<keyof ComponentsFixOptions, 'provided_by_patterns'>
+export type ComponentsRuleKey = Exclude<
+  keyof ComponentsFixOptions,
+  'provided_by_patterns' | 'purl_case_mode'
+>
 
 export const BASE_RULES: readonly FixRule<BaseRuleKey>[] = [
   {
@@ -171,6 +174,32 @@ export const COMPONENTS_RULES: readonly FixRule<ComponentsRuleKey>[] = [
 }`,
       after: `{
   "components": []
+}`,
+    },
+  },
+  {
+    id: 'components.lowercase_purl',
+    key: 'lowercase_purl',
+    example: {
+      before: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "openssl",
+      "version": "3.0",
+      "purl": "pkg:deb/Ubuntu/OpenSSL@3.0"
+    }
+  ]
+}`,
+      after: `{
+  "components": [
+    {
+      "type": "library",
+      "name": "openssl",
+      "version": "3.0",
+      "purl": "pkg:deb/ubuntu/openssl@3.0"
+    }
+  ]
 }`,
     },
   },

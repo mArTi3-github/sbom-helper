@@ -209,6 +209,8 @@ export interface ComponentsFixOptions {
   remove_leaf_missing_purl: boolean
   remove_leaf_invalid_purl: boolean
   remove_leaf_missing_version: boolean
+  lowercase_purl: boolean
+  purl_case_mode: 'sbom_checker' | 'purl_spec'
   filter_external_references: boolean
   filter_properties: boolean
   fill_missing_gost_properties: boolean

@@ -12,14 +12,14 @@ function lookup(messages: Record<string, unknown>, path: string): unknown {
 
 const GROUPS = [
   { rules: BASE_RULES, prefix: '', size: 5, flat: true },
-  { rules: COMPONENTS_RULES, prefix: 'components.', size: 7, flat: false },
+  { rules: COMPONENTS_RULES, prefix: 'components.', size: 8, flat: false },
   { rules: LICENSES_RULES, prefix: 'licenses.', size: 3, flat: false },
 ]
 
 describe('sbomFixerRules catalog', () => {
-  it('covers all 15 rules with unique ids', () => {
-    expect(ALL_FIX_RULES).toHaveLength(15)
-    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(15)
+  it('covers all 16 rules with unique ids', () => {
+    expect(ALL_FIX_RULES).toHaveLength(16)
+    expect(new Set(ALL_FIX_RULES.map((rule) => rule.id)).size).toBe(16)
     for (const rule of ALL_FIX_RULES) {
       expect(rule.key, rule.id).toBe(rule.id.split('.').pop())
     }
@@ -55,6 +55,7 @@ describe('sbomFixerRules catalog', () => {
       'components.remove_leaf_missing_purl',
       'components.remove_leaf_invalid_purl',
       'components.remove_leaf_missing_version',
+      'components.lowercase_purl',
       'components.filter_external_references',
       'components.filter_properties',
       'components.fill_missing_gost_properties',
@@ -65,6 +66,14 @@ describe('sbomFixerRules catalog', () => {
       'licenses.add_proprietary',
       'licenses.remove_proprietary_source_references',
     ])
+  })
+
+  it('has the purl case rule after the leaf rules', () => {
+    const index = COMPONENTS_RULES.findIndex(
+      (rule) => rule.id === 'components.lowercase_purl',
+    )
+    expect(index).toBe(3)
+    expect(COMPONENTS_RULES[index].key).toBe('lowercase_purl')
   })
 
   it('provides valid JSON examples that actually differ', () => {
