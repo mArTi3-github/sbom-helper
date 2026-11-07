@@ -121,6 +121,27 @@
               />
             </div>
             <div
+              v-if="rule.key === 'lowercase_purl'"
+              class="purl-case-mode"
+              data-purl-case-mode
+            >
+              <label
+                v-for="mode in PURL_CASE_MODES"
+                :key="mode"
+                class="purl-case-mode-option"
+              >
+                <input
+                  v-model="options.components.purl_case_mode"
+                  type="radio"
+                  name="purl-case-mode"
+                  :value="mode"
+                  :data-purl-case-mode-option="mode"
+                  :disabled="!options.components.lowercase_purl"
+                />
+                <span>{{ t(`sbomFixer.purlCaseMode.${mode}`) }}</span>
+              </label>
+            </div>
+            <div
               v-if="rule.key === 'add_provided_by'"
               class="pattern-rows"
               data-provided-by-editor
@@ -391,6 +412,8 @@ import type {
   SbomFixResponse,
   SbomFixStat,
 } from '../types/api'
+
+const PURL_CASE_MODES = ['sbom_checker', 'purl_spec'] as const
 
 const { t, te } = useI18n()
 
@@ -966,6 +989,20 @@ h1 {
   flex-direction: column;
   gap: 0.5rem;
   margin-left: 1.5rem;
+}
+
+.purl-case-mode {
+  flex-basis: 100%;
+  display: flex;
+  gap: 1rem;
+  padding: 0.25rem 0 0.5rem 1.5rem;
+}
+
+.purl-case-mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
 }
 
 .pattern-rows > .btn {

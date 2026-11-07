@@ -415,6 +415,61 @@ describe('SbomFixer.vue', () => {
     expect((wrapper.find(rule('components.remove_leaf_missing_version')).element as HTMLInputElement).checked).toBe(false)
   })
 
+  it('defaults the lowercase PURL rule to enabled with sbom_checker mode', async () => {
+    const wrapper = await mountFixer()
+    expect((wrapper.find(rule('components.lowercase_purl')).element as HTMLInputElement).checked).toBe(true)
+    expect(
+      (wrapper.find('[data-purl-case-mode-option="sbom_checker"]').element as HTMLInputElement).checked,
+    ).toBe(true)
+    expect(
+      (wrapper.find('[data-purl-case-mode-option="purl_spec"]').element as HTMLInputElement).checked,
+    ).toBe(false)
+  })
+
+  it('disables the PURL case mode selector while the rule is off', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find(rule('components.lowercase_purl')).setValue(false)
+    expect(
+      (wrapper.find('[data-purl-case-mode-option="sbom_checker"]').element as HTMLInputElement).disabled,
+    ).toBe(true)
+    expect(
+      (wrapper.find('[data-purl-case-mode-option="purl_spec"]').element as HTMLInputElement).disabled,
+    ).toBe(true)
+  })
+
+  it('saves the selected PURL case mode and sends it with a fix', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-purl-case-mode-option="purl_spec"]').setValue(true)
+    await wrapper.find('.save-settings').trigger('click')
+    await flushPromises()
+    const saved = saveFixOptionsMock.mock.calls[0][0] as SbomFixOptions
+    expect(saved.components.purl_case_mode).toBe('purl_spec')
+
+    const file = await selectFile(wrapper)
+    await wrapper.find('.fix-button').trigger('click')
+    await flushPromises()
+    const sent = fixSbomMock.mock.calls[0][1] as SbomFixOptions
+    expect(sent.components.purl_case_mode).toBe('purl_spec')
+    expect(fixSbomMock).toHaveBeenCalledWith(file, expect.anything(), [])
+  })
+
+  it('resets the PURL case mode to sbom_checker', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-purl-case-mode-option="purl_spec"]').setValue(true)
+    await wrapper.find('.reset-defaults').trigger('click')
+    expect(
+      (wrapper.find('[data-purl-case-mode-option="sbom_checker"]').element as HTMLInputElement).checked,
+    ).toBe(true)
+  })
+
+  it('describes both PURL case modes in the help panel', async () => {
+    const wrapper = await mountFixer()
+    await wrapper.find('[data-help-for="components.lowercase_purl"]').trigger('click')
+    const panel = wrapper.find('[data-rule-row="components.lowercase_purl"] .rule-help-panel')
+    expect(panel.text()).toContain('sbom-checker')
+    expect(panel.text()).toContain('purl-spec')
+  })
+
   it('renders the licenses card with three rules and help', async () => {
     const wrapper = await mountFixer()
     const card = wrapper.find('.group-card[data-group="licenses"]')

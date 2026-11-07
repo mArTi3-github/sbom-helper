@@ -102,6 +102,7 @@ const panelId = useId()
 
 .rule-help-description {
   margin: 0 0 0.75rem;
+  white-space: pre-line;
 }
 
 .rule-examples {
