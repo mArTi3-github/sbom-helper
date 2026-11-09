@@ -76,6 +76,17 @@ describe('DatabaseAdmin.vue', () => {
     expect(wrapper.findAll('tbody tr').length).toBe(3)
   })
 
+  it('shows database backup and restore help', async () => {
+    const wrapper = mountAdmin()
+    await flushPromises()
+
+    const help = wrapper.find('[data-role="db-backup-help"]')
+    expect(help.exists()).toBe(true)
+    expect(help.text()).toContain('Database backup and restore')
+    expect(help.text()).toContain('scripts/db_backup.sh')
+    expect(help.text()).toContain('scripts/db_restore.sh')
+  })
+
   it('applies filters on Apply click and resets page to 1', async () => {
     const wrapper = mountAdmin()
     await flushPromises()

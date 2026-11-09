@@ -6,6 +6,7 @@
     <DbFilterPanel />
     <DbDataTable />
     <DbImportModal />
+    <DbBackupHelp />
   </div>
 </template>
 
@@ -14,6 +15,7 @@ import { useI18n } from 'vue-i18n'
 import DbFilterPanel from '../components/db/DbFilterPanel.vue'
 import DbDataTable from '../components/db/DbDataTable.vue'
 import DbImportModal from '../components/db/DbImportModal.vue'
+import DbBackupHelp from '../components/db/DbBackupHelp.vue'
 const { t } = useI18n()
 </script>
 

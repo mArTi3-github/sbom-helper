@@ -26,6 +26,7 @@
 | Add batch PURL resolution | `domains/purl-resolution.md`, `architecture/layers.md` |
 | Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
 | Manage database (view, edit, filter, import, export) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
+| Back up or restore the full database | `domains/web-ui.md` |
 | Refactor CSV import/export or storage interface | `architecture/layers.md`, `contracts/api-contract.md` |
 | Add application settings | `domains/purl-resolution.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 | Add URL validation for cached URLs | `domains/purl-resolution.md`, `architecture/layers.md` |

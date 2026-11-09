@@ -13,3 +13,4 @@ docs/
 *.egg-info
 AGENTS.md
 CONTEXT.md
+backups/

@@ -301,7 +301,15 @@
     "saveNewRow": "Save",
     "cancelNewRow": "Cancel",
     "invalidPurl": "Invalid PURL format: {detail}",
-    "purlExists": "This PURL already exists in the database."
+    "purlExists": "This PURL already exists in the database.",
+    "backupHelp": {
+      "title": "Database backup and restore",
+      "intro": "Full backup and migration are performed by scripts on the server (not in the browser).",
+      "backup": "Full backup of the resolved_purls table:",
+      "restore": "Restore (merge by default — only missing PURLs are added):",
+      "replace": "Full table replacement (deletes rows missing from the file):",
+      "note": "The export and import buttons above work only with selected rows and small CSV files."
+    }
   },
   "settings": {
     "title": "Settings",

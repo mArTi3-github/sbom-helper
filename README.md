@@ -20,6 +20,7 @@ A web application and API service for enriching and validating CycloneDX SBOMs w
 - [Requirements](#requirements)
 - [Setup](#setup)
 - [Updating](#updating)
+- [Database backup and restore](#database-backup-and-restore)
 - [API Reference](#api-reference)
 - [Security Notes](#security-notes)
 - [Planned Features](#planned-features)
@@ -55,6 +56,18 @@ docker compose logs --follow
 ./scripts/update.sh         # pulls latest code, rebuilds, redeploys
 ./scripts/update.sh -v      # verbose mode
 ```
+
+### Database backup and restore
+
+Full backups of the `resolved_purls` table (PURL → repository URL mappings) are created and restored on the host:
+
+```bash
+./scripts/db_backup.sh                                  # creates backups/sbom_purls_<UTC>.csv.gz
+./scripts/db_restore.sh backups/<file>.csv.gz           # merge: add missing PURLs only
+./scripts/db_restore.sh backups/<file>.csv.gz --mode replace --yes
+```
+
+The default restore mode is `merge`: rows already present in the target database are kept, and only missing PURLs are added. `--mode replace` replaces the whole table and deletes rows missing from the backup; without `--yes` it asks for confirmation. Run `./scripts/db_backup.sh --help` and `./scripts/db_restore.sh --help` for all options.
 
 ## Architecture
 

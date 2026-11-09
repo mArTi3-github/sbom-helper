@@ -14,7 +14,7 @@ A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepti
 - `frontend/src/components/RuleHelp.vue` — presentational rule help: round "(i)" button and an inline panel with a description (multi-line, rendered with `white-space: pre-line`) and "Before"/"After" snippets
 - `frontend/src/views/sbomFixerRules.test.ts` — Vitest unit tests for the fix rule catalog
 - `frontend/src/views/SbomFixer.test.ts` — Vitest unit tests for the Fix SBOM page
-- `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete
+- `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete, collapsible backup/restore help
 - `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, deps.dev, ecosyste.ms, Libraries.io, and LLM resolver cards
 - `frontend/src/views/ImagesListConverter.vue` — Images List Converter page: file upload, conversion status card, images table, download
 - `frontend/src/views/NotFound.vue` — 404 catch-all page
@@ -27,6 +27,7 @@ A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepti
 - `frontend/src/components/db/DbDataTable.vue` — Sortable/filterable PURL data table for database admin
 - `frontend/src/components/db/DbFilterPanel.vue` — Search, resolver filter (dynamically populated from `GET /api/v1/db/resolvers`), and date range controls for database admin
 - `frontend/src/components/db/DbImportModal.vue` — CSV import dialog with drag-and-drop upload
+- `frontend/src/components/db/DbBackupHelp.vue` — collapsible help card in the database admin page with commands for the host-side `scripts/db_backup.sh` and `scripts/db_restore.sh` scripts
 - `frontend/src/api/client.ts` — Typed fetch wrapper with `ApiError` class
 - `frontend/src/api/purl.ts` — PURL resolution API client
 - `frontend/src/api/sbom.ts` — SBOM enrichment + ignore patterns + SBOM fix API client (`fixSbom`, `getFixOptions`, `saveFixOptions`, `analyzeSbom`, `getFieldCatalog`)
@@ -252,6 +253,7 @@ User                   Browser (Vue SPA)             API Layer
 - Import modal includes a collapsible CSV format reference section listing required/optional columns and a multi-column example using `,` delimiter
 - Import strategy radio labels: "Overwrite existing" (upsert) and "Skip existing" (skip_existing)
 - Import modal supports drag-and-drop for CSV files (via `FileUploadZone` and `ModalDialog` components)
+- A collapsible "Database backup and restore" help card below the table documents the host-side scripts `scripts/db_backup.sh` and `scripts/db_restore.sh`; restore uses `merge` by default (missing PURLs only) and `--mode replace --yes` for a full table replacement. The card is informational and makes no API calls.
 - Pagination is managed by `useDbAdminStore` (Pinia store with `goToPage`, `changePageSize`, `totalPages` computed state)
 
 ### Settings Page
@@ -318,7 +320,7 @@ Frontend unit tests are written with **Vitest 4.1.9**, `@vue/test-utils 2.4.11`,
 - `frontend/src/views/SbomFixer.test.ts` — option loading and fallback warning, master/indeterminate checkboxes, select/clear all, license card (master and pattern editor add/remove/disable/gating), provided_by editor (Astra default row, load/add/remove, disabled while off, values kept on toggle, normalization and incomplete-row dropping, sent on save and fix, reset restores the Astra row), PURL case selector (default enabled with `sbom_checker`, radios disabled while the rule is off, selected mode saved and sent on fix, reset restores `sbom_checker`, help panel describes both modes), pattern normalization on save and fix, reset defaults, save/reset status, spec-version and manufacturer input gating, analysis flow (analyze, unchecked candidates, keep-list filtering), candidate select/clear all, `remove_fields` on fix, read-only FSTEC list, new-file reset, catalog-failure degradation, fix flow, statistics (including `field` rows) and issues spoilers, issue-label fallback, downloads (`jsonIndent` fallback to 4), `ApiError` and network errors.
 - `frontend/src/views/sbomFixerRules.test.ts` — 16-rule catalog (`BASE_RULES` 5 + `COMPONENTS_RULES` 8 + `LICENSES_RULES` 3, unique ids), base group starts with the merged `reorder` rule, removed rule ids absent, `components.lowercase_purl` present and positioned after the three leaf-removal rules, `components.add_provided_by` present and positioned after `fill_missing_gost_properties`, valid before/after JSON examples, labels and help texts present in both locales.
 - `frontend/src/views/ImagesListConverter.test.ts` — conversion flow, status cards (transformed / not transformed), JSON download.
-- `frontend/src/views/DatabaseAdmin.test.ts` — filter, sort, select, inline edit (Enter/Escape/blur), single and bulk delete (confirm branches), CSV export, CSV import (upsert / skip_existing), pagination (next page, page size), ApiError and network errors.
+- `frontend/src/views/DatabaseAdmin.test.ts` — filter, sort, select, inline edit (Enter/Escape/blur), single and bulk delete (confirm branches), CSV export, CSV import (upsert / skip_existing), backup/restore help card rendering, pagination (next page, page size), ApiError and network errors.
 - `frontend/src/composables/useDownload.test.ts` — `downloadJson` blob/anchor behaviour, `safeUrl` dangerous-protocol rejection (javascript, data, vbscript).
 - `frontend/src/components/RecentJobs.test.ts` — job status icons, polling, cancel/delete flow.
 
