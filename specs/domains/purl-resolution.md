@@ -346,7 +346,7 @@ Rows produced by `non_numeric_version` are the exception: they use `repository_o
 
 `no_version` and `non_numeric_version` are returned in the API row and never stored as archive cache rows.
 
-All four persistent match types are cached, including negative results. `force_refresh=true` bypasses only the archive cache; the versionless `resolved_purls` cache is still used for the repository URL. Archive rows persist until a `force_refresh` lookup overwrites them or a restore replaces them; there is no TTL or background refresh.
+All four persistent match types are cached, including negative results. `force_refresh=true` bypasses only the archive cache; the versionless `resolved_purls` cache is still used for the repository URL. Archive rows persist until a `force_refresh` lookup overwrites them or a `--mode replace` restore truncates them; a default `merge` restore keeps existing archive rows. There is no TTL or background refresh.
 
 ### Backup and Restore
 
@@ -413,7 +413,7 @@ All four persistent match types are cached, including negative results. `force_r
 - **Archive rows align with resolution rows**: archive results are mapped back to the successful (error-free) result rows by index, so rows with a per-row error keep null/empty archive fields and a failure in archive lookup never changes the HTTP status of another row
 - **Archive cache key includes the version**: `purl_source_archives.purl` is the canonical PURL with `version` and without qualifiers or subpath; one row exists per versioned PURL and `store_archive` overwrites it
 - **Archive cache stores all four persistent match types**: `exact`, `near`, `repository_only`, and `not_found` rows are cached, so negative results avoid repeated git and HEAD calls
-- **API-only outcomes are not persisted**: `no_version` (match type and reason) and `non_numeric_version` (reason) are computed and returned per request but never written to `purl_source_archives`
+- **API-only outcomes are not persisted**: `no_version` (match type and reason) and `non_numeric_version` (reason) are computed and returned per request but never written to `purl_source_archives`; their `source_archive_resolver` and `source_archive_resolved_at` fields are empty strings
 - **Archive reason precedence is fixed**: the first applicable code in the order `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag` is the reported reason; `exact` and `near` rows report `reason = NULL`
 - **Repository change invalidates a cached archive**: a cache hit is returned only when the current repository URL is `None` or equals the stored `repository_url`; a current non-null repository URL that differs forces a fresh lookup and overwrites the row
 - **force_refresh bypasses only the archive cache**: `force_refresh=true` ignores `purl_source_archives` for the request and recomputes those rows; repository resolution still uses the versionless `resolved_purls` cache

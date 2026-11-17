@@ -134,6 +134,8 @@ Row for that PURL:
 - `source_archive_cached`: `true` when the row came from `purl_source_archives` without a git/HEAD call.
 - `source_archive_resolved_at`: time the archive result was stored or computed.
 
+For the API-only outcomes `no_version` and `non_numeric_version`, `source_archive_resolver` and `source_archive_resolved_at` are empty strings (`""`), because these results are computed per request and never stored.
+
 Rows with a per-row `error` keep all `source_archive_*` fields at their null/empty defaults. Archive lookup failures are per-row statuses and never change the HTTP status of the request. Cached archive rows are returned with an empty archive portion of `warnings`, because archive warnings are not persisted.
 
 #### Error Response (400) — too many PURLs
