@@ -23,6 +23,38 @@ SOURCE_ROWS = [
     ("pkg:pypi/beta", "https://github.com/example/beta", "import-csv", "2026-01-02T03:04:05+00"),
 ]
 
+ARCHIVE_HEADER = (
+    "purl",
+    "version",
+    "match_type",
+    "reason",
+    "archive_url",
+    "archive_url_commit",
+    "matched_ref",
+    "matched_ref_type",
+    "matched_version",
+    "repository_url",
+    "resolver",
+    "resolved_at",
+)
+
+ARCHIVE_ROWS = [
+    (
+        "pkg:pypi/alpha",
+        "1.0.0",
+        "exact",
+        None,
+        "https://github.com/example/alpha/archive/refs/tags/v1.0.0.tar.gz",
+        "https://github.com/example/alpha/archive/abc123.tar.gz",
+        "refs/tags/v1.0.0",
+        "tag",
+        "1.0.0",
+        "https://github.com/example/alpha",
+        "git-ls-remote",
+        "2026-01-03T04:05:06+00",
+    ),
+]
+
 
 def _docker_db_available() -> bool:
     if shutil.which("docker") is None:
@@ -72,8 +104,26 @@ def _seed(database: str, rows=SOURCE_ROWS) -> None:
     )
     _psql(
         database,
-        "TRUNCATE resolved_purls; "
+        "TRUNCATE resolved_purls, purl_source_archives; "
         "INSERT INTO resolved_purls (purl, repository_url, resolver, resolved_at) "
+        f"VALUES {values}",
+    )
+
+
+def _sql_literal(value: object) -> str:
+    if value is None:
+        return "NULL"
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _write_archive_rows(database: str, rows=ARCHIVE_ROWS) -> None:
+    values = ", ".join(
+        "(" + ", ".join(_sql_literal(value) for value in row) + ")" for row in rows
+    )
+    _psql(
+        database,
+        "TRUNCATE purl_source_archives; "
+        f"INSERT INTO purl_source_archives ({', '.join(ARCHIVE_HEADER)}) "
         f"VALUES {values}",
     )
 
@@ -165,6 +215,85 @@ def test_backup_creates_csv_gz_with_all_columns(test_db, tmp_path):
     assert by_purl["pkg:pypi/beta"]["resolved_at"].startswith("2026-01-02 03:04:05")
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
     assert "rows: 2" in result.stdout
+
+
+def test_backup_exports_source_archives_file(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+    out = tmp_path / "out.csv.gz"
+    archive = tmp_path / "out.source_archives.csv.gz"
+
+    result = _run_script(
+        SCRIPT_BACKUP,
+        "-o",
+        str(out),
+        env={"DB_NAME": test_db, "BACKUP_DIR": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert out.exists()
+    assert archive.exists()
+    assert stat.S_IMODE(out.stat().st_mode) == 0o600
+    assert stat.S_IMODE(archive.stat().st_mode) == 0o600
+
+    fieldnames, rows = _read_backup(archive)
+    assert fieldnames == list(ARCHIVE_HEADER)
+    assert len(rows) == 1
+    expected = dict(zip(ARCHIVE_HEADER, ARCHIVE_ROWS[0]))
+    for column in ARCHIVE_HEADER:
+        if column == "resolved_at":
+            assert rows[0][column].startswith("2026-01-03 04:05:06")
+        else:
+            assert rows[0][column] == (expected[column] or "")
+
+    assert "archives rows: 1" in result.stdout
+    assert str(out) in result.stdout
+    assert str(archive) in result.stdout
+
+
+def test_backup_default_names_share_timestamp_suffix(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+
+    result = _run_script(
+        SCRIPT_BACKUP,
+        env={"DB_NAME": test_db, "BACKUP_DIR": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    purl_files = sorted(tmp_path.glob("sbom_purls_*.csv.gz"))
+    archive_files = sorted(tmp_path.glob("sbom_source_archives_*.csv.gz"))
+    assert len(purl_files) == 1
+    assert len(archive_files) == 1
+    suffix = purl_files[0].name[len("sbom_purls_") : -len(".csv.gz")]
+    assert suffix
+    assert archive_files[0].name == f"sbom_source_archives_{suffix}.csv.gz"
+
+
+def test_backup_keep_removes_older_file_pairs(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+    old_purl = tmp_path / "sbom_purls_20000101-000000.csv.gz"
+    old_archive = tmp_path / "sbom_source_archives_20000101-000000.csv.gz"
+    old_purl.write_bytes(b"old")
+    old_archive.write_bytes(b"old")
+    out = tmp_path / "sbom_purls_20990101-000000.csv.gz"
+    archive = tmp_path / "sbom_purls_20990101-000000.source_archives.csv.gz"
+
+    result = _run_script(
+        SCRIPT_BACKUP,
+        "-o",
+        str(out),
+        "--keep",
+        "1",
+        env={"DB_NAME": test_db, "BACKUP_DIR": str(tmp_path)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert out.exists()
+    assert archive.exists()
+    assert not old_purl.exists()
+    assert not old_archive.exists()
 
 
 def test_merge_keeps_existing_rows_and_replace_overwrites(test_db, tmp_path):
