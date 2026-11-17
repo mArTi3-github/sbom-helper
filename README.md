@@ -59,15 +59,15 @@ docker compose logs --follow
 
 ### Database backup and restore
 
-Full backups of the `resolved_purls` table (PURL → repository URL mappings) are created and restored on the host:
+Full backups of the `resolved_purls` (PURL → repository URL mappings) and `purl_source_archives` (source archive link cache) tables are created and restored on the host. A backup set is two files that share one timestamp:
 
 ```bash
-./scripts/db_backup.sh                                  # creates backups/sbom_purls_<UTC>.csv.gz
-./scripts/db_restore.sh backups/<file>.csv.gz           # merge: add missing PURLs only
-./scripts/db_restore.sh backups/<file>.csv.gz --mode replace --yes
+./scripts/db_backup.sh                                  # creates backups/sbom_purls_<UTC>.csv.gz and backups/sbom_source_archives_<UTC>.csv.gz
+./scripts/db_restore.sh backups/sbom_purls_<UTC>.csv.gz backups/sbom_source_archives_<UTC>.csv.gz
+./scripts/db_restore.sh backups/sbom_purls_<UTC>.csv.gz backups/sbom_source_archives_<UTC>.csv.gz --mode replace --yes
 ```
 
-The default restore mode is `merge`: rows already present in the target database are kept, and only missing PURLs are added. `--mode replace` replaces the whole table and deletes rows missing from the backup; without `--yes` it asks for confirmation. Run `./scripts/db_backup.sh --help` and `./scripts/db_restore.sh --help` for all options.
+`db_restore.sh` accepts one file or both, in any order: the table is detected from the exact CSV header. An older backup containing only the PURL mapping file still restores. The default restore mode is `merge`: rows already present in the target database are kept, and only missing PURLs are added. `--mode replace` replaces each restored table independently and deletes rows missing from the backup; without `--yes` it asks for confirmation. The script prints the mode, each file, and the `inserted/skipped/total` counts per table. Run `./scripts/db_backup.sh --help` and `./scripts/db_restore.sh --help` for all options.
 
 ## Architecture
 

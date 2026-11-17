@@ -323,10 +323,11 @@
     "backupHelp": {
       "title": "Database backup and restore",
       "intro": "Full backup and migration are performed by scripts on the server (not in the browser).",
-      "backup": "Full backup of the resolved_purls table:",
-      "restore": "Restore (merge by default — only missing PURLs are added):",
-      "replace": "Full table replacement (deletes rows missing from the file):",
-      "note": "The export and import buttons above work only with selected rows and small CSV files."
+      "backup": "Full backup of the resolved_purls and purl_source_archives tables (two files with a shared timestamp):",
+      "restore": "Restore (merge by default — pass one file or both, in any order; the table is detected from the header):",
+      "replace": "Full table replacement (deletes rows missing from the files):",
+      "note": "The export and import buttons above work only with selected rows and small CSV files.",
+      "files": "The source archive file is optional; an older backup with only the PURL mapping file still restores. Restore prints the file and inserted/skipped/total counts for each table."
     }
   },
   "settings": {

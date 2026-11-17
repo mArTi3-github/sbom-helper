@@ -171,11 +171,28 @@ def _write_backup(
         writer.writerows(rows)
 
 
+def _fetch_archive_rows(database: str) -> dict[str, tuple[str, str]]:
+    result = _psql(
+        database,
+        "SELECT purl, version, coalesce(archive_url, '') "
+        "FROM purl_source_archives ORDER BY purl",
+        extra=["-tA", "-F", "|"],
+    )
+    rows: dict[str, tuple[str, str]] = {}
+    for line in result.stdout.strip().splitlines():
+        if line:
+            purl, version, archive_url = line.split("|", 2)
+            rows[purl] = (version, archive_url)
+    return rows
+
+
 def _staging_table_count(database: str) -> int:
     result = _psql(
         database,
         "SELECT count(*) FROM pg_tables "
-        "WHERE schemaname = 'public' AND tablename LIKE 'resolved_purls_import%'",
+        "WHERE schemaname = 'public' AND ("
+        "tablename LIKE 'resolved_purls_import%' "
+        "OR tablename LIKE 'purl_source_archives_import%')",
         extra=["-tA"],
     )
     return int(result.stdout.strip())
@@ -495,3 +512,194 @@ def test_backup_keep_removes_old_files(test_db, tmp_path):
         env={"DB_NAME": test_db, "BACKUP_DIR": str(tmp_path)},
     )
     assert invalid.returncode != 0
+
+
+ALPHA_ARCHIVE_ROW = (
+    "pkg:pypi/alpha",
+    "1.0.0",
+    "exact",
+    None,
+    "https://backup/alpha.tar.gz",
+    "https://backup/alpha-commit.tar.gz",
+    "refs/tags/v1.0.0",
+    "tag",
+    "1.0.0",
+    "https://github.com/example/alpha",
+    "git-ls-remote",
+    "2026-01-03 04:05:06+00",
+)
+
+BETA_ARCHIVE_ROW = (
+    "pkg:pypi/beta",
+    "2.0.0",
+    "near",
+    "no_matching_tag",
+    "https://github.com/example/beta/archive/refs/tags/v2.tar.gz",
+    None,
+    None,
+    None,
+    None,
+    "https://github.com/example/beta",
+    "git-ls-remote",
+    "2026-01-04 05:06:07+00",
+)
+
+
+def test_restore_archive_file_merge_keeps_existing_rows(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+    _psql(
+        test_db,
+        "UPDATE purl_source_archives SET archive_url = 'https://existing/alpha' "
+        "WHERE purl = 'pkg:pypi/alpha'",
+    )
+    path = tmp_path / "archives.csv.gz"
+    _write_backup(path, [ALPHA_ARCHIVE_ROW, BETA_ARCHIVE_ROW], header=ARCHIVE_HEADER)
+
+    result = _run_script(SCRIPT_RESTORE, str(path), env={"DB_NAME": test_db})
+
+    assert result.returncode == 0, result.stderr
+    assert "mode: merge" in result.stdout
+    assert "table: purl_source_archives" in result.stdout
+    assert "inserted: 1" in result.stdout
+    assert "skipped: 1" in result.stdout
+    assert "total: 2" in result.stdout
+    rows = _fetch_archive_rows(test_db)
+    assert rows["pkg:pypi/alpha"] == ("1.0.0", "https://existing/alpha")
+    assert rows["pkg:pypi/beta"][0] == "2.0.0"
+
+
+def test_restore_both_files_in_one_invocation(test_db, tmp_path):
+    _psql(test_db, "TRUNCATE resolved_purls, purl_source_archives")
+    purls_path = tmp_path / "sbom_purls_20260101-000000.csv.gz"
+    archive_path = tmp_path / "sbom_source_archives_20260101-000000.csv.gz"
+    _write_backup(purls_path, SOURCE_ROWS)
+    _write_backup(archive_path, ARCHIVE_ROWS, header=ARCHIVE_HEADER)
+
+    result = _run_script(
+        SCRIPT_RESTORE,
+        str(archive_path),
+        str(purls_path),
+        env={"DB_NAME": test_db},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "table: resolved_purls" in result.stdout
+    assert "table: purl_source_archives" in result.stdout
+    assert "inserted: 2" in result.stdout
+    assert "total: 2" in result.stdout
+    assert "inserted: 1" in result.stdout
+    assert "total: 1" in result.stdout
+    assert _fetch_rows(test_db) == {
+        "pkg:pypi/alpha": "https://github.com/example/alpha",
+        "pkg:pypi/beta": "https://github.com/example/beta",
+    }
+    assert set(_fetch_archive_rows(test_db)) == {"pkg:pypi/alpha"}
+
+
+def test_restore_replace_replaces_archive_table(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+    _psql(
+        test_db,
+        "INSERT INTO purl_source_archives "
+        "(purl, version, match_type, repository_url, resolver, resolved_at) VALUES "
+        "('pkg:pypi/gamma', '3.0.0', 'exact', "
+        "'https://github.com/example/gamma', 'git-ls-remote', NOW())",
+    )
+    path = tmp_path / "archives.csv.gz"
+    _write_backup(path, [ALPHA_ARCHIVE_ROW], header=ARCHIVE_HEADER)
+
+    result = _run_script(
+        SCRIPT_RESTORE,
+        str(path),
+        "--mode",
+        "replace",
+        "--yes",
+        env={"DB_NAME": test_db},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mode: replace" in result.stdout
+    rows = _fetch_archive_rows(test_db)
+    assert set(rows) == {"pkg:pypi/alpha"}
+    assert rows["pkg:pypi/alpha"][1] == "https://backup/alpha.tar.gz"
+    assert set(_fetch_rows(test_db)) == {"pkg:pypi/alpha", "pkg:pypi/beta"}
+
+
+def test_restore_archive_wrong_header_rejected_without_touching_tables(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+    purls_path = tmp_path / "purls.csv.gz"
+    _write_backup(
+        purls_path,
+        [
+            (
+                "pkg:pypi/delta",
+                "https://github.com/example/delta",
+                "import-csv",
+                "2026-01-05 00:00:00+00",
+            )
+        ],
+    )
+    bad_path = tmp_path / "bad-archives.csv.gz"
+    _write_backup(
+        bad_path,
+        [ARCHIVE_ROWS[0]],
+        header=(ARCHIVE_HEADER[1], ARCHIVE_HEADER[0], *ARCHIVE_HEADER[2:]),
+    )
+
+    result = _run_script(
+        SCRIPT_RESTORE,
+        str(purls_path),
+        str(bad_path),
+        env={"DB_NAME": test_db},
+    )
+
+    assert result.returncode != 0
+    assert "pkg:pypi/delta" not in _fetch_rows(test_db)
+    assert set(_fetch_archive_rows(test_db)) == {"pkg:pypi/alpha"}
+
+
+def test_restore_replace_refuses_empty_archive_backup(test_db, tmp_path):
+    _seed(test_db)
+    _write_archive_rows(test_db)
+    purls_path = tmp_path / "purls.csv.gz"
+    archive_path = tmp_path / "archives.csv.gz"
+    _write_backup(purls_path, SOURCE_ROWS)
+    _write_backup(archive_path, [], header=ARCHIVE_HEADER)
+
+    result = _run_script(
+        SCRIPT_RESTORE,
+        str(purls_path),
+        str(archive_path),
+        "--mode",
+        "replace",
+        "--yes",
+        env={"DB_NAME": test_db},
+    )
+
+    assert result.returncode != 0
+    assert _fetch_rows(test_db) == {
+        "pkg:pypi/alpha": "https://github.com/example/alpha",
+        "pkg:pypi/beta": "https://github.com/example/beta",
+    }
+    assert set(_fetch_archive_rows(test_db)) == {"pkg:pypi/alpha"}
+
+
+def test_restore_copy_failure_leaves_no_staging_tables(test_db, tmp_path):
+    _seed(test_db)
+    purls_path = tmp_path / "purls.csv.gz"
+    archive_path = tmp_path / "archives.csv.gz"
+    _write_backup(purls_path, SOURCE_ROWS)
+    _write_backup(archive_path, [("pkg:pypi/broken",)], header=ARCHIVE_HEADER)
+
+    result = _run_script(
+        SCRIPT_RESTORE,
+        str(purls_path),
+        str(archive_path),
+        env={"DB_NAME": test_db},
+    )
+
+    assert result.returncode != 0
+    assert _staging_table_count(test_db) == 0

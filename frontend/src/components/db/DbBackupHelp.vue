@@ -9,11 +9,12 @@
         <pre><code>./scripts/db_backup.sh</code></pre>
 
         <p>{{ t('dbAdmin.backupHelp.restore') }}</p>
-        <pre><code>./scripts/db_restore.sh backups/sbom_purls_YYYYMMDD-HHMMSS.csv.gz</code></pre>
+        <pre><code>./scripts/db_restore.sh backups/sbom_purls_YYYYMMDD-HHMMSS.csv.gz backups/sbom_source_archives_YYYYMMDD-HHMMSS.csv.gz</code></pre>
 
         <p>{{ t('dbAdmin.backupHelp.replace') }}</p>
-        <pre><code>./scripts/db_restore.sh backups/sbom_purls_YYYYMMDD-HHMMSS.csv.gz --mode replace --yes</code></pre>
+        <pre><code>./scripts/db_restore.sh backups/sbom_purls_YYYYMMDD-HHMMSS.csv.gz backups/sbom_source_archives_YYYYMMDD-HHMMSS.csv.gz --mode replace --yes</code></pre>
 
+        <p class="backup-help-note">{{ t('dbAdmin.backupHelp.files') }}</p>
         <p class="backup-help-note">{{ t('dbAdmin.backupHelp.note') }}</p>
       </div>
     </details>
