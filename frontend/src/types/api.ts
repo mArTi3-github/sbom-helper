@@ -1,6 +1,10 @@
 export interface BatchResolveRequest {
   purls: string[]
+  find_source_archive?: boolean
+  force_refresh?: boolean
 }
+
+export type SourceArchiveMatch = 'exact' | 'near' | 'repository_only' | 'not_found' | 'no_version'
 
 export interface ResolveResponse {
   purl: string
@@ -13,6 +17,17 @@ export interface ResolveResponse {
 
 export interface BatchResolveItem extends ResolveResponse {
   error: string | null
+  source_archive_url?: string | null
+  source_archive_commit_url?: string | null
+  source_archive_commit_sha?: string | null
+  source_archive_match?: SourceArchiveMatch | null
+  source_archive_reason?: string | null
+  source_archive_ref?: string | null
+  source_archive_ref_type?: string | null
+  source_archive_matched_version?: string | null
+  source_archive_resolver?: string
+  source_archive_cached?: boolean
+  source_archive_resolved_at?: string
 }
 
 export interface BatchResolveResponse {

@@ -136,6 +136,61 @@ describe('PurlResolver.vue', () => {
     expect(wrapper.find('.status-error').exists()).toBe(true)
   })
 
+  it('sends find_source_archive when the mode checkbox is checked', async () => {
+    const wrapper = mountResolver()
+    await flushPromises()
+    await wrapper.find('textarea').setValue('pkg:github/ClickHouse/ClickHouse@23.8.16.40')
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(resolvePurlsMock).toHaveBeenCalledWith({
+      purls: ['pkg:github/ClickHouse/ClickHouse@23.8.16.40'],
+      find_source_archive: true,
+    })
+  })
+
+  it('renders archive columns and exact badge', async () => {
+    resolvePurlsMock.mockResolvedValueOnce({
+      results: [{
+        ...successResponse.results[0],
+        source_archive_url: 'https://github.com/psf/requests/archive/refs/tags/v2.31.0.tar.gz',
+        source_archive_match: 'exact',
+        source_archive_ref: 'v2.31.0',
+        source_archive_matched_version: '2.31.0',
+        source_archive_resolver: 'git-tags',
+        source_archive_cached: false,
+        source_archive_resolved_at: '2026-11-17T12:00:00+00:00',
+      }],
+    })
+    const wrapper = mountResolver()
+    await flushPromises()
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0')
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Source archive')
+    expect(wrapper.text()).toContain('Exact')
+    expect(wrapper.find('a[href$=".tar.gz"]').exists()).toBe(true)
+  })
+
+  it('renders near badge with the matched version', async () => {
+    resolvePurlsMock.mockResolvedValueOnce({
+      results: [{
+        ...successResponse.results[0],
+        source_archive_url: 'https://github.com/psf/requests/archive/refs/tags/v2.30.0.tar.gz',
+        source_archive_match: 'near',
+        source_archive_matched_version: '2.30.0',
+      }],
+    })
+    const wrapper = mountResolver()
+    await flushPromises()
+    await wrapper.find('textarea').setValue('pkg:pypi/requests@2.31.0')
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Near v2.30.0')
+  })
+
   it('shows API error message when resolvePurls rejects with ApiError', async () => {
     resolvePurlsMock.mockRejectedValueOnce(new ApiError(400, 'batch_too_large'))
     const wrapper = mountResolver()

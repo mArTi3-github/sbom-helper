@@ -9,6 +9,11 @@
         :placeholder="t('purlResolver.placeholder')"
         rows="5"
       ></textarea>
+      <label class="mode-toggle">
+        <input v-model="findSourceArchive" type="checkbox" />
+        <span>{{ t('purlResolver.findSourceArchive') }}</span>
+      </label>
+      <p class="mode-hint">{{ t('purlResolver.findSourceArchiveHint') }}</p>
       <button type="submit" class="btn btn-primary" :disabled="loading">{{ t('purlResolver.resolve') }}</button>
     </form>
 
@@ -22,6 +27,10 @@
           <tr>
             <th>{{ t('purlResolver.purl') }}</th>
             <th>{{ t('purlResolver.repoUrl') }}</th>
+            <template v-if="findSourceArchive">
+              <th>{{ t('purlResolver.archiveLink') }}</th>
+              <th>{{ t('purlResolver.archiveMatch') }}</th>
+            </template>
             <th>{{ t('purlResolver.foundBy') }}</th>
             <th>{{ t('purlResolver.resolver') }}</th>
             <th>{{ t('purlResolver.warnings') }}</th>
@@ -35,11 +44,19 @@
               <a v-if="item.repository_url" :href="item.repository_url" target="_blank">{{ item.repository_url }}</a>
               <span v-else class="muted">&mdash;</span>
             </td>
+            <td v-if="findSourceArchive">
+              <a v-if="item.source_archive_url" :href="item.source_archive_url" target="_blank">{{ item.source_archive_url }}</a>
+              <span v-else class="muted">&mdash;</span>
+            </td>
+            <td v-if="findSourceArchive">
+              <span v-if="archiveMatchText(item)" :class="['status-badge', archiveMatchClass(item)]">{{ archiveMatchText(item) }}</span>
+              <span v-else class="muted">&mdash;</span>
+            </td>
             <td>{{ item.found_by || '—' }}</td>
             <td>{{ item.resolver || '—' }}</td>
             <td>
-              <ul v-if="item.warnings && item.warnings.length" class="warnings-list">
-                <li v-for="(warning, i) in item.warnings" :key="i">{{ warning }}</li>
+              <ul v-if="warningsFor(item).length" class="warnings-list">
+                <li v-for="(warning, i) in warningsFor(item)" :key="i">{{ warning }}</li>
               </ul>
               <span v-else class="muted">&mdash;</span>
             </td>
@@ -60,14 +77,53 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { resolvePurls } from '../api/purl'
 import { ApiError } from '../api/client'
-import type { BatchResolveItem } from '../types/api'
+import type { BatchResolveItem, BatchResolveRequest } from '../types/api'
 
 const { t, te } = useI18n()
 
 const purlInput = ref('')
+const findSourceArchive = ref(false)
 const loading = ref(false)
 const results = ref<BatchResolveItem[]>([])
 const error = ref<string | null>(null)
+
+function archiveMatchText(item: BatchResolveItem): string | null {
+  switch (item.source_archive_match) {
+    case 'exact':
+      return t('purlResolver.archiveMatchExact')
+    case 'near':
+      return t('purlResolver.archiveMatchNear', {
+        version: item.source_archive_matched_version ?? '',
+      })
+    case 'repository_only':
+      return t('purlResolver.archiveMatchRepositoryOnly')
+    case 'not_found':
+      return t('purlResolver.archiveMatchNotFound')
+    case 'no_version':
+      return t('purlResolver.archiveMatchNoVersion')
+    default:
+      return null
+  }
+}
+
+function archiveMatchClass(item: BatchResolveItem): string {
+  if (item.source_archive_match === 'exact') return 'match-exact'
+  if (item.source_archive_match === 'near') return 'match-near'
+  return 'match-other'
+}
+
+function warningsFor(item: BatchResolveItem): string[] {
+  const warnings = [...(item.warnings ?? [])]
+  const reason = item.source_archive_reason
+  if (!reason) return warnings
+  const key = 'purlResolver.archiveReason.' + reason
+  const reasonText = te(key) ? t(key) : reason
+  const covered = warnings.some(
+    (warning) => warning === reasonText || warning.includes(reason) || warning.includes(reasonText),
+  )
+  if (!covered) warnings.push(reasonText)
+  return warnings
+}
 
 function statusText(item: BatchResolveItem): string {
   if (item.error) {
@@ -96,7 +152,9 @@ async function handleResolve() {
   loading.value = true
 
   try {
-    const res = await resolvePurls({ purls })
+    const body: BatchResolveRequest = { purls }
+    if (findSourceArchive.value) body.find_source_archive = true
+    const res = await resolvePurls(body)
     results.value = res.results
   } catch (e: unknown) {
     if (e instanceof ApiError) {
@@ -151,6 +209,18 @@ textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-focus);
+}
+
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mode-hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-muted);
 }
 
 .form-group .btn {
@@ -225,6 +295,21 @@ textarea:focus {
 .status-error {
   background: var(--color-error-bg);
   color: var(--color-error);
+}
+
+.match-exact {
+  background: var(--color-success-bg, #e6f4ea);
+  color: var(--color-success, #1a7f37);
+}
+
+.match-near {
+  background: var(--color-warning-bg, #fff8e6);
+  color: var(--color-warning, #9a6700);
+}
+
+.match-other {
+  background: var(--color-card-header-bg, #f2f2f2);
+  color: var(--color-muted);
 }
 
 .muted {
