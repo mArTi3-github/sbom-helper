@@ -9,7 +9,9 @@ from purl_resolver.storage.inmemory_source_archive import InMemorySourceArchiveS
 
 PURL = "pkg:github/ClickHouse/ClickHouse@23.8.16.40"
 REPO = "https://github.com/ClickHouse/ClickHouse"
-TAGS = [TagInfo("v23.8.16.40-lts", "sha1"), TagInfo("v23.8.16.39", "sha2")]
+TAG_SHA = "e143a9039ba36ad0c25f2ed85503f36e88f61063"
+OTHER_SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+TAGS = [TagInfo("v23.8.16.40-lts", TAG_SHA), TagInfo("v23.8.16.39", OTHER_SHA)]
 
 
 def make_service(tmp_path, tags=TAGS, head=True):
@@ -38,16 +40,37 @@ async def test_exact_match_is_stored_and_returned(tmp_path) -> None:
     service, calls = make_service(tmp_path)
     result = await service.lookup(PURL, REPO)
     assert result.match_type == "exact"
-    assert result.archive_url.endswith("/archive/refs/tags/v23.8.16.40-lts.tar.gz")
-    assert result.archive_url_commit.endswith("/archive/sha1.tar.gz")
+    assert result.archive_url == (
+        "https://github.com/ClickHouse/ClickHouse/archive/refs/tags/v23.8.16.40-lts.tar.gz"
+    )
+    assert result.archive_url_commit == (
+        f"https://github.com/ClickHouse/ClickHouse/archive/{TAG_SHA}.tar.gz"
+    )
     assert result.matched_ref == "v23.8.16.40-lts"
     assert result.resolver == "git-tags"
     assert calls["tags"] == 1
 
 
 @pytest.mark.asyncio
+async def test_exact_match_without_commit_sha_has_no_commit_url(tmp_path) -> None:
+    service, _ = make_service(tmp_path, tags=[TagInfo("v23.8.16.40-lts")])
+    result = await service.lookup(PURL, REPO)
+    assert result.match_type == "exact"
+    assert result.archive_url == (
+        "https://github.com/ClickHouse/ClickHouse/archive/refs/tags/v23.8.16.40-lts.tar.gz"
+    )
+    assert result.archive_url_commit is None
+
+
+@pytest.mark.asyncio
 async def test_multiple_exact_tags_add_warning(tmp_path) -> None:
-    service, _ = make_service(tmp_path, tags=[TagInfo("v1.2.3", "a"), TagInfo("1.2.3", "b")])
+    service, _ = make_service(
+        tmp_path,
+        tags=[
+            TagInfo("v1.2.3", "0f1e2d3c4b5a69788796a5b4c3d2e1f001122334"),
+            TagInfo("1.2.3", "9a8b7c6d5e4f30211203f4e5d6c7b8a990817263"),
+        ],
+    )
     result = await service.lookup("pkg:github/a/b@1.2.3", "https://github.com/a/b")
     assert result.matched_ref == "1.2.3"
     assert any("multiple" in w.lower() for w in result.warnings)
@@ -124,7 +147,7 @@ async def test_git_error_falls_back_to_repository_only(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_near_match_when_no_exact(tmp_path) -> None:
-    service, _ = make_service(tmp_path, tags=[TagInfo("v23.8.16.39", "sha2")])
+    service, _ = make_service(tmp_path, tags=[TagInfo("v23.8.16.39", OTHER_SHA)])
     result = await service.lookup(PURL, REPO)
     assert result.match_type == "near"
     assert result.matched_version == "23.8.16.39"
@@ -132,7 +155,7 @@ async def test_near_match_when_no_exact(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_no_matching_tag(tmp_path) -> None:
-    service, _ = make_service(tmp_path, tags=[TagInfo("v1.0.0", "sha2")])
+    service, _ = make_service(tmp_path, tags=[TagInfo("v1.0.0", OTHER_SHA)])
     result = await service.lookup(PURL, REPO)
     assert result.match_type == "repository_only"
     assert result.reason == "no_matching_tag"
@@ -189,7 +212,7 @@ def make_batch_service(tmp_path, concurrency=5):
         active["max"] = max(active["max"], active["current"])
         await asyncio.sleep(0.01)
         active["current"] -= 1
-        return [TagInfo("v1.0.0", "sha1")]
+        return [TagInfo("v1.0.0", TAG_SHA)]
 
     async def checker(url, timeout):
         return True

@@ -6,13 +6,18 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal, cast
-from urllib.parse import quote
 
 from ..purl_utils import PurlValidationError, normalize_with_version, validate
 from ..settings_store import SettingsStore
 from ..storage.source_archive import SourceArchiveRow, SourceArchiveStorage
 from .git_tags import fetch_tags
-from .github import GitHubRepo, check_archive_url, parse_github_repository, tag_archive_url
+from .github import (
+    GitHubRepo,
+    check_archive_url,
+    commit_archive_url,
+    parse_github_repository,
+    tag_archive_url,
+)
 from .matching import TagInfo, TagMatch, find_exact, find_near, parse_version
 
 logger = logging.getLogger(__name__)
@@ -232,7 +237,7 @@ def _match_row(
         version=version,
         match_type=match.match_type,
         archive_url=tag_archive_url(repo, tag.name),
-        archive_url_commit=_commit_archive_url(repo, tag.commit_sha) if tag.commit_sha else None,
+        archive_url_commit=commit_archive_url(repo, tag.commit_sha) if tag.commit_sha else None,
         matched_ref=tag.name,
         matched_ref_type="tag",
         matched_version=match.matched_version,
@@ -240,10 +245,6 @@ def _match_row(
         resolver="git-tags",
         resolved_at=_now(),
     )
-
-
-def _commit_archive_url(repo: GitHubRepo, sha: str) -> str:
-    return f"https://github.com/{repo.owner}/{repo.name}/archive/{quote(sha, safe='')}.tar.gz"
 
 
 def _cache_key(purl: str) -> str:
