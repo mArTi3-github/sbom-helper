@@ -4,6 +4,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { mountWithI18n } from '../tests/i18n'
 import { resetThemeState } from '../composables/useTheme'
 import Settings from './Settings.vue'
+import { useSettingsStore } from '../stores/useSettingsStore'
 import type { SettingsResponse } from '../types/api'
 
 const defaultSettings: SettingsResponse = {
@@ -31,6 +32,8 @@ const defaultSettings: SettingsResponse = {
   llm_resolver_model: null,
   llm_resolver_attempts_count: 2,
   llm_resolver_timeout: 60,
+  source_archive_timeout: 30,
+  source_archive_concurrency: 5,
   token_set: { librariesio_api_key: false, ecosystems_api_key: false, llm_resolver_api_key: false },
 }
 
@@ -49,6 +52,12 @@ async function flush(ms = 0) {
 
 function mountSettings(): VueWrapper {
   return mountWithI18n(Settings)
+}
+
+function findNumberInputByLabel(wrapper: VueWrapper, label: string) {
+  const row = wrapper.findAll('.setting-row').find((item) => item.find('.setting-label').exists() && item.find('.setting-label').text() === label)
+  expect(row).toBeDefined()
+  return row!.find<HTMLInputElement>('input[type="number"]')
 }
 
 describe('Settings.vue', () => {
@@ -126,6 +135,51 @@ describe('Settings.vue', () => {
 
       expect(successUpdate).toHaveBeenCalledTimes(1)
       expect(successUpdate).toHaveBeenCalledWith({ batch_max_items: 250 })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('loads source archive timeout and concurrency', async () => {
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    const store = useSettingsStore()
+    expect(store.sourceArchiveTimeout).toBe(30)
+    expect(store.sourceArchiveConcurrency).toBe(5)
+    expect(findNumberInputByLabel(wrapper, 'Source archive timeout (seconds)').element.value).toBe('30')
+    expect(findNumberInputByLabel(wrapper, 'Source archive concurrency').element.value).toBe('5')
+  })
+
+  it('auto-saves source archive timeout change after debounce', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountSettings()
+      await flushPromises()
+
+      const timeoutInput = findNumberInputByLabel(wrapper, 'Source archive timeout (seconds)')
+      await timeoutInput.setValue(45)
+      await flush(500)
+
+      expect(successUpdate).toHaveBeenCalledTimes(1)
+      expect(successUpdate).toHaveBeenCalledWith({ source_archive_timeout: 45 })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('auto-saves source archive concurrency change after debounce', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountSettings()
+      await flushPromises()
+
+      const concurrencyInput = findNumberInputByLabel(wrapper, 'Source archive concurrency')
+      await concurrencyInput.setValue(8)
+      await flush(500)
+
+      expect(successUpdate).toHaveBeenCalledTimes(1)
+      expect(successUpdate).toHaveBeenCalledWith({ source_archive_concurrency: 8 })
     } finally {
       vi.useRealTimers()
     }

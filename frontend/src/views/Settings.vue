@@ -346,6 +346,24 @@
           </div>
           <input type="number" v-model.number="connectivityTimeout" min="1" max="30" @change="debouncedAutoSave({ connectivity_timeout: connectivityTimeout })" class="num-input">
         </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.network.sourceArchiveTimeout') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.network.sourceArchiveTimeoutDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="sourceArchiveTimeout" min="1" max="300" step="0.5" @change="debouncedAutoSave({ source_archive_timeout: sourceArchiveTimeout })" class="num-input">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">{{ t('settings.network.sourceArchiveConcurrency') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.network.sourceArchiveConcurrencyDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="sourceArchiveConcurrency" min="1" max="50" @change="debouncedAutoSave({ source_archive_concurrency: sourceArchiveConcurrency })" class="num-input">
+        </div>
       </div>
 
       <div class="card">
@@ -421,6 +439,7 @@ const {
   retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
   librariesioEnabled, depsdevEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
   batchSemaphoreLimit, batchMaxItems, jobTtlHours, connectivityUrl, connectivityTimeout,
+  sourceArchiveTimeout, sourceArchiveConcurrency,
   tokenSet, loading, jsonIndent,
   llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
 } = storeToRefs(store)

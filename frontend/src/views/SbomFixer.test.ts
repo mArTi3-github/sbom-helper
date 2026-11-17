@@ -83,6 +83,8 @@ const settingsResponse: SettingsResponse = {
   llm_resolver_model: null,
   llm_resolver_attempts_count: 2,
   llm_resolver_timeout: 60,
+  source_archive_timeout: 30,
+  source_archive_concurrency: 5,
   token_set: { librariesio_api_key: false, ecosystems_api_key: false, llm_resolver_api_key: false },
 }
 

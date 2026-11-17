@@ -434,7 +434,11 @@
       "probeUrl": "Connectivity probe URL",
       "probeUrlDesc": "Target URL used to check internet access before URL validation. Set to empty to disable the probe.",
       "probeTimeout": "Connectivity probe timeout (seconds)",
-      "probeTimeoutDesc": "Timeout for the connectivity HEAD request (1–30 seconds). Default: 2."
+      "probeTimeoutDesc": "Timeout for the connectivity HEAD request (1–30 seconds). Default: 2.",
+      "sourceArchiveTimeout": "Source archive timeout (seconds)",
+      "sourceArchiveTimeoutDesc": "Timeout for a source archive lookup per PURL (1–300 seconds, step 0.5). Default: 30.",
+      "sourceArchiveConcurrency": "Source archive concurrency",
+      "sourceArchiveConcurrencyDesc": "Maximum number of concurrent source archive lookups (1–50). Default: 5."
     },
     "logging": {
       "title": "Logging",

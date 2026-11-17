@@ -28,6 +28,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const llmModel = ref('')
   const llmAttemptsCount = ref(2)
   const llmTimeout = ref(60)
+  const sourceArchiveTimeout = ref(30)
+  const sourceArchiveConcurrency = ref(5)
   const tokenSet = ref({ librariesio_api_key: false, ecosystems_api_key: false, llm_resolver_api_key: false })
   const librariesioKey = ref('')
   const ecosystemsKey = ref('')
@@ -65,6 +67,8 @@ export const useSettingsStore = defineStore('settings', () => {
       llmModel.value = data.llm_resolver_model ?? ''
       llmAttemptsCount.value = data.llm_resolver_attempts_count
       llmTimeout.value = data.llm_resolver_timeout
+      sourceArchiveTimeout.value = data.source_archive_timeout
+      sourceArchiveConcurrency.value = data.source_archive_concurrency
       tokenSet.value = data.token_set
     } catch {
       throw new Error('Failed to load settings')
@@ -89,6 +93,7 @@ export const useSettingsStore = defineStore('settings', () => {
     librariesioEnabled, depsdevEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, batchMaxItems, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
     llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
+    sourceArchiveTimeout, sourceArchiveConcurrency,
     tokenSet, librariesioKey, ecosystemsKey, llmApiKey, loading,
     hasAnyToken, load, save, clearToken,
   }
