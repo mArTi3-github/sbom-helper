@@ -2,12 +2,15 @@ import asyncio
 
 import pytest
 
+from purl_resolver.purl_utils import normalize_with_version, validate
 from purl_resolver.settings_store import AppSettings, SettingsStore
 from purl_resolver.source_archive.matching import TagInfo
 from purl_resolver.source_archive.service import SourceArchiveService
 from purl_resolver.storage.inmemory_source_archive import InMemorySourceArchiveStorage
+from purl_resolver.storage.source_archive import SourceArchiveRow
 
 PURL = "pkg:github/ClickHouse/ClickHouse@23.8.16.40"
+KEY = normalize_with_version(validate(PURL))
 REPO = "https://github.com/ClickHouse/ClickHouse"
 TAG_SHA = "e143a9039ba36ad0c25f2ed85503f36e88f61063"
 OTHER_SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
@@ -265,3 +268,135 @@ async def test_enrich_many_bounds_concurrency(tmp_path) -> None:
         ],
     )
     assert active["max"] == 1
+
+
+def make_service_with_storage(tmp_path, tags=TAGS, head=True):
+    storage = InMemorySourceArchiveStorage()
+    calls = {"tags": 0, "head": 0}
+
+    async def fetcher(url, timeout):
+        calls["tags"] += 1
+        return list(tags)
+
+    async def checker(url, timeout):
+        calls["head"] += 1
+        return head
+
+    service = SourceArchiveService(
+        storage=storage,
+        settings_store=SettingsStore(path=tmp_path / "settings.json"),
+        tag_fetcher=fetcher,
+        url_checker=checker,
+    )
+    return service, calls, storage
+
+
+@pytest.mark.asyncio
+async def test_git_error_is_not_persisted(tmp_path) -> None:
+    async def failing_fetcher(url, timeout):
+        raise RuntimeError("boom")
+
+    async def ok_checker(url, timeout):
+        return True
+
+    storage = InMemorySourceArchiveStorage()
+    service = SourceArchiveService(
+        storage=storage,
+        settings_store=SettingsStore(path=tmp_path / "settings.json"),
+        tag_fetcher=failing_fetcher,
+        url_checker=ok_checker,
+    )
+    result = await service.lookup(PURL, REPO)
+    assert result.reason == "git_error"
+    assert await storage.lookup_archive(KEY) is None
+
+
+@pytest.mark.asyncio
+async def test_archive_check_failure_is_not_persisted(tmp_path) -> None:
+    service, _, storage = make_service_with_storage(tmp_path, head=False)
+    result = await service.lookup(PURL, REPO)
+    assert result.reason == "archive_check_failed"
+    assert await storage.lookup_archive(KEY) is None
+
+
+@pytest.mark.asyncio
+async def test_deterministic_negatives_are_persisted(tmp_path) -> None:
+    service, _, storage = make_service_with_storage(
+        tmp_path, tags=[TagInfo("v1.0.0", OTHER_SHA)]
+    )
+    no_tag = await service.lookup(PURL, REPO)
+    assert no_tag.reason == "no_matching_tag"
+    assert (await storage.lookup_archive(KEY)).reason == "no_matching_tag"
+
+    no_repo = await service.lookup(PURL, None, force_refresh=True)
+    assert no_repo.reason == "no_repository"
+    assert (await storage.lookup_archive(KEY)).reason == "no_repository"
+
+    unsupported = await service.lookup(
+        PURL, "https://gitlab.com/a/b", force_refresh=True
+    )
+    assert unsupported.reason == "unsupported_host"
+    row = await storage.lookup_archive(KEY)
+    assert row.reason == "unsupported_host"
+
+
+@pytest.mark.asyncio
+async def test_invalid_commit_sha_drops_commit_url(tmp_path) -> None:
+    service, _, _ = make_service_with_storage(
+        tmp_path, tags=[TagInfo("v23.8.16.40-lts", "not-a-sha")]
+    )
+    result = await service.lookup(PURL, REPO)
+    assert result.match_type == "exact"
+    assert result.archive_url is not None
+    assert result.archive_url_commit is None
+
+
+@pytest.mark.asyncio
+async def test_enrich_many_isolates_unexpected_row_failure(tmp_path) -> None:
+    class RaisingService(SourceArchiveService):
+        async def lookup(self, purl, repository_url, force_refresh=False):
+            if "boom" in purl:
+                raise RuntimeError("boom")
+            return await super().lookup(purl, repository_url, force_refresh=force_refresh)
+
+    storage = InMemorySourceArchiveStorage()
+
+    async def fetcher(url, timeout):
+        return list(TAGS)
+
+    async def checker(url, timeout):
+        return True
+
+    service = RaisingService(
+        storage=storage,
+        settings_store=SettingsStore(path=tmp_path / "settings.json"),
+        tag_fetcher=fetcher,
+        url_checker=checker,
+    )
+    results = await service.enrich_many(
+        ["pkg:github/a/boom@1.0.0", PURL], [REPO, REPO]
+    )
+    assert results[0].match_type == "repository_only"
+    assert results[0].reason == "internal_error"
+    assert results[1].match_type == "exact"
+    boom_key = normalize_with_version(validate("pkg:github/a/boom@1.0.0"))
+    assert await storage.lookup_archive(boom_key) is None
+
+
+@pytest.mark.asyncio
+async def test_transient_cached_row_is_recomputed(tmp_path) -> None:
+    service, calls, storage = make_service_with_storage(tmp_path)
+    await storage.store_archive(
+        SourceArchiveRow(
+            purl=KEY,
+            version="23.8.16.40",
+            match_type="repository_only",
+            reason="git_error",
+            repository_url=REPO,
+            resolver="git-tags",
+        )
+    )
+    result = await service.lookup(PURL, REPO)
+    assert result.cached is False
+    assert result.match_type == "exact"
+    assert calls["tags"] == 1

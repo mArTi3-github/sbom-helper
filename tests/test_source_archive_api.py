@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from purl_resolver.resolver.interface import Resolution
+from purl_resolver.resolver.interface import Resolution, Resolver
 from purl_resolver.router import router
 from purl_resolver.service import PurlResolutionService
 from purl_resolver.settings_store import SettingsStore
@@ -14,22 +14,40 @@ from purl_resolver.source_archive.matching import TagInfo
 from purl_resolver.source_archive.service import SourceArchiveService
 from purl_resolver.storage.inmemory import InMemoryCache
 from purl_resolver.storage.inmemory_source_archive import InMemorySourceArchiveStorage
-from tests.helpers import FakeResolver
 
 PURL = "pkg:github/ClickHouse/ClickHouse@23.8.16.40"
 REPO = "https://github.com/ClickHouse/ClickHouse"
+POISON_PURL = "pkg:github/poison/repo@1.0.0"
+POISON_REPO = "https://[abc"
 TAG_SHA = "e143a9039ba36ad0c25f2ed85503f36e88f61063"
 TAGS = [TagInfo("v23.8.16.40-lts", TAG_SHA)]
 
 
+class MappingResolver(Resolver):
+    def __init__(self, mapping: dict[str, str]) -> None:
+        self._mapping = mapping
+
+    @property
+    def name(self) -> str:
+        return "fake"
+
+    async def resolve(self, purl: str) -> Resolution:
+        return Resolution(purl=purl, repository_url=self._mapping.get(purl))
+
+
 @pytest.fixture
-def client(tmp_path: Path) -> TestClient:
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    async def offline_connectivity(**kwargs: object) -> bool:
+        return True
+
+    monkeypatch.setattr(
+        "purl_resolver.routes.resolve.ensure_connectivity", offline_connectivity
+    )
+
     test_app = FastAPI()
     test_app.state.storage = InMemoryCache()
     test_app.state.resolvers = [
-        FakeResolver(
-            resolution=Resolution(purl=PURL, repository_url=REPO),
-        ),
+        MappingResolver({PURL: REPO, POISON_PURL: POISON_REPO}),
     ]
     test_app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
     test_app.state.resolution_service = PurlResolutionService(
@@ -119,3 +137,19 @@ def test_flag_on_returns_commit_metadata(client):
     assert item["source_archive_matched_version"] == "23.8.16.40"
     assert item["source_archive_resolver"] == "git-tags"
     assert item["source_archive_resolved_at"]
+
+
+def test_poison_repository_row_does_not_break_batch(client):
+    response = client.post(
+        "/api/v1/resolve/batch",
+        json={
+            "purls": [POISON_PURL, PURL],
+            "find_source_archive": True,
+        },
+    )
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert results[0]["source_archive_match"] == "repository_only"
+    assert results[0]["source_archive_reason"] == "unsupported_host"
+    assert results[1]["source_archive_match"] == "exact"
+    assert results[1]["source_archive_url"] is not None

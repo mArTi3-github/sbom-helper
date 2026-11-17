@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import asyncpg
 
 from .source_archive import SourceArchiveRow, SourceArchiveStorage
+
+
+def _iso(value: object) -> str:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    text = str(value)
+    try:
+        return datetime.fromisoformat(text).isoformat()
+    except ValueError:
+        return text
 
 
 class PostgresSourceArchiveStorage(SourceArchiveStorage):
@@ -29,7 +41,7 @@ class PostgresSourceArchiveStorage(SourceArchiveStorage):
             matched_version=row["matched_version"],
             repository_url=row["repository_url"],
             resolver=row["resolver"],
-            resolved_at=str(row["resolved_at"]),
+            resolved_at=_iso(row["resolved_at"]),
         )
 
     async def store_archive(self, row: SourceArchiveRow) -> None:

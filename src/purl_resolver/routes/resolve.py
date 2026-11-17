@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Request
@@ -8,9 +10,11 @@ from fastapi.responses import JSONResponse
 
 from ..schemas import BatchResolveItem, BatchResolveRequest, BatchResolveResponse
 from ..settings_store import SettingsStore
+from ..source_archive.service import SourceArchiveResult
 from ..url_validator import ensure_connectivity
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -18,7 +22,10 @@ _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 def _commit_sha_from_url(url: str | None) -> str | None:
     if url is None:
         return None
-    name = urlsplit(url).path.rsplit("/", 1)[-1]
+    try:
+        name = urlsplit(url).path.rsplit("/", 1)[-1]
+    except ValueError:
+        return None
     if name.endswith(".tar.gz"):
         name = name[: -len(".tar.gz")]
     return name if _COMMIT_SHA.fullmatch(name) else None
@@ -72,11 +79,28 @@ async def resolve_batch_endpoint(body: BatchResolveRequest, request: Request) ->
                 archive_repository_urls.append(result.response.repository_url)
 
     if body.find_source_archive and archive_purls:
-        archive_results = await request.app.state.source_archive_service.enrich_many(
-            purls=archive_purls,
-            repository_urls=archive_repository_urls,
-            force_refresh=body.force_refresh,
-        )
+        try:
+            archive_results = await request.app.state.source_archive_service.enrich_many(
+                purls=archive_purls,
+                repository_urls=archive_repository_urls,
+                force_refresh=body.force_refresh,
+            )
+        except Exception:
+            logger.warning(
+                "Source archive enrichment failed for the batch", exc_info=True
+            )
+            archive_results = [
+                SourceArchiveResult(
+                    purl=purl,
+                    match_type="repository_only" if repository_url else "not_found",
+                    reason="internal_error",
+                    repository_url=repository_url,
+                    resolved_at=datetime.now(timezone.utc).isoformat(),
+                )
+                for purl, repository_url in zip(
+                    archive_purls, archive_repository_urls
+                )
+            ]
         for index, archive_result in zip(archive_indices, archive_results):
             item = items[index]
             item.source_archive_url = archive_result.archive_url

@@ -18,7 +18,10 @@ class GitHubRepo:
 
 
 def parse_github_repository(url: str) -> GitHubRepo | None:
-    parts = urlsplit(url)
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
     if parts.scheme.lower() not in ("http", "https"):
         return None
     if parts.hostname is None or parts.hostname.lower() not in _ALLOWED_HOSTS:
@@ -32,6 +35,8 @@ def parse_github_repository(url: str) -> GitHubRepo | None:
     if len(segments) != 3 or segments[0] != "":
         return None
     owner, name = segments[1], segments[2]
+    if owner in (".", "..") or name in (".", ".."):
+        return None
     if not _SEGMENT.match(owner) or not _SEGMENT.match(name):
         return None
     return GitHubRepo(owner, name)

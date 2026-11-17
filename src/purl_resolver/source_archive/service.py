@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal, cast
+from urllib.parse import urlsplit, urlunsplit
 
 from ..purl_utils import PurlValidationError, normalize_with_version, validate
 from ..settings_store import SettingsStore
@@ -21,6 +22,8 @@ from .github import (
 from .matching import TagInfo, TagMatch, find_exact, find_near, parse_version
 
 logger = logging.getLogger(__name__)
+
+_TRANSIENT_REASONS = frozenset({"git_error", "archive_check_failed", "internal_error"})
 
 MatchType = Literal["exact", "near", "repository_only", "not_found", "no_version"]
 
@@ -87,6 +90,8 @@ class SourceArchiveService:
 
         if not force_refresh:
             cached = await self._load_cached(key)
+            if cached is not None and cached.reason in _TRANSIENT_REASONS:
+                cached = None
             if cached is not None and not _is_stale(cached, repository_url):
                 return _result_from_row(cached, cached=True)
 
@@ -106,7 +111,9 @@ class SourceArchiveService:
         try:
             tags = await self._tag_fetcher(repository_url, timeout)
         except Exception:
-            logger.warning("Failed to fetch tags for %s", repository_url, exc_info=True)
+            logger.warning(
+                "Failed to fetch tags for %s", _redact_url(repository_url), exc_info=True
+            )
             return await self._store_outcome(
                 key, components.version, "repository_only", "git_error", repository_url
             )
@@ -166,7 +173,18 @@ class SourceArchiveService:
             purl: str, repository_url: str | None
         ) -> SourceArchiveResult:
             async with semaphore:
-                return await self.lookup(purl, repository_url, force_refresh=force_refresh)
+                try:
+                    return await self.lookup(
+                        purl, repository_url, force_refresh=force_refresh
+                    )
+                except Exception:
+                    logger.warning(
+                        "Source archive lookup failed for %s (%s)",
+                        _cache_key(purl),
+                        _redact_url(repository_url),
+                        exc_info=True,
+                    )
+                    return _internal_error_result(purl, repository_url)
 
         unique_results = await asyncio.gather(
             *[_lookup_one(purl, url) for purl, url in representatives]
@@ -212,6 +230,8 @@ class SourceArchiveService:
             resolver="git-tags",
             resolved_at=_now(),
         )
+        if reason in _TRANSIENT_REASONS:
+            return _result_from_row(row, cached=False)
         return await self._store_row(row)
 
     async def _check(self, url: str | None, timeout: float) -> bool:
@@ -232,12 +252,20 @@ def _match_row(
     repository_url: str,
 ) -> SourceArchiveRow:
     tag = match.tag
+    commit_url = None
+    if tag.commit_sha:
+        try:
+            commit_url = commit_archive_url(repo, tag.commit_sha)
+        except ValueError:
+            logger.warning(
+                "Ignoring invalid commit SHA %r for %s", tag.commit_sha, key, exc_info=True
+            )
     return SourceArchiveRow(
         purl=key,
         version=version,
         match_type=match.match_type,
         archive_url=tag_archive_url(repo, tag.name),
-        archive_url_commit=commit_archive_url(repo, tag.commit_sha) if tag.commit_sha else None,
+        archive_url_commit=commit_url,
         matched_ref=tag.name,
         matched_ref_type="tag",
         matched_version=match.matched_version,
@@ -245,6 +273,35 @@ def _match_row(
         resolver="git-tags",
         resolved_at=_now(),
     )
+
+
+def _internal_error_result(purl: str, repository_url: str | None) -> SourceArchiveResult:
+    return SourceArchiveResult(
+        purl=_cache_key(purl),
+        match_type="repository_only" if repository_url else "not_found",
+        reason="internal_error",
+        repository_url=repository_url,
+        resolved_at=_now(),
+    )
+
+
+def _redact_url(url: str | None) -> str | None:
+    if not url:
+        return url
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "<invalid-url>"
+    if parts.username is None and parts.password is None:
+        return url
+    host = parts.hostname or ""
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    if port is not None:
+        host = f"{host}:{port}"
+    return urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
 
 
 def _cache_key(purl: str) -> str:

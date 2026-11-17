@@ -55,6 +55,12 @@ def test_parse_github_repository_rejects_other_hosts_and_extra_paths() -> None:
     assert parse_github_repository("https://github.com/a/b/tree/main") is None
 
 
+def test_parse_github_repository_rejects_dot_segments_and_malformed_urls() -> None:
+    assert parse_github_repository("https://github.com/./b") is None
+    assert parse_github_repository("https://github.com/a/..") is None
+    assert parse_github_repository("https://[abc") is None
+
+
 def test_archive_urls() -> None:
     repo = GitHubRepo("ClickHouse", "ClickHouse")
     assert tag_archive_url(repo, "v23.8.16.40-lts") == (
