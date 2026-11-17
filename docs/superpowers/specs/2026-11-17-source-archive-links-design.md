@@ -239,11 +239,17 @@ PostgreSQL используется in-memory реализация, как се�
    таймаут);
 6. `archive_check_failed` — собранная архивная ссылка не прошла HEAD;
 7. `no_matching_tag` — теги получены, но ни точного, ни близкого
-   совпадения нет.
+   совпадения нет;
+8. `internal_error` — непредвиденный сбой при обработке строки
+   (исключение внутри сервиса или изолированный сбой одной строки
+   batch-запроса). Строка не ломает батч: при известном репозитории
+   возвращается `repository_only`, иначе `not_found`.
 
 Для `exact` и `near` `reason` = NULL. `no_version` и
 `non_numeric_version` в БД не сохраняются как отдельные строки (см.
-6.8), но возвращаются в ответе API.
+6.8), но возвращаются в ответе API. Транзиентные причины `git_error`,
+`archive_check_failed` и `internal_error` также возвращаются клиенту, но
+не сохраняются (см. 6.8).
 
 ### 6.5. Сопоставление версий
 
@@ -384,6 +390,9 @@ class SourceArchiveService:
    иначе `not_found`).
 3. `normalize_with_version()` → ключ.
 4. Если `force_refresh = false` — `lookup_archive(key)`. При попадании:
+   - если сохранённая причина транзиентная (`git_error`,
+     `archive_check_failed`, `internal_error`), запись игнорируется и
+     поиск выполняется заново;
    - если текущий `repository_url` не пуст и отличается от сохранённого
      в строке — запись считается устаревшей, идём дальше и перезаписываем
      её (репозиторий сменился);
@@ -394,20 +403,28 @@ class SourceArchiveService:
 6. Разобрать GitHub owner/repo; не GitHub → `repository_only` /
    `unsupported_host`; сохранить.
 7. `git ls-remote --tags`; ошибка → `repository_only` / `git_error`;
-   сохранить.
+   вернуть, но не сохранять.
 8. Точное совпадение → HEAD; успех → `exact`; неудача →
-   `repository_only` / `archive_check_failed`; сохранить.
+   `repository_only` / `archive_check_failed`; вернуть, но не сохранять.
 9. Близкое совпадение → HEAD; успех → `near`; неудача →
-   `repository_only` / `archive_check_failed`; сохранить.
+   `repository_only` / `archive_check_failed`; вернуть, но не сохранять.
 10. Иначе `repository_only` / `no_matching_tag`; сохранить.
-11. Сохранение в БД — best-effort: ошибка storage логируется и не ломает
+11. Непредвиденное исключение при обработке строки не прерывает batch:
+    строка получает `repository_only` / `internal_error` при известном
+    репозитории или `not_found` / `internal_error` иначе; результат
+    возвращается, но не сохраняется.
+12. Сохранение в БД — best-effort: ошибка storage логируется и не ломает
     ответ.
 
-Кэшируются все четыре типа (`exact`, `near`, `repository_only`,
-`not_found`). `force_refresh=true` игнорирует кэш архивов, выполняет
-поиск заново и перезаписывает строку. Разрешение репозитория при этом
-идёт обычным путём (со своим versionless-кэшем): `force_refresh` не
-обходит кэш `resolved_purls`.
+Кэшируются `exact`, `near` и детерминированные отрицательные исходы
+(`repository_only` с `unsupported_host`/`no_matching_tag`, `not_found` с
+`no_repository`). Транзиентные исходы `git_error`,
+`archive_check_failed` и `internal_error` не сохраняются, чтобы
+следующий запрос мог повторить поиск без `force_refresh`.
+`force_refresh=true` игнорирует кэш архивов, выполняет поиск заново и
+перезаписывает строку. Разрешение репозитория при этом идёт обычным
+путём (со своим versionless-кэшем): `force_refresh` не обходит кэш
+`resolved_purls`.
 
 ### 6.9. API
 

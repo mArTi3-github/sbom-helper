@@ -25,8 +25,8 @@ Add a source archive lookup mode to `POST /api/v1/resolve/batch` (`find_source_a
    - otherwise no archive link.
    No LLM participates in tag selection.
 4. **GitHub-only first version.** Only `github.com`/`www.github.com` repositories with a strict `/{owner}/{repo}` path produce archive links. Other hosts return `repository_only` with `unsupported_host`. The package boundary leaves room for more hosts.
-5. **Negative caching.** Cache all four persistent outcomes (`exact`, `near`, `repository_only`, `not_found`) in `purl_source_archives`. `no_version` and `non_numeric_version` are API-only results and are not persisted. `force_refresh` bypasses only the archive cache, not the versionless repository cache.
-6. **Verified URLs.** Construct archive URLs from validated owner/repo and tag or 40-hex SHA, then verify them with a redirected HEAD request (`follow_redirects=True`, final status below 400). Unverified URLs are stored only as `repository_only` / `archive_check_failed`.
+5. **Deterministic negative caching.** Cache `exact`, `near`, and deterministic negative outcomes (`repository_only` with `unsupported_host`/`no_matching_tag`, `not_found` with `no_repository`) in `purl_source_archives`. Do not persist transient outcomes (`git_error`, `archive_check_failed`, `internal_error`), so the next request retries them without `force_refresh`. `no_version` and `non_numeric_version` are API-only results and are not persisted. `force_refresh` bypasses only the archive cache, not the versionless repository cache.
+6. **Verified URLs.** Construct archive URLs from validated owner/repo and tag or 40-hex SHA, then verify them with a redirected HEAD request (`follow_redirects=True`, final status below 400). Unverified URLs are returned only as `repository_only` / `archive_check_failed` and are not cached.
 
 ## Rationale
 
@@ -50,5 +50,6 @@ Add a source archive lookup mode to `POST /api/v1/resolve/batch` (`find_source_a
 - Responses carry an explicit `match_type`, so a near or repository-only result cannot be mistaken for an exact archive link.
 - Archive lookups are synchronous per batch and can be slow on large batches; `source_archive_concurrency` bounds parallelism and consumers should send smaller archive-mode batches. TTL refresh and background archive jobs are deliberately absent in v1.
 - Non-GitHub hosts and any tag scheme outside the deterministic rules return `repository_only`, so coverage is intentionally narrower than repository resolution.
+- Archive lookup failures are per-row statuses. `git_error`, `archive_check_failed`, and an unexpected `internal_error` for one row never abort the batch or produce a 5xx, and they are not cached, so a transient failure can succeed on the next request.
 - Archive warnings (for example multiple exact tags) are runtime-only; cache hits return them empty because warnings are not persisted.
 - Restoring a backup keeps existing `purl_source_archives` rows in merge mode and only overwrites them with `--mode replace`.

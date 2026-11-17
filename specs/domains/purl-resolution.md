@@ -12,7 +12,7 @@ Core capability of the system. Accepts one or more Package URL (PURL) strings an
 - `src/purl_resolver/source_archive/matching.py` — `TagInfo`/`TagMatch` types, `parse_version()`, `find_exact()`, and `find_near()`; numeric version extraction from tags, exact-match priority, and same-`major.minor` near matching
 - `src/purl_resolver/source_archive/git_tags.py` — `fetch_tags()`: `git ls-remote --tags`, annotated-tag peeling, output/tag-count limits, timeout handling; `parse_ls_remote()`
 - `src/purl_resolver/source_archive/github.py` — `parse_github_repository()`, `tag_archive_url()`, `commit_archive_url()`, `check_archive_url()`: GitHub-only repository parsing, archive URL construction, and redirected HEAD verification
-- `src/purl_resolver/source_archive/service.py` — `SourceArchiveService`: cache lookup, validity check, repository/tag/URL resolution pipeline, batch deduplication and concurrency, best-effort persistence; `SourceArchiveResult`
+- `src/purl_resolver/source_archive/service.py` — `SourceArchiveService`: cache lookup, validity check, repository/tag/URL resolution pipeline, batch deduplication and concurrency, per-row failure isolation, best-effort persistence of deterministic outcomes; `SourceArchiveResult`
 - `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `_resolve_concurrent()` core (semaphore + dedup by normalized key) shared by `resolve_many()` (batch endpoint, one row per input PURL) and `resolve_batch()` (SBOM flow, successful results only); `store_preexisting_references()` for SBOM pre-existing refs
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
@@ -265,7 +265,7 @@ Optional mode of `POST /api/v1/resolve/batch` that returns a GitHub archive URL 
 
 - Cache key: `normalize_with_version(validate(purl))` — canonical PURL including `version`, with qualifiers and subpath removed (for example `pkg:github/ClickHouse/ClickHouse@23.8.16.40`).
 - `SourceArchiveStorage` (`storage/source_archive.py`) is an ABC separate from `Storage`: `lookup_archive(purl) → SourceArchiveRow | None` and `store_archive(row) → None`.
-- `PostgresSourceArchiveStorage` reads with `SELECT * FROM purl_source_archives WHERE purl = $1` and writes with `INSERT ... ON CONFLICT (purl) DO UPDATE` for every data column.
+- `PostgresSourceArchiveStorage` reads with `SELECT * FROM purl_source_archives WHERE purl = $1` and writes with `INSERT ... ON CONFLICT (purl) DO UPDATE` for every data column. A read normalizes `resolved_at` to an ISO-8601 string, matching freshly computed results.
 - `InMemorySourceArchiveStorage` keeps a dictionary keyed by PURL and is used when PostgreSQL is unavailable, matching the `resolved_purls` degradation path.
 - `main.py` creates the storage next to `PostgresCache` and injects it into `SourceArchiveService`; both storages switch together.
 
@@ -296,7 +296,7 @@ The first version uses deterministic matching only; no LLM is consulted for tag 
 
 ### GitHub Archive URLs
 
-`github.parse_github_repository()` accepts only `github.com` and `www.github.com` with a path of exactly `/{owner}/{repo}`; a trailing `/` and `.git` suffix are stripped, and owner/repo must match `^[A-Za-z0-9_.-]+$`.
+`github.parse_github_repository()` accepts only `github.com` and `www.github.com` with a path of exactly `/{owner}/{repo}`; a trailing `/` and `.git` suffix are stripped, and owner/repo must match `^[A-Za-z0-9_.-]+$` and must not be `.` or `..`. A repository URL that `urlsplit` cannot parse yields `None`.
 
 - Tag URL: `https://github.com/{owner}/{repo}/archive/refs/tags/{tag}.tar.gz`; the tag is percent-encoded with `/` preserved.
 - Commit URL: `https://github.com/{owner}/{repo}/archive/{sha}.tar.gz`; the SHA must be 40 hex characters.
@@ -309,14 +309,15 @@ For one PURL the service executes:
 1. `validate(purl)`; a valid PURL without `version` returns `no_version` / `no_version` (not persisted, no git call).
 2. Extract the numeric version; no digits returns `non_numeric_version` with `repository_only` when a repository URL exists and `not_found` otherwise (not persisted).
 3. Build the versioned cache key.
-4. Unless `force_refresh` is set, read the cache. A hit is returned with `cached=True` unless the current non-null repository URL differs from the stored `repository_url`; a differing repository marks the row stale and the lookup continues. When the current repository URL is `None`, the stored row is still returned.
+4. Unless `force_refresh` is set, read the cache. A hit is returned with `cached=True` unless the current non-null repository URL differs from the stored `repository_url`; a differing repository marks the row stale and the lookup continues. A cached row whose reason is transient (`git_error`, `archive_check_failed`, `internal_error`) is treated as a miss. When the current repository URL is `None`, the stored row is still returned.
 5. No repository URL → `not_found` / `no_repository`; store.
 6. Non-GitHub repository → `repository_only` / `unsupported_host`; store.
-7. Tag fetch failure → `repository_only` / `git_error`; store.
-8. Exact tag → HEAD check; success stores `exact`, failure stores `repository_only` / `archive_check_failed`.
-9. Near tag → HEAD check; success stores `near`, failure stores `repository_only` / `archive_check_failed`.
+7. Tag fetch failure → `repository_only` / `git_error`; return without storing.
+8. Exact tag → HEAD check; success stores `exact`, failure returns `repository_only` / `archive_check_failed` without storing.
+9. Near tag → HEAD check; success stores `near`, failure returns `repository_only` / `archive_check_failed` without storing.
 10. No match → `repository_only` / `no_matching_tag`; store.
-11. A storage failure is logged and the computed result is still returned.
+11. An unexpected exception while resolving one row is isolated: the row returns `repository_only` / `internal_error` when a repository URL exists, `not_found` / `internal_error` otherwise, and the row is not stored. Other rows in the batch are unaffected.
+12. A storage failure is logged and the computed result is still returned.
 
 `SourceArchiveService.enrich_many()` deduplicates identical `(cache key, repository_url)` pairs, preserves input order, and bounds lookups with a semaphore set from `source_archive_concurrency`; this semaphore is separate from `batch_semaphore_limit`.
 
@@ -326,11 +327,11 @@ For one PURL the service executes:
 |---|---|---|---|
 | `exact` | yes | set | Tag version equals the PURL version after normalization |
 | `near` | yes | set | Nearest tag in the same `major.minor`; `matched_version` differs |
-| `repository_only` | yes | `NULL` | No archive link; a repository may be known |
-| `not_found` | yes | `NULL` | Neither archive link nor repository |
+| `repository_only` | deterministic outcomes only | `NULL` | No archive link; a repository may be known |
+| `not_found` | deterministic outcomes only | `NULL` | Neither archive link nor repository |
 | `no_version` | no (API only) | `NULL` | The PURL has no version |
 
-Rows produced by `non_numeric_version` are the exception: they use `repository_only` or `not_found` in the response but are not persisted.
+`repository_only` rows with `unsupported_host` or `no_matching_tag` and `not_found` rows with `no_repository` are deterministic and persisted. `repository_only` / `not_found` rows with a transient reason (`git_error`, `archive_check_failed`, `internal_error`) are returned but not stored. Rows produced by `non_numeric_version` use `repository_only` or `not_found` in the response but are not persisted.
 
 `reason` is mutually exclusive and follows this precedence; `exact` and `near` rows carry `NULL`:
 
@@ -343,10 +344,11 @@ Rows produced by `non_numeric_version` are the exception: they use `repository_o
 | 5 | `git_error` | `git ls-remote` failed (network, private repository, timeout, limits) |
 | 6 | `archive_check_failed` | Constructed archive URL failed the HEAD check |
 | 7 | `no_matching_tag` | Tags were fetched but neither exact nor near matched |
+| 8 | `internal_error` | Unexpected per-row failure during archive lookup |
 
-`no_version` and `non_numeric_version` are returned in the API row and never stored as archive cache rows.
+`no_version` and `non_numeric_version` are returned in the API row and never stored as archive cache rows. `git_error`, `archive_check_failed`, and `internal_error` are returned but not stored.
 
-All four persistent match types are cached, including negative results. `force_refresh=true` bypasses only the archive cache; the versionless `resolved_purls` cache is still used for the repository URL. Archive rows persist until a `force_refresh` lookup overwrites them or a `--mode replace` restore truncates them; a default `merge` restore keeps existing archive rows. There is no TTL or background refresh.
+Only deterministic outcomes are cached, including negative ones: `exact`, `near`, `repository_only` with `unsupported_host` or `no_matching_tag`, and `not_found` with `no_repository`. Transient outcomes (`git_error`, `archive_check_failed`, `internal_error`) are recomputed on the next request. `force_refresh=true` bypasses only the archive cache; the versionless `resolved_purls` cache is still used for the repository URL. Archive rows persist until a `force_refresh` lookup overwrites them or a `--mode replace` restore truncates them; a default `merge` restore keeps existing archive rows. There is no TTL or background refresh.
 
 ### Backup and Restore
 
@@ -412,14 +414,15 @@ All four persistent match types are cached, including negative results. `force_r
 - **Source archive lookup is opt-in**: `find_source_archive=false` (the default) performs no archive work and leaves every `source_archive_*` field at its null/empty default; `force_refresh` has no effect unless `find_source_archive=true`
 - **Archive rows align with resolution rows**: archive results are mapped back to the successful (error-free) result rows by index, so rows with a per-row error keep null/empty archive fields and a failure in archive lookup never changes the HTTP status of another row
 - **Archive cache key includes the version**: `purl_source_archives.purl` is the canonical PURL with `version` and without qualifiers or subpath; one row exists per versioned PURL and `store_archive` overwrites it
-- **Archive cache stores all four persistent match types**: `exact`, `near`, `repository_only`, and `not_found` rows are cached, so negative results avoid repeated git and HEAD calls
+- **Archive cache stores deterministic outcomes only**: `exact`, `near`, `repository_only` with `unsupported_host`/`no_matching_tag`, and `not_found` with `no_repository` are cached; the transient `git_error`, `archive_check_failed`, and `internal_error` outcomes are returned per request and never written to `purl_source_archives`
 - **API-only outcomes are not persisted**: `no_version` (match type and reason) and `non_numeric_version` (reason) are computed and returned per request but never written to `purl_source_archives`; their `source_archive_resolver` and `source_archive_resolved_at` fields are empty strings
-- **Archive reason precedence is fixed**: the first applicable code in the order `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag` is the reported reason; `exact` and `near` rows report `reason = NULL`
+- **Archive reason precedence is fixed**: the first applicable code in the order `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag`, `internal_error` is the reported reason; `exact` and `near` rows report `reason = NULL`
+- **Archive lookup failures are isolated per row**: an unexpected exception while resolving one row produces `repository_only` / `internal_error` when a repository URL exists and `not_found` / `internal_error` otherwise; the row is not stored and other rows, including the HTTP status, are unaffected. A batch-wide failure inside `enrich_many` likewise falls back to per-row `internal_error` results instead of a 5xx
 - **Repository change invalidates a cached archive**: a cache hit is returned only when the current repository URL is `None` or equals the stored `repository_url`; a current non-null repository URL that differs forces a fresh lookup and overwrites the row
 - **force_refresh bypasses only the archive cache**: `force_refresh=true` ignores `purl_source_archives` for the request and recomputes those rows; repository resolution still uses the versionless `resolved_purls` cache
 - **Archive matching is deterministic**: tag selection uses numeric-tuple comparison, suffix rules, pre-release ordering, and same-`major.minor` bounds; no LLM participates in matching
 - **Archive URLs are verified before storage**: only HEAD-checked tag URLs become `exact`/`near` results; the check follows redirects and accepts final statuses below 400
-- **Commit URLs are derived from a 40-hex SHA**: `archive_url_commit` is populated whenever `git ls-remote` yields a SHA for the matched tag; `source_archive_commit_sha` is the 40-hex path segment of that commit URL
+- **Commit URLs are derived from a 40-hex SHA**: `archive_url_commit` is populated whenever `git ls-remote` yields a 40-hex SHA for the matched tag; `source_archive_commit_sha` is the 40-hex path segment of that commit URL. A non-40-hex SHA omits the commit URL and does not fail the row
 - **Archive lookup is GitHub-only**: non-GitHub repositories produce `repository_only` / `unsupported_host` and never trigger archive URL construction
 - **Tag retrieval uses git only**: `git ls-remote --tags` supplies tag names and SHAs; the GitHub REST API and GitHub tokens are not used for source archives
 - **Archive warnings are runtime-only**: archive warnings (such as the multiple-exact-tags notice) are returned with the computed result and are not persisted, so a cache hit returns an empty `warnings` list for the archive portion

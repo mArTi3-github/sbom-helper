@@ -125,7 +125,7 @@ Row for that PURL:
 
 - `source_archive_url`: main tag archive URL; `null` for `repository_only`, `not_found`, and `no_version`.
 - `source_archive_match`: one of `exact`, `near`, `repository_only`, `not_found`, `no_version`.
-- `source_archive_reason`: stable reason code, `null` for `exact`/`near`. Precedence: `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag`.
+- `source_archive_reason`: stable reason code, `null` for `exact`/`near`. Precedence: `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag`, `internal_error`.
 - `source_archive_ref`: matched tag name; `null` when no tag was selected.
 - `source_archive_ref_type`: `"tag"` when a tag was matched, otherwise `null`.
 - `source_archive_matched_version`: numeric version of the matched tag; differs from the PURL version for `near`.
@@ -135,6 +135,8 @@ Row for that PURL:
 - `source_archive_resolved_at`: time the archive result was stored or computed.
 
 For the API-only outcomes `no_version` and `non_numeric_version`, `source_archive_resolver` and `source_archive_resolved_at` are empty strings (`""`), because these results are computed per request and never stored.
+
+Transient outcomes `git_error`, `archive_check_failed`, and `internal_error` are returned per row but are not stored in `purl_source_archives`. `internal_error` is a per-row status: when a repository URL exists it is returned as `source_archive_match: "repository_only"`, otherwise as `source_archive_match: "not_found"`. No malformed row can abort the batch or turn the request into a 5xx; unexpected failures inside archive enrichment produce per-row `internal_error` results.
 
 Rows with a per-row `error` keep all `source_archive_*` fields at their null/empty defaults. Archive lookup failures are per-row statuses and never change the HTTP status of the request. Cached archive rows are returned with an empty archive portion of `warnings`, because archive warnings are not persisted.
 
