@@ -51,7 +51,8 @@
       "unsupported_host": "Source archives are only supported for GitHub repositories",
       "git_error": "Failed to read repository tags",
       "archive_check_failed": "Archive link check failed",
-      "no_matching_tag": "No matching tag found"
+      "no_matching_tag": "No matching tag found",
+      "internal_error": "Internal error while looking up the archive link"
     },
     "foundBy": "Found by",
     "resolver": "Resolver",
