@@ -20,8 +20,11 @@ from .router import router
 from .sbom_fix_options_store import SbomFixOptionsStore
 from .service import PurlResolutionService
 from .settings_store import SettingsStore
+from .source_archive.service import SourceArchiveService
 from .storage.inmemory import InMemoryCache
+from .storage.inmemory_source_archive import InMemorySourceArchiveStorage
 from .storage.postgres import PostgresCache, create_pool
+from .storage.postgres_source_archive import PostgresSourceArchiveStorage
 from .url_validation_cache import UrlValidationCache
 from .url_validator import enable_child_subreaper, reap_orphaned_processes
 from .validation_service import UrlValidationService
@@ -46,12 +49,14 @@ async def lifespan(app: FastAPI):
     try:
         pool = await create_pool()
         app.state.storage = PostgresCache(pool)
+        app.state.source_archive_storage = PostgresSourceArchiveStorage(pool)
         logger.info("Connected to PostgreSQL at %s", storage_settings.url)
     except (asyncpg.InvalidCatalogNameError, OSError, Exception):
         logger.warning(
             "PostgreSQL unavailable, falling back to in-memory cache", exc_info=True
         )
         app.state.storage = InMemoryCache()
+        app.state.source_archive_storage = InMemorySourceArchiveStorage()
     app.state.settings_store = SettingsStore()
     app.state.ignore_patterns_store = IgnorePatternsStore()
     app.state.sbom_fix_options_store = SbomFixOptionsStore()
@@ -71,6 +76,10 @@ async def lifespan(app: FastAPI):
         resolvers=app.state.resolvers,
         settings_store=app.state.settings_store,
         validation_service=app.state.validation_service,
+    )
+    app.state.source_archive_service = SourceArchiveService(
+        storage=app.state.source_archive_storage,
+        settings_store=app.state.settings_store,
     )
 
     # Job manager for async SBOM enrichment

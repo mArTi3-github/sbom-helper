@@ -12,6 +12,8 @@ class BatchResolveRequest(BaseModel):
     purls: list[Annotated[str, Field(max_length=2048)]] = Field(
         ..., min_length=1, max_length=1000, description="Package URLs to resolve"
     )
+    find_source_archive: bool = False
+    force_refresh: bool = False
 
 
 class ResolveResponse(BaseModel):
@@ -25,6 +27,17 @@ class ResolveResponse(BaseModel):
 
 class BatchResolveItem(ResolveResponse):
     error: str | None = None
+    source_archive_url: str | None = None
+    source_archive_commit_url: str | None = None
+    source_archive_commit_sha: str | None = None
+    source_archive_match: str | None = None
+    source_archive_reason: str | None = None
+    source_archive_ref: str | None = None
+    source_archive_ref_type: str | None = None
+    source_archive_matched_version: str | None = None
+    source_archive_resolver: str = ""
+    source_archive_cached: bool = False
+    source_archive_resolved_at: str = ""
 
 
 class BatchResolveResponse(BaseModel):
