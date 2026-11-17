@@ -2,11 +2,17 @@
 
 ## Description
 
-Core capability of the system. Accepts one or more Package URL (PURL) strings and returns the corresponding source code repository URLs with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → deps.dev → ecosyste.ms → libraries.io → apk → llm), storing successful results for future lookups. Resolver composition is settings-driven — each resolver after purl2repo can be toggled; the LLM resolver, when enabled, is always last.
+Core capability of the system. Accepts one or more Package URL (PURL) strings and returns the corresponding source code repository URLs with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → deps.dev → ecosyste.ms → libraries.io → apk → llm), storing successful results for future lookups. Resolver composition is settings-driven — each resolver after purl2repo can be toggled; the LLM resolver, when enabled, is always last. An optional source archive mode returns a download link for the exact version named in the PURL, using repository git tags and a deterministic version/tag matcher.
 
 ## Key Files
 
 - `src/purl_resolver/router.py` — API endpoint handlers that call the Service Layer
+- `src/purl_resolver/routes/resolve.py` — `POST /api/v1/resolve/batch` handler: batch repository resolution plus optional per-row source archive enrichment (`find_source_archive`, `force_refresh`); maps archive results to rows by index and derives `source_archive_commit_sha` from the commit archive URL
+- `src/purl_resolver/source_archive/` — deterministic source archive lookup package: version/tag matching, git tag retrieval, GitHub archive URL construction and verification, and the `SourceArchiveService`
+- `src/purl_resolver/source_archive/matching.py` — `TagInfo`/`TagMatch` types, `parse_version()`, `find_exact()`, and `find_near()`; numeric version extraction from tags, exact-match priority, and same-`major.minor` near matching
+- `src/purl_resolver/source_archive/git_tags.py` — `fetch_tags()`: `git ls-remote --tags`, annotated-tag peeling, output/tag-count limits, timeout handling; `parse_ls_remote()`
+- `src/purl_resolver/source_archive/github.py` — `parse_github_repository()`, `tag_archive_url()`, `commit_archive_url()`, `check_archive_url()`: GitHub-only repository parsing, archive URL construction, and redirected HEAD verification
+- `src/purl_resolver/source_archive/service.py` — `SourceArchiveService`: cache lookup, validity check, repository/tag/URL resolution pipeline, batch deduplication and concurrency, best-effort persistence; `SourceArchiveResult`
 - `src/purl_resolver/service.py` — `PurlResolutionService` class: Orchestration → validation → normalization → storage lookup → URL validation → resolver → storage store; `_resolve_concurrent()` core (semaphore + dedup by normalized key) shared by `resolve_many()` (batch endpoint, one row per input PURL) and `resolve_batch()` (SBOM flow, successful results only); `store_preexisting_references()` for SBOM pre-existing refs
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
@@ -19,12 +25,16 @@ Core capability of the system. Accepts one or more Package URL (PURL) strings an
 - `src/purl_resolver/resolver/llm.py` — `LlmResolver`: last resolver in the chain; asks an OpenAI-compatible LLM (with web search) for the repository URL, validates the JSON response schema and verifies the URL via HTTP HEAD (failed checks are fed back for the next attempt); optional (settings-controlled), always placed last
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
+- `src/purl_resolver/storage/source_archive.py` — `SourceArchiveRow` dataclass and the `SourceArchiveStorage` ABC (`lookup_archive`, `store_archive`), a storage surface separate from `Storage`
+- `src/purl_resolver/storage/postgres_source_archive.py` — `PostgresSourceArchiveStorage`: `SELECT` by PURL and `INSERT ... ON CONFLICT (purl) DO UPDATE`
+- `src/purl_resolver/storage/inmemory_source_archive.py` — `InMemorySourceArchiveStorage`: dictionary-backed fallback used when PostgreSQL is unavailable
+- `src/purl_resolver/storage/schema.sql` — Table definitions for `jobs`, `resolved_purls`, and `purl_source_archives`
 - `src/purl_resolver/sbom/parser.py` — CycloneDX SBOM validation and parsing
 - `src/purl_resolver/sbom/collector.py` — Recursive component collection with path tracking, `needs_enrichment` and `has_subcomponents` detection
 - `src/purl_resolver/sbom/enricher.py` — Inserts VCS external references into SBOM components
 - `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
-- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, batch_semaphore_limit, batch_max_items, job_ttl_hours, connectivity settings)
+- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, batch_semaphore_limit, batch_max_items, source_archive_timeout, source_archive_concurrency, job_ttl_hours, connectivity settings)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
 - `src/purl_resolver/url_validation_cache.py` — `UrlValidationCache`: diskcache-based URL validation result cache with TTL expiry; used by `UrlValidationService`
 - `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url()` with UrlValidationCache; consumed by `PurlResolutionService` and accessed by `SbomEnrichmentPipeline` through `PurlResolutionService.validation_service` property
@@ -34,12 +44,15 @@ Core capability of the system. Accepts one or more Package URL (PURL) strings an
 - `src/purl_resolver/routes/jobs.py` — Async SBOM enrichment job endpoints (`POST /api/v1/jobs/sbom-enrich`, `GET /api/v1/jobs`, etc.)
 - `tests/test_api.py` — Integration tests for resolution workflow
 - `tests/test_storage.py` — Unit tests for service and in-memory cache
+- `tests/test_source_archive_*.py` — Unit tests for matching, `git ls-remote` parsing, GitHub URL construction/checking, archive storage, the service, and the batch API fields
 
 ## Core Types
 
 ```python
 class BatchResolveRequest(BaseModel):
     purls: list[str]  # one PURL per list item
+    find_source_archive: bool = False  # opt into source archive lookup
+    force_refresh: bool = False        # bypass the archive cache (archive mode only)
 
 class BatchResolveItem(BaseModel):  # one row per input PURL, in input order
     purl: str            # original input string (with version)
@@ -49,6 +62,18 @@ class BatchResolveItem(BaseModel):  # one row per input PURL, in input order
     found_by: str = ""
     resolved_at: str = ""
     error: str | None = None  # invalid_purl / upstream_error for this row
+    # Source archive fields: populated only in archive mode for rows without error
+    source_archive_url: str | None = None
+    source_archive_commit_url: str | None = None
+    source_archive_commit_sha: str | None = None
+    source_archive_match: str | None = None       # exact | near | repository_only | not_found | no_version
+    source_archive_reason: str | None = None      # stable reason code
+    source_archive_ref: str | None = None         # matched tag name
+    source_archive_ref_type: str | None = None    # tag
+    source_archive_matched_version: str | None = None
+    source_archive_resolver: str = ""
+    source_archive_cached: bool = False
+    source_archive_resolved_at: str = ""
 
 class BatchResolveResponse(BaseModel):
     results: list[BatchResolveItem]
@@ -83,6 +108,48 @@ class UrlValidationOutput:
     # final_url is str(resp.url) from httpx with follow_redirects=True
     # final_url is None only when HEAD request did not execute
     # (scheme error, rate-limit cooldown, connectivity failure, HEAD exception)
+
+@dataclass(frozen=True)
+class SourceArchiveRow:  # persisted row in purl_source_archives
+    purl: str
+    version: str
+    match_type: str          # exact | near | repository_only | not_found
+    reason: str | None = None
+    archive_url: str | None = None
+    archive_url_commit: str | None = None
+    matched_ref: str | None = None
+    matched_ref_type: str | None = None  # tag
+    matched_version: str | None = None
+    repository_url: str | None = None
+    resolver: str = ""       # "git-tags"
+    resolved_at: str = ""
+
+@dataclass(frozen=True)
+class SourceArchiveResult:  # service result, adds runtime-only fields
+    purl: str
+    match_type: str          # exact | near | repository_only | not_found | no_version
+    reason: str | None = None
+    archive_url: str | None = None
+    archive_url_commit: str | None = None
+    matched_ref: str | None = None
+    matched_ref_type: str | None = None
+    matched_version: str | None = None
+    repository_url: str | None = None
+    resolver: str = ""
+    cached: bool = False
+    resolved_at: str = ""
+    warnings: list[str] = []
+
+@dataclass(frozen=True)
+class TagInfo:  # one tag from git ls-remote
+    name: str
+    commit_sha: str | None = None  # peeled commit SHA (annotated tags use ^{})
+
+@dataclass(frozen=True)
+class TagMatch:
+    tag: TagInfo
+    match_type: str    # exact | near
+    matched_version: str
 ```
 
 ## Flow
@@ -190,6 +257,112 @@ Client                    API Layer (router)         Service Layer             p
 - Consumed by `PurlResolutionService` as an optional dependency. `SbomEnrichmentPipeline` accesses `validation_service` through `PurlResolutionService.validation_service` property.
 - Decouples URL validation setup from resolution orchestration; single point for validation configuration changes
 
+## Source Archive Resolution
+
+Optional mode of `POST /api/v1/resolve/batch` that returns a GitHub archive URL for the version named in the PURL. Repository resolution keeps its existing versionless cache and resolver chain; archive data is stored separately per versioned PURL.
+
+### Cache Key and Storage
+
+- Cache key: `normalize_with_version(validate(purl))` — canonical PURL including `version`, with qualifiers and subpath removed (for example `pkg:github/ClickHouse/ClickHouse@23.8.16.40`).
+- `SourceArchiveStorage` (`storage/source_archive.py`) is an ABC separate from `Storage`: `lookup_archive(purl) → SourceArchiveRow | None` and `store_archive(row) → None`.
+- `PostgresSourceArchiveStorage` reads with `SELECT * FROM purl_source_archives WHERE purl = $1` and writes with `INSERT ... ON CONFLICT (purl) DO UPDATE` for every data column.
+- `InMemorySourceArchiveStorage` keeps a dictionary keyed by PURL and is used when PostgreSQL is unavailable, matching the `resolved_purls` degradation path.
+- `main.py` creates the storage next to `PostgresCache` and injects it into `SourceArchiveService`; both storages switch together.
+
+### Version and Tag Matching
+
+Tag names and the PURL version are normalized by extracting the longest chain of digit groups separated only by `.`, `-`, `_`, `/`, or `+`:
+
+- Text before the chain is a prefix (`v`, `release`, project name) and is ignored.
+- Text after the chain is a suffix normalized to lowercase alphanumerics (`lts`, `rc1`, `stable`).
+- `v23.8.16.40-lts` → `(23, 8, 16, 40)` + `lts`; `rel_23_8_16_40` → `(23, 8, 16, 40)`; `release-1.2.3` → `(1, 2, 3)`; `v1.2.3-rc4` → `(1, 2, 3)` + `rc4`.
+- Tags without digits never match. A PURL version without digits yields `non_numeric_version`.
+- Numeric tuples are compared component-wise with missing components padded by zeros, so `1.2` and `1.2.0` are equal.
+
+**Exact (`exact`)** — equal numeric tuples; if the PURL version has a non-numeric suffix, the tag suffix must equal it (case-insensitive); if the PURL version has no suffix, any tag suffix is accepted. Several exact tags are ordered by: no pre-release marker (`rc`, `alpha`, `beta`, `pre`, `dev`, `snapshot`, `nightly`) first, then shorter tag name, then lexicographically smaller tag name. More than one exact candidate adds the warning `Multiple exact tags matched; chose '<tag>'`.
+
+**Near (`near`)** — only tags with the same `major.minor` are considered; pre-release tags are excluded unless the PURL version itself is a pre-release; an equal numeric tuple with a different suffix counts as near. Priority: equal numeric tuple first, then the highest version below the target, then the lowest version above the target. `matched_version` carries the numeric version of the selected tag.
+
+The first version uses deterministic matching only; no LLM is consulted for tag selection.
+
+### Tag Retrieval
+
+`git_tags.fetch_tags(repository_url, timeout)` runs `git ls-remote --tags <repository_url>` via `asyncio.create_subprocess_exec` with `GIT_TERMINAL_PROMPT=0` and `GIT_ASKPASS=/bin/true`.
+
+- Only `http(s)` URLs with a non-empty hostname are accepted; other inputs raise `GitTagsError` (reported as `git_error` by the service).
+- The process is killed on timeout (`source_archive_timeout`) and tracked through the shared subprocess helpers in `url_validator.py`.
+- Output is capped at 5 MB and 50 000 tags; exceeding either raises `GitTagsError`.
+- Lines `refs/tags/<tag>` and `refs/tags/<tag>^{}` are parsed; the peeled `^{}` commit SHA replaces the annotated tag-object SHA, so `TagInfo.commit_sha` always refers to a commit when available.
+
+### GitHub Archive URLs
+
+`github.parse_github_repository()` accepts only `github.com` and `www.github.com` with a path of exactly `/{owner}/{repo}`; a trailing `/` and `.git` suffix are stripped, and owner/repo must match `^[A-Za-z0-9_.-]+$`.
+
+- Tag URL: `https://github.com/{owner}/{repo}/archive/refs/tags/{tag}.tar.gz`; the tag is percent-encoded with `/` preserved.
+- Commit URL: `https://github.com/{owner}/{repo}/archive/{sha}.tar.gz`; the SHA must be 40 hex characters.
+- `check_archive_url(url, timeout)` performs HTTP HEAD with `follow_redirects=True` and returns `True` only for a final status below 400. GitHub redirects archives to `codeload.github.com`, so redirects are required.
+
+### Lookup Order
+
+For one PURL the service executes:
+
+1. `validate(purl)`; a valid PURL without `version` returns `no_version` / `no_version` (not persisted, no git call).
+2. Extract the numeric version; no digits returns `non_numeric_version` with `repository_only` when a repository URL exists and `not_found` otherwise (not persisted).
+3. Build the versioned cache key.
+4. Unless `force_refresh` is set, read the cache. A hit is returned with `cached=True` unless the current non-null repository URL differs from the stored `repository_url`; a differing repository marks the row stale and the lookup continues. When the current repository URL is `None`, the stored row is still returned.
+5. No repository URL → `not_found` / `no_repository`; store.
+6. Non-GitHub repository → `repository_only` / `unsupported_host`; store.
+7. Tag fetch failure → `repository_only` / `git_error`; store.
+8. Exact tag → HEAD check; success stores `exact`, failure stores `repository_only` / `archive_check_failed`.
+9. Near tag → HEAD check; success stores `near`, failure stores `repository_only` / `archive_check_failed`.
+10. No match → `repository_only` / `no_matching_tag`; store.
+11. A storage failure is logged and the computed result is still returned.
+
+`SourceArchiveService.enrich_many()` deduplicates identical `(cache key, repository_url)` pairs, preserves input order, and bounds lookups with a semaphore set from `source_archive_concurrency`; this semaphore is separate from `batch_semaphore_limit`.
+
+### Match Types and Reasons
+
+| `match_type` | Persisted | `archive_url` | Meaning |
+|---|---|---|---|
+| `exact` | yes | set | Tag version equals the PURL version after normalization |
+| `near` | yes | set | Nearest tag in the same `major.minor`; `matched_version` differs |
+| `repository_only` | yes | `NULL` | No archive link; a repository may be known |
+| `not_found` | yes | `NULL` | Neither archive link nor repository |
+| `no_version` | no (API only) | `NULL` | The PURL has no version |
+
+Rows produced by `non_numeric_version` are the exception: they use `repository_only` or `not_found` in the response but are not persisted.
+
+`reason` is mutually exclusive and follows this precedence; `exact` and `near` rows carry `NULL`:
+
+| Order | `reason` | Condition |
+|---|---|---|
+| 1 | `no_version` | PURL has no version |
+| 2 | `non_numeric_version` | PURL version has no digit chain |
+| 3 | `no_repository` | Repository URL is absent |
+| 4 | `unsupported_host` | Repository is not GitHub |
+| 5 | `git_error` | `git ls-remote` failed (network, private repository, timeout, limits) |
+| 6 | `archive_check_failed` | Constructed archive URL failed the HEAD check |
+| 7 | `no_matching_tag` | Tags were fetched but neither exact nor near matched |
+
+`no_version` and `non_numeric_version` are returned in the API row and never stored as archive cache rows.
+
+All four persistent match types are cached, including negative results. `force_refresh=true` bypasses only the archive cache; the versionless `resolved_purls` cache is still used for the repository URL. Archive rows persist until a `force_refresh` lookup overwrites them or a restore replaces them; there is no TTL or background refresh.
+
+### Backup and Restore
+
+`scripts/db_backup.sh` writes a two-file set:
+
+- `backups/sbom_purls_YYYYmmdd-HHMMSS.csv.gz` — `resolved_purls` (`purl`, `repository_url`, `resolver`, `resolved_at`), unchanged;
+- `backups/sbom_source_archives_YYYYmmdd-HHMMSS.csv.gz` — `purl_source_archives` with the exact column order `purl,version,match_type,reason,archive_url,archive_url_commit,matched_ref,matched_ref_type,matched_version,repository_url,resolver,resolved_at`, sorted by `purl`, exported with `PGTZ=UTC`.
+
+`-o FILE`/`--output FILE` sets the PURL mapping path; the archive file is written beside it: `out.csv.gz` becomes `out.source_archives.csv.gz`, and a name without the `.csv.gz` suffix gets `.source_archives.csv.gz` appended. Without `-o`, both files share one UTC timestamp. `--keep N` groups files by their `YYYYmmdd-HHMMSS` suffix and removes whole old sets, keeping the `N` newest stamps; a file whose counterpart is missing still belongs to its stamp group and is removed with it, while files without a timestamp are not rotated.
+
+`scripts/db_restore.sh` accepts one or both files in any order and detects the target table from the exact CSV header, so old PURL-only backups keep working; two files for the same table are rejected.
+
+- `--mode merge` (default) inserts only missing `purl` values and keeps existing rows on the target stand for both tables.
+- `--mode replace` truncates the table and inserts from a staging table in one transaction, applied independently per supplied table; an empty file for replace is rejected.
+- `inserted`, `skipped`, and `total` counters are printed per table; staging tables are created with `LIKE <table> INCLUDING DEFAULTS` and dropped on exit.
+
 ## Invariants
 
 - `POST /api/v1/resolve/batch` always returns HTTP 200 with one result row per input PURL, in input order
@@ -236,6 +409,23 @@ Client                    API Layer (router)         Service Layer             p
 - **Docker provides VCS tools**: `git`, `subversion`, `mercurial` are installed in both `dev` and `prod` stages of the Dockerfile; fossil uses HTTP (httpx) and requires no binary
 - **VCS subprocess timeouts are non-fatal**: `asyncio.TimeoutError` from any subprocess call is treated as `None` (uncertain) and logged as a warning; never raised to the caller
 - **UrlValidationService is optional**: `PurlResolutionService` accepts an optional `validation_service: UrlValidationService | None` parameter; when `None`, callers fall back to direct `validate_url()` calls. `SbomEnrichmentPipeline` accesses `validation_service` through `PurlResolutionService.validation_service` property
+- **Source archive lookup is opt-in**: `find_source_archive=false` (the default) performs no archive work and leaves every `source_archive_*` field at its null/empty default; `force_refresh` has no effect unless `find_source_archive=true`
+- **Archive rows align with resolution rows**: archive results are mapped back to the successful (error-free) result rows by index, so rows with a per-row error keep null/empty archive fields and a failure in archive lookup never changes the HTTP status of another row
+- **Archive cache key includes the version**: `purl_source_archives.purl` is the canonical PURL with `version` and without qualifiers or subpath; one row exists per versioned PURL and `store_archive` overwrites it
+- **Archive cache stores all four persistent match types**: `exact`, `near`, `repository_only`, and `not_found` rows are cached, so negative results avoid repeated git and HEAD calls
+- **API-only outcomes are not persisted**: `no_version` (match type and reason) and `non_numeric_version` (reason) are computed and returned per request but never written to `purl_source_archives`
+- **Archive reason precedence is fixed**: the first applicable code in the order `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag` is the reported reason; `exact` and `near` rows report `reason = NULL`
+- **Repository change invalidates a cached archive**: a cache hit is returned only when the current repository URL is `None` or equals the stored `repository_url`; a current non-null repository URL that differs forces a fresh lookup and overwrites the row
+- **force_refresh bypasses only the archive cache**: `force_refresh=true` ignores `purl_source_archives` for the request and recomputes those rows; repository resolution still uses the versionless `resolved_purls` cache
+- **Archive matching is deterministic**: tag selection uses numeric-tuple comparison, suffix rules, pre-release ordering, and same-`major.minor` bounds; no LLM participates in matching
+- **Archive URLs are verified before storage**: only HEAD-checked tag URLs become `exact`/`near` results; the check follows redirects and accepts final statuses below 400
+- **Commit URLs are derived from a 40-hex SHA**: `archive_url_commit` is populated whenever `git ls-remote` yields a SHA for the matched tag; `source_archive_commit_sha` is the 40-hex path segment of that commit URL
+- **Archive lookup is GitHub-only**: non-GitHub repositories produce `repository_only` / `unsupported_host` and never trigger archive URL construction
+- **Tag retrieval uses git only**: `git ls-remote --tags` supplies tag names and SHAs; the GitHub REST API and GitHub tokens are not used for source archives
+- **Archive warnings are runtime-only**: archive warnings (such as the multiple-exact-tags notice) are returned with the computed result and are not persisted, so a cache hit returns an empty `warnings` list for the archive portion
+- **Archive storage is best-effort**: any lookup or store failure in `SourceArchiveStorage` is logged and the computed archive result is still returned
+- **Archive concurrency is independent**: `source_archive_concurrency` bounds archive lookups per batch and does not replace `batch_semaphore_limit`
+- **Archive lookups are deduplicated per batch**: inputs that share the versioned cache key and repository URL are resolved once and the result is reused for every matching row
 
 ## Configuration
 
@@ -274,6 +464,8 @@ Client                    API Layer (router)         Service Layer             p
 | `retry_base_cooldown_seconds` | `5.0` | Base wait time between retries; actual wait = cooldown × (attempt − 1). Range: 0.5–120. |
 | `batch_semaphore_limit` | `10` | Maximum concurrent resolution requests in batch mode (1–100) |
 | `batch_max_items` | `100` | Maximum PURLs per batch request (1–1000) |
+| `source_archive_timeout` | `30.0` | Timeout in seconds for `git ls-remote` and the archive HEAD check (1–300) |
+| `source_archive_concurrency` | `5` | Maximum concurrent source archive lookups per batch request (1–50) |
 | `job_ttl_hours` | `24` | Time-to-live in hours for async job records (1–720) |
 | `connectivity_url` | `"https://github.com"` | URL used for connectivity probes |
 | `connectivity_timeout` | `2` | Timeout in seconds for connectivity probes (1–30) |
@@ -299,3 +491,22 @@ The `resolved_purls` table stores resolution results:
 | `resolved_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` |
 
 Created on startup via `CREATE TABLE IF NOT EXISTS`. Schema is defined in `storage/schema.sql` alongside the `jobs` table. An index on `resolver` column (`idx_resolved_purls_resolver`) is created after the table to accelerate `SELECT DISTINCT resolver` queries.
+
+The `purl_source_archives` table caches source archive lookups by versioned PURL:
+
+| Column | Type | Constraints |
+|---|---|---|
+| `purl` | `TEXT` | `PRIMARY KEY` — canonical PURL with version, without qualifiers/subpath |
+| `version` | `TEXT` | `NOT NULL` — PURL version as supplied |
+| `match_type` | `TEXT` | `NOT NULL` — `exact`, `near`, `repository_only`, or `not_found` |
+| `reason` | `TEXT` | nullable — stable reason code for `repository_only`/`not_found` |
+| `archive_url` | `TEXT` | nullable — main tag archive URL for `exact`/`near` |
+| `archive_url_commit` | `TEXT` | nullable — commit archive URL when a SHA is known |
+| `matched_ref` | `TEXT` | nullable — matched tag name |
+| `matched_ref_type` | `TEXT` | nullable — `tag` |
+| `matched_version` | `TEXT` | nullable — numeric version of the matched tag |
+| `repository_url` | `TEXT` | nullable — repository used to build the link |
+| `resolver` | `TEXT` | `NOT NULL` — `git-tags` |
+| `resolved_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` |
+
+`idx_purl_source_archives_match_type` indexes `match_type` for filtering and diagnostics. The table is created on startup together with `resolved_purls`.

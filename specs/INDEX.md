@@ -24,9 +24,12 @@
 | Fix SBOM normalization defects | `domains/sbom-fixing.md`, `contracts/api-contract.md`, `domains/web-ui.md`, `architecture/layers.md` |
 | Remove optional SBOM fields (analysis-driven white list) | `domains/sbom-fixing.md`, `contracts/api-contract.md`, `domains/web-ui.md`, `architecture/layers.md`; design: `docs/superpowers/specs/2026-10-29-sbom-fixer-optional-fields-design.md` |
 | Add batch PURL resolution | `domains/purl-resolution.md`, `architecture/layers.md` |
+| Find a source archive link for a PURL version | `domains/purl-resolution.md`, `contracts/api-contract.md`, `domains/web-ui.md`, `decisions/0009-source-archive-links.md` |
+| Change source archive matching, git tags, caching, or archive URLs | `domains/purl-resolution.md`, `architecture/layers.md`, `decisions/0009-source-archive-links.md` |
 | Add SBOM file upload UI | `domains/web-ui.md`, `contracts/api-contract.md` |
 | Manage database (view, edit, filter, import, export) | `domains/web-ui.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 | Back up or restore the full database | `domains/web-ui.md` |
+| Back up or restore the source archive cache | `domains/purl-resolution.md`, `domains/web-ui.md` |
 | Refactor CSV import/export or storage interface | `architecture/layers.md`, `contracts/api-contract.md` |
 | Add application settings | `domains/purl-resolution.md`, `contracts/api-contract.md`, `architecture/layers.md` |
 | Add URL validation for cached URLs | `domains/purl-resolution.md`, `architecture/layers.md` |
@@ -63,6 +66,7 @@ decisions/0005-ecosyste-ms-as-fallback-resolver.md
 decisions/0006-async-first-resolver-architecture.md
 decisions/0007-depsdev-as-fallback-resolver.md
 decisions/0008-llm-as-last-resort-resolver.md
+decisions/0009-source-archive-links.md
 ```
 
 The API contract depends on the purl-resolution domain definition. The web UI depends on the API contract. Architecture layers provide the structural constraints for all domains. Decisions document the rationale behind architectural choices.
@@ -75,9 +79,9 @@ specs/
 ├── INDEX.md                         — This file
 ├── WORKFLOW.md                      — Agent workflows
 ├── architecture/
-│   └── layers.md                    — Layer hierarchy, import rules, DbAdminService, JobManager, UrlValidationCache, sbom/optional_fields.py
+│   └── layers.md                    — Layer hierarchy, import rules, DbAdminService, JobManager, UrlValidationCache, SourceArchiveService, SourceArchiveStorage, sbom/optional_fields.py
 ├── domains/
-│   ├── purl-resolution.md           — Core resolution capability (sync + async batch)
+│   ├── purl-resolution.md           — Core resolution capability (sync + async batch + source archive mode)
 │   ├── sbom-fixing.md               — SBOM normalization fixes, optional-field removal, stats, issue report
 │   └── web-ui.md                    — Browser interface (home + six tool pages, Vue SPA, Pinia stores)
 ├── contracts/
@@ -91,5 +95,6 @@ specs/
     ├── 0005-ecosyste-ms-as-fallback-resolver.md  — ecosyste.ms as fallback resolver
     ├── 0006-async-first-resolver-architecture.md — Async-first resolver architecture
     ├── 0007-depsdev-as-fallback-resolver.md      — deps.dev as fallback resolver
-    └── 0008-llm-as-last-resort-resolver.md       — LLM as last-resort resolver
+    ├── 0008-llm-as-last-resort-resolver.md       — LLM as last-resort resolver
+    └── 0009-source-archive-links.md              — source archive links (separate table, git ls-remote, deterministic matching)
 ```

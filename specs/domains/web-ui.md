@@ -2,12 +2,12 @@
 
 ## Description
 
-A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepting one or more PURLs per request, an SBOM-updater page for enriching CycloneDX SBOM files, a Fix SBOM page for applying selectable normalization fixes to CycloneDX SBOM documents, a database administration page for managing the `resolved_purls` table, a settings page for application configuration, and an Images List Converter page for transforming CycloneDX SBOM files into machine-readable lists of Docker container images.
+A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepting one or more PURLs per request (with an optional source archive mode), an SBOM-updater page for enriching CycloneDX SBOM files, a Fix SBOM page for applying selectable normalization fixes to CycloneDX SBOM documents, a database administration page for managing the `resolved_purls` table, a settings page for application configuration, and an Images List Converter page for transforming CycloneDX SBOM files into machine-readable lists of Docker container images.
 
 ## Key Files
 
 - `frontend/src/views/HomePage.vue` — landing page: hero section and tiles linking to the six tool pages
-- `frontend/src/views/PurlResolver.vue` — PURL resolver page: textarea input (one PURL per line, batch supported), resolve button, results table with per-PURL status, warnings, and resolver metadata
+- `frontend/src/views/PurlResolver.vue` — PURL resolver page: textarea input (one PURL per line, batch supported), optional source archive mode checkbox, resolve button, results table with per-PURL status, warnings, resolver metadata, and conditional source archive columns
 - `frontend/src/views/SbomUpdater.vue` — SBOM-updater page: file upload, options, ignore patterns editor, results summary and table
 - `frontend/src/views/SbomFixer.vue` — Fix SBOM page: file upload, fix options in four sections (basic fixes, `components[]` edits with a local three-column provided_by row editor and a PURL case mode selector, component license edits with an inline pattern editor, optional-fields whitelist) with master checkboxes on the first three, the optional-fields analysis card (analysis button, candidate table, two white lists), save/reset options, status card, statistics and issues spoilers, fixed-SBOM download
 - `frontend/src/views/sbomFixerRules.ts` — single catalog of the 16 static fix rules (`BASE_RULES` with 5 entries, `COMPONENTS_RULES` with 8, `LICENSES_RULES` with 3: rule id, option key, before/after JSON examples) that drives the rule rows of the Fix SBOM page
@@ -15,7 +15,7 @@ A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepti
 - `frontend/src/views/sbomFixerRules.test.ts` — Vitest unit tests for the fix rule catalog
 - `frontend/src/views/SbomFixer.test.ts` — Vitest unit tests for the Fix SBOM page
 - `frontend/src/views/DatabaseAdmin.vue` — database administration page: filterable/sortable table, inline editing, CSV import/export, bulk delete, collapsible backup/restore help
-- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, deps.dev, ecosyste.ms, Libraries.io, and LLM resolver cards
+- `frontend/src/views/Settings.vue` — settings page: URL validation, retry config, log level, JSON Format, APK resolver, deps.dev, ecosyste.ms, Libraries.io, LLM resolver, and Network & Performance cards (including source archive timeout and concurrency)
 - `frontend/src/views/ImagesListConverter.vue` — Images List Converter page: file upload, conversion status card, images table, download
 - `frontend/src/views/NotFound.vue` — 404 catch-all page
 - `frontend/src/router/index.ts` — Vue Router configuration (7 page routes + catch-all)
@@ -27,7 +27,7 @@ A Vue 3 SPA with a landing page and six tool pages: a PURL resolver page accepti
 - `frontend/src/components/db/DbDataTable.vue` — Sortable/filterable PURL data table for database admin
 - `frontend/src/components/db/DbFilterPanel.vue` — Search, resolver filter (dynamically populated from `GET /api/v1/db/resolvers`), and date range controls for database admin
 - `frontend/src/components/db/DbImportModal.vue` — CSV import dialog with drag-and-drop upload
-- `frontend/src/components/db/DbBackupHelp.vue` — collapsible help card in the database admin page with commands for the host-side `scripts/db_backup.sh` and `scripts/db_restore.sh` scripts
+- `frontend/src/components/db/DbBackupHelp.vue` — collapsible help card in the database admin page with commands for the host-side `scripts/db_backup.sh` and `scripts/db_restore.sh` scripts, including the two-file backup set (PURL mappings and source archive cache)
 - `frontend/src/api/client.ts` — Typed fetch wrapper with `ApiError` class
 - `frontend/src/api/purl.ts` — PURL resolution API client
 - `frontend/src/api/sbom.ts` — SBOM enrichment + ignore patterns + SBOM fix API client (`fixSbom`, `getFixOptions`, `saveFixOptions`, `analyzeSbom`, `getFieldCatalog`)
@@ -66,10 +66,14 @@ User                   Browser (Vue SPA)             API Layer
   |                       |                           |
   | Enters one or more     |                           |
   | PURLs (one per line),  |                           |
+  | optionally enables the |                           |
+  | source archive mode,   |                           |
   | clicks "Resolve"       |                           |
   |---------------------->|                           |
   |                       | POST /api/v1/resolve/batch |
-  |                       | {"purls": [...]}          |
+  |                       | {"purls": [...],          |
+  |                       |  "find_source_archive":   |
+  |                       |    true|false}            |
   |                       |-------------------------->|
   |                       | 200 {results: [...]}      |
   |                       |<--------------------------|
@@ -194,6 +198,14 @@ User                   Browser (Vue SPA)             API Layer
 - All states (loading, success, unresolved, error, network failure) have distinct visual representations
 - Warnings within a resolved row are shown in red; the unresolved fallback message is shown in yellow; errors in red
 - `found_by` and `resolver` fields are displayed in the details section when present
+- A checkbox under the textarea toggles the source archive mode (`findSourceArchive`); it is unchecked by default and sends `find_source_archive: true` in the batch request only when checked
+- The checkbox label is «Искать ссылку на исходники версии» / "Find source archive for the version"; the hint is «Будет указано, точная ли ссылка, близкая или только репозиторий» / "Shows whether the link is exact, near, or repository only"
+- With the mode on, the table adds two columns: «Ссылка на исходники» / "Source archive" and «Совпадение» / "Match"; with the mode off, neither column is rendered
+- The archive column shows the `.tar.gz` link when `source_archive_url` is present and an em-dash otherwise
+- The match column renders a badge: «Точная» / "Exact", «Близкая v{version}» / "Near v{version}" (using `source_archive_matched_version`), «Только репозиторий» / "Repository only", «Не найдено» / "Not found", «Нет версии» / "No version"; no badge is rendered for an empty match
+- Archive reason codes are translated from `purlResolver.archiveReason.<code>`; the translated (or raw) reason is appended to the row warnings only when not already covered by an existing warning
+- The source archive mode performs no lookup when unchecked; the page preserves its loading, error, and empty-result states in both modes
+- `force_refresh` has no UI control in this page; it is an API-only option
 
 ### SBOM-updater Page
 
@@ -253,7 +265,7 @@ User                   Browser (Vue SPA)             API Layer
 - Import modal includes a collapsible CSV format reference section listing required/optional columns and a multi-column example using `,` delimiter
 - Import strategy radio labels: "Overwrite existing" (upsert) and "Skip existing" (skip_existing)
 - Import modal supports drag-and-drop for CSV files (via `FileUploadZone` and `ModalDialog` components)
-- A collapsible "Database backup and restore" help card below the table documents the host-side scripts `scripts/db_backup.sh` and `scripts/db_restore.sh`; restore uses `merge` by default (missing PURLs only) and `--mode replace --yes` for a full table replacement. The card is informational and makes no API calls.
+- A collapsible "Database backup and restore" help card below the table documents the host-side scripts `scripts/db_backup.sh` and `scripts/db_restore.sh`; a backup set is two files (PURL mappings and source archive cache), restore accepts one or both files in any order, uses `merge` by default (missing PURLs only) and `--mode replace --yes` for a full table replacement. The card is informational and makes no API calls.
 - Pagination is managed by `useDbAdminStore` (Pinia store with `goToPage`, `changePageSize`, `totalPages` computed state)
 
 ### Settings Page
@@ -261,6 +273,7 @@ User                   Browser (Vue SPA)             API Layer
 - Settings page is accessible at `/settings` via Vue Router; nav-bar link present on all pages (via `AppNav` component)
 - Language card: dropdown selects UI language (`en` or `ru`); choice is persisted to `localStorage` immediately and to backend via `PATCH /api/v1/settings` with `language` field
 - URL Validation card: toggle switch controls `validate_db_urls`, number input controls `url_validation_timeout` (1–60 seconds), number input controls `revalidation_cooldown_hours` (0–720, default 24; 0 disables cooldown)
+- Network & Performance card: inputs control `batch_semaphore_limit` (1–100), `batch_max_items` (1–1000), `connectivity_url` (text, saved on blur), `connectivity_timeout` (1–30), `source_archive_timeout` (1–300 seconds, step 0.5, default 30), and `source_archive_concurrency` (1–50, default 5); the source archive inputs auto-save on change through the shared debounced settings update
 - Retry Configuration card: number input controls `retry_max_attempts` (1–10), number input controls `retry_base_cooldown_seconds` (0.5–120)
 - Log Level card: dropdown controls `log_level` (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - APK Resolver card: enable toggle (controls `apk_resolver_enabled`), no API key, Alpine Linux APK packages resolve to `https://github.com/alpinelinux/aports` as a fallback
@@ -272,7 +285,7 @@ User                   Browser (Vue SPA)             API Layer
 - Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
 - Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error); toast messages are translated via i18n keys
 - JSON Format card: select controls `json_indent` (1 space, 2 spaces, 4 spaces; default 4); description explains the setting affects downloaded SBOM and Images List files
-- Component is covered by `frontend/src/views/Settings.test.ts` (Vitest) with tests for auto-save, debounce, blur logic, success/error toast, and clear-token behaviour
+- Component is covered by `frontend/src/views/Settings.test.ts` (Vitest) with tests for auto-save, debounce, blur logic, success/error toast, clear-token behaviour, and the source archive timeout/concurrency inputs
 
 ### Images List Converter Page
 
@@ -314,8 +327,8 @@ Frontend unit tests are written with **Vitest 4.1.9**, `@vue/test-utils 2.4.11`,
 
 **Tested files:**
 
-- `frontend/src/views/Settings.test.ts` — auto-save, debounce, blur logic, success/error toast, clear-token behaviour.
-- `frontend/src/views/PurlResolver.test.ts` — resolve flow, details toggle, ApiError and network errors.
+- `frontend/src/views/Settings.test.ts` — auto-save, debounce, blur logic, success/error toast, clear-token behaviour, and source archive timeout/concurrency inputs.
+- `frontend/src/views/PurlResolver.test.ts` — resolve flow, details toggle, ApiError and network errors; source archive mode checkbox, `find_source_archive` request flag, conditional archive columns, and `exact`/`near`/`repository_only`/`not_found`/`no_version` badges.
 - `frontend/src/views/SbomUpdater.test.ts` — ignore-patterns editor (add/remove/save), process flow, AbortSignal passed to `resolveSbom`.
 - `frontend/src/views/SbomFixer.test.ts` — option loading and fallback warning, master/indeterminate checkboxes, select/clear all, license card (master and pattern editor add/remove/disable/gating), provided_by editor (Astra default row, load/add/remove, disabled while off, values kept on toggle, normalization and incomplete-row dropping, sent on save and fix, reset restores the Astra row), PURL case selector (default enabled with `sbom_checker`, radios disabled while the rule is off, selected mode saved and sent on fix, reset restores `sbom_checker`, help panel describes both modes), pattern normalization on save and fix, reset defaults, save/reset status, spec-version and manufacturer input gating, analysis flow (analyze, unchecked candidates, keep-list filtering), candidate select/clear all, `remove_fields` on fix, read-only FSTEC list, new-file reset, catalog-failure degradation, fix flow, statistics (including `field` rows) and issues spoilers, issue-label fallback, downloads (`jsonIndent` fallback to 4), `ApiError` and network errors.
 - `frontend/src/views/sbomFixerRules.test.ts` — 16-rule catalog (`BASE_RULES` 5 + `COMPONENTS_RULES` 8 + `LICENSES_RULES` 3, unique ids), base group starts with the merged `reorder` rule, removed rule ids absent, `components.lowercase_purl` present and positioned after the three leaf-removal rules, `components.add_provided_by` present and positioned after `fill_missing_gost_properties`, valid before/after JSON examples, labels and help texts present in both locales.

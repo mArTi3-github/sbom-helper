@@ -13,17 +13,21 @@ All API endpoints are served from the root path. No version prefix in the base U
 
 ### `POST /api/v1/resolve/batch`
 
-Resolve one or more PURLs to their repository URLs. Returns one result row per input PURL, in input order.
+Resolve one or more PURLs to their repository URLs. Returns one result row per input PURL, in input order. Optionally returns a source archive download link for the version named in each PURL.
 
 #### Request
 
 ```json
 {
-  "purls": ["pkg:pypi/requests@2.31.0", "pkg:pypi/flask@3.0.0"]
+  "purls": ["pkg:pypi/requests@2.31.0", "pkg:pypi/flask@3.0.0"],
+  "find_source_archive": false,
+  "force_refresh": false
 }
 ```
 
 - `purls`: required, non-empty list of strings (1 to `batch_max_items` items, configurable in settings, default 100).
+- `find_source_archive`: optional boolean, default `false`. When `true`, each error-free row receives the `source_archive_*` fields; when `false`, no archive lookup runs and those fields keep their null/empty defaults.
+- `force_refresh`: optional boolean, default `false`. When `true` together with `find_source_archive: true`, the `purl_source_archives` cache is bypassed for the request and archive lookups are recomputed; the versionless repository cache is still used. Ignored when `find_source_archive` is `false`.
 - Each item's `purl` field in the response contains the original input string (with version), not the normalized form.
 
 #### Success Response (200)
@@ -38,7 +42,18 @@ Resolve one or more PURLs to their repository URLs. Returns one result row per i
       "resolver": "purl2repo",
       "found_by": "resolver",
       "resolved_at": "2026-05-31T12:00:00Z",
-      "error": null
+      "error": null,
+      "source_archive_url": null,
+      "source_archive_commit_url": null,
+      "source_archive_commit_sha": null,
+      "source_archive_match": null,
+      "source_archive_reason": null,
+      "source_archive_ref": null,
+      "source_archive_ref_type": null,
+      "source_archive_matched_version": null,
+      "source_archive_resolver": "",
+      "source_archive_cached": false,
+      "source_archive_resolved_at": ""
     },
     {
       "purl": "pkg:pypi/obscure-package@0.1.0",
@@ -47,7 +62,18 @@ Resolve one or more PURLs to their repository URLs. Returns one result row per i
       "resolver": "",
       "found_by": "",
       "resolved_at": "",
-      "error": null
+      "error": null,
+      "source_archive_url": null,
+      "source_archive_commit_url": null,
+      "source_archive_commit_sha": null,
+      "source_archive_match": null,
+      "source_archive_reason": null,
+      "source_archive_ref": null,
+      "source_archive_ref_type": null,
+      "source_archive_matched_version": null,
+      "source_archive_resolver": "",
+      "source_archive_cached": false,
+      "source_archive_resolved_at": ""
     }
   ]
 }
@@ -57,6 +83,58 @@ Each row is one of:
 - **Resolved** — `repository_url` set, `error` is `null`.
 - **Unresolved** — `repository_url` is `null`, `error` is `null`, warnings explain why.
 - **Error** — `error` contains an error code (`invalid_purl`, `upstream_error`), `repository_url` is `null`. A single invalid PURL does not fail the whole request.
+
+With `find_source_archive: false`, every `source_archive_*` field is `null`, `""`, or `false` as shown.
+
+#### Success Response (200) — source archive mode
+
+Request:
+
+```json
+{
+  "purls": ["pkg:github/ClickHouse/ClickHouse@23.8.16.40"],
+  "find_source_archive": true,
+  "force_refresh": false
+}
+```
+
+Row for that PURL:
+
+```json
+{
+  "purl": "pkg:github/ClickHouse/ClickHouse@23.8.16.40",
+  "repository_url": "https://github.com/ClickHouse/ClickHouse",
+  "warnings": ["Multiple exact tags matched; chose 'v23.8.16.40-lts'"],
+  "resolver": "purl2repo",
+  "found_by": "resolver",
+  "resolved_at": "2026-11-17T12:00:00Z",
+  "error": null,
+  "source_archive_url": "https://github.com/ClickHouse/ClickHouse/archive/refs/tags/v23.8.16.40-lts.tar.gz",
+  "source_archive_commit_url": "https://github.com/ClickHouse/ClickHouse/archive/e143a9039ba36ad0c25f2ed85503f36e88f61063.tar.gz",
+  "source_archive_commit_sha": "e143a9039ba36ad0c25f2ed85503f36e88f61063",
+  "source_archive_match": "exact",
+  "source_archive_reason": null,
+  "source_archive_ref": "v23.8.16.40-lts",
+  "source_archive_ref_type": "tag",
+  "source_archive_matched_version": "23.8.16.40",
+  "source_archive_resolver": "git-tags",
+  "source_archive_cached": false,
+  "source_archive_resolved_at": "2026-11-17T12:00:00Z"
+}
+```
+
+- `source_archive_url`: main tag archive URL; `null` for `repository_only`, `not_found`, and `no_version`.
+- `source_archive_match`: one of `exact`, `near`, `repository_only`, `not_found`, `no_version`.
+- `source_archive_reason`: stable reason code, `null` for `exact`/`near`. Precedence: `no_version`, `non_numeric_version`, `no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag`.
+- `source_archive_ref`: matched tag name; `null` when no tag was selected.
+- `source_archive_ref_type`: `"tag"` when a tag was matched, otherwise `null`.
+- `source_archive_matched_version`: numeric version of the matched tag; differs from the PURL version for `near`.
+- `source_archive_commit_url` / `source_archive_commit_sha`: commit archive URL and its 40-hex path segment, present when `git ls-remote` yielded a SHA for the matched tag.
+- `source_archive_resolver`: `"git-tags"` for archive results.
+- `source_archive_cached`: `true` when the row came from `purl_source_archives` without a git/HEAD call.
+- `source_archive_resolved_at`: time the archive result was stored or computed.
+
+Rows with a per-row `error` keep all `source_archive_*` fields at their null/empty defaults. Archive lookup failures are per-row statuses and never change the HTTP status of the request. Cached archive rows are returned with an empty archive portion of `warnings`, because archive warnings are not persisted.
 
 #### Error Response (400) — too many PURLs
 
@@ -465,6 +543,8 @@ Return current application settings.
   "llm_resolver_model": null,
   "llm_resolver_attempts_count": 2,
   "llm_resolver_timeout": 60.0,
+  "source_archive_timeout": 30.0,
+  "source_archive_concurrency": 5,
   "token_set": {
     "librariesio_api_key": false,
     "ecosystems_api_key": false,
@@ -496,6 +576,8 @@ Return current application settings.
 - `llm_resolver_model`: string|null — LLM model name
 - `llm_resolver_attempts_count`: integer — attempts per PURL (1–10, default: `2`)
 - `llm_resolver_timeout`: number — request timeout in seconds (1–600, default: `60`)
+- `source_archive_timeout`: number — timeout in seconds for `git ls-remote` and the archive HEAD check (1–300, default: `30.0`)
+- `source_archive_concurrency`: integer — maximum concurrent source archive lookups per batch request (1–50, default: `5`)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
 - `token_set.ecosystems_api_key`: boolean — whether an ecosyste.ms API key is configured
 - `token_set.llm_resolver_api_key`: boolean — whether an LLM API key is configured
@@ -545,6 +627,8 @@ All fields optional. Only provided fields are updated.
 - `llm_resolver_model`: optional string — LLM model name.
 - `llm_resolver_attempts_count`: optional int — attempts per PURL (1–10).
 - `llm_resolver_timeout`: optional float — LLM request timeout in seconds (1–600).
+- `source_archive_timeout`: optional float — timeout in seconds for `git ls-remote` and the archive HEAD check (1–300).
+- `source_archive_concurrency`: optional int — maximum concurrent source archive lookups per batch request (1–50).
 
 #### Response (200)
 
@@ -862,6 +946,9 @@ Standard FastAPI/Pydantic 422 response.
 | Invalid PURL format (application-level validation) | 400 | `invalid_purl` |
 | Unsupported ecosystem (resolver returns no result) | 200 | — (`repository_url: null`, `warnings` populated) |
 | Valid PURL, no repository found | 200 | — (`repository_url: null`) |
+| Source archive lookup: any archive reason (`no_repository`, `unsupported_host`, `git_error`, `archive_check_failed`, `no_matching_tag`, `non_numeric_version`) | 200 | — (`source_archive_match` / `source_archive_reason` per row) |
+| Source archive lookup: PURL without version | 200 | — (`source_archive_match: "no_version"`, `source_archive_reason: "no_version"`) |
+| Source archive lookup on a row that already has a per-row error | 200 | — (archive fields stay `null`, original row error unchanged) |
 | purl2repo network/timeout error | 502 | `upstream_error` |
 | Empty purl string | 422 | (Pydantic validation) |
 | PURL not found on PATCH | 404 | `purl_not_found` |

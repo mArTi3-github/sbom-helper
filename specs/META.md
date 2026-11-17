@@ -26,7 +26,8 @@ specs/
     ├── 0005-ecosyste-ms-as-fallback-resolver.md  # ecosyste.ms as fallback resolver
     ├── 0006-async-first-resolver-architecture.md # Async-first resolver architecture
     ├── 0007-depsdev-as-fallback-resolver.md      # deps.dev as fallback resolver
-    └── 0008-llm-as-last-resort-resolver.md       # LLM as last-resort resolver
+    ├── 0008-llm-as-last-resort-resolver.md       # LLM as last-resort resolver
+    └── 0009-source-archive-links.md              # Source archive links for PURL versions
 ```
 
 ## How to Use

@@ -55,6 +55,11 @@
 |  |    .resolve_purl()          |                   |
 |  |    .resolve_batch()         |                   |
 |  |    .store_preexisting_refs()|                   |
+|  |                             |                   |
+|  |  SourceArchiveService       |                   |
+|  |  source_archive/service.py  |                   |
+|  |    .lookup()                |                   |
+|  |    .enrich_many()           |                   |
 |  +----+--------------------+---+                   |
 |       |                    |                       |
 |       | Python call        | Python call           |
@@ -253,11 +258,13 @@
 - **API Layer (routes/)** imports **SBOM Module** (`sbom/images_list_converter.py`) for the images list conversion endpoint
 - **API Layer (routes/sbom_fix.py)** imports **SBOM Module** (`sbom/fixer.py`, `sbom/optional_fields.py`, `sbom/parser.py`) and **Config Layer** (`sbom_settings`); accesses the **SBOM Fix Options Store** only through `request.app.state.sbom_fix_options_store` (never imports the store module directly)
 - **Service Layer** imports **PURL Utils Layer** (`purl_utils/`), **Storage Layer** (`storage/interface.py`), **Resolver Layer** (`resolver/interface.py`), **URL Validator** (`url_validator.py`), **Validation Service** (`validation_service.py`), and **SBOM Module** (`sbom/`); exports `PurlResolutionService` class with constructor injection (`storage`, `resolvers`, `settings_store`, `validation_service`); exposes `settings_store` and `validation_service` as read-only properties for downstream consumers; dependencies are declared once in `__init__` instead of passed to every method; methods accept optional `resolver` parameter to tag stored records with their origin (e.g. `"import-sbom"`, `"import-csv"`); `resolve_batch()` uses `batch_semaphore_limit` from `AppSettings` for concurrency control
+- **Source Archive Service** (`source_archive/`) is a separate service module: `service.py` (`SourceArchiveService`) imports **PURL Utils Layer** (`purl_utils.validate`, `normalize_with_version`), **Settings Store** (`SettingsStore`), **Source Archive Storage** (`storage/source_archive.py`), its own `git_tags.py`, `github.py`, and `matching.py`, and the process helpers from **URL Validator** (`url_validator.py`); it does not import `PurlResolutionService` and does not use the resolver chain
+- **API Layer (routes/resolve.py)** accesses **Source Archive Service** through `request.app.state.source_archive_service`; it passes archive results to response models and derives `source_archive_commit_sha` from the commit archive URL
 - **SBOM Enrichment Pipeline** (`sbom_enrichment.py`) imports **Service Layer** (`PurlResolutionService`), **SBOM Module** (`sbom/`), and **PURL Utils Layer** (`purl_utils/`); receives only `PurlResolutionService` via constructor injection, accessing `settings_store` and `validation_service` through its properties
 - **SBOM Module** imports **PURL Utils Layer** for normalization and PURL case handling; does not import Storage or Resolver directly. `sbom/fixer.py` is a pure transformation module: it imports the standard library, Pydantic, `purl_utils` (`validate`, `case_rules`), and `optional_fields`, with no imports from Storage, Resolver, database, API schemas, or the parser. `sbom/optional_fields.py` imports only the standard library (`re`, `dataclasses`, `typing`) and has no dependency on `fixer.py`, Storage, Resolver, or the parser; `fixer.py` imports `optional_fields` (catalog/grammar/analysis/removal) but `optional_fields` never imports `fixer`
 - **SBOM Fix Options Store** (`sbom_fix_options_store.py`) imports `SbomFixOptions` from `sbom/fixer.py` and provides JSON-file persistence only; it is instantiated in `main.py` as `app.state.sbom_fix_options_store`
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
-- **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert
+- **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert, `SourceArchiveRow`, and the `SourceArchiveStorage` ABC with `PostgresSourceArchiveStorage`/`InMemorySourceArchiveStorage` implementations
 - **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `DepsdevResolver` wraps the deps.dev v3 API (maven, npm, golang, pypi, nuget, cargo, gem; no API key). `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages. `LlmResolver` wraps an OpenAI-compatible chat API and is always added last.
 - **Resolver Layer** imports purl2repo, httpx, and `purl_utils`; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
@@ -274,6 +281,7 @@
 - Define HTTP endpoints (routes, methods, status codes) — split across `routes/resolve.py`, `routes/db_admin.py`, `routes/settings.py`, `routes/images_list.py`, `routes/ignore_patterns.py`, `routes/jobs.py`, `routes/sbom_fix.py`
 - Validate request input via Pydantic schemas
 - Delegate single PURL resolution to Service Layer (`service.resolve_purl()`)
+- Enrich batch rows with source archive links via `request.app.state.source_archive_service.enrich_many()` when `find_source_archive=true`; map results by row index and never fail the request on archive lookup errors
 - Delegate SBOM enrichment to `SbomEnrichmentPipeline` (`sbom_enrichment.py`) via async jobs (routes/jobs.py) — handles parsing, collection, deduplication, batch resolution, and enrichment
 - Delegate CSV parsing/rendering to csv_io module (`csv_io.parse_csv_import()`, `csv_io.render_csv_export()`)
 - Delegate DB admin operations to `DbAdminService` (`db_admin_service.list_purls()`, `db_admin_service.update_purl()`, `db_admin_service.list_resolvers()`, etc.) which wraps Storage Layer and CSV I/O
@@ -294,6 +302,21 @@
 - Map resolver `Resolution` to canonical `ResolveResponse` format (purl, repository_url, warnings, resolver, found_by, resolved_at); tag stored records with `resolver.name` (e.g. `"purl2repo"`, `"libraries.io"`)
 - Handle graceful degradation: if storage is unavailable, fall through to resolver
 - Log errors from storage without breaking the response
+
+### Source Archive Service (`source_archive/`)
+- `SourceArchiveService` class with constructor injection (`storage: SourceArchiveStorage`, `settings_store: SettingsStore`, `tag_fetcher`, `url_checker` with production defaults `fetch_tags`/`check_archive_url`)
+- `lookup(purl, repository_url, force_refresh=False) → SourceArchiveResult` — validates the PURL, builds the versioned cache key, reads/validates the archive cache, then runs GitHub parsing → `git ls-remote --tags` → deterministic exact/near matching → HEAD verification, persisting cacheable outcomes best-effort
+- `enrich_many(purls, repository_urls, force_refresh=False) → list[SourceArchiveResult]` — deduplicates identical `(cache key, repository_url)` pairs, preserves input order, and bounds concurrency with a semaphore from `source_archive_concurrency`
+- `matching.py` — `parse_version()`, `find_exact()`, `find_near()`: numeric-chain extraction, suffix normalization, exact-match priority, same-`major.minor` near selection; no LLM
+- `git_tags.py` — `fetch_tags()` runs `git ls-remote --tags` with prompt suppression, timeout, process tracking, 5 MB output and 50 000 tag limits; `parse_ls_remote()` handles lightweight and annotated (`^{}`) refs
+- `github.py` — `parse_github_repository()`, `tag_archive_url()`, `commit_archive_url()`, `check_archive_url()`: GitHub-only URL construction from validated owner/repo and 40-hex SHA, with redirected HEAD verification
+- Storage failures are logged and never break the returned result; archive failures surface as per-row match/reason values, not exceptions
+
+### Source Archive Storage (`storage/source_archive.py`)
+- `SourceArchiveRow` frozen dataclass mirrors one `purl_source_archives` row (purl, version, match_type, reason, archive URLs, matched ref/version, repository URL, resolver, resolved_at)
+- `SourceArchiveStorage` ABC exposes `lookup_archive(purl)` and `store_archive(row)` and is separate from the `Storage` protocol used for `resolved_purls`
+- `PostgresSourceArchiveStorage` uses asyncpg `SELECT`/`INSERT ... ON CONFLICT (purl) DO UPDATE`
+- `InMemorySourceArchiveStorage` keeps a PURL-keyed dictionary and is the fallback when PostgreSQL is unavailable; `main.py` selects the implementation together with the `resolved_purls` storage
 
 ### SBOM Enrichment Pipeline (`sbom_enrichment.py`)
 - Orchestrate the complete CycloneDX SBOM enrichment workflow in a single class
@@ -334,7 +357,7 @@
 - Dependencies: only `csv`, `io`, `json` from stdlib
 
 ### PURL Utils Layer (`purl_utils/`)
-- **`__init__.py`** — `validate(purl) → PurlComponents` (raises `PurlValidationError`), `normalize(components) → str`, `safe_normalize(purl) → str`
+- **`__init__.py`** — `validate(purl) → PurlComponents` (raises `PurlValidationError`), `normalize(components) → str`, `normalize_with_version(components) → str` (keeps `version`, drops qualifiers/subpath), `safe_normalize(purl) → str`
 - **`case_rules.py`** — `PurlCaseMode` (`"sbom_checker"` | `"purl_spec"`), the static purl-spec lowercase sets for `namespace`/`name`/`version`, the 10-type sbom-checker supplement over `packageurl.validate.DEFINITIONS_BY_TYPE`, the cached per-type flag map, and `lowercase_purl(purl, mode) → str | None`, which rebuilds only the permitted fields and preserves `qualifiers`/`subpath` verbatim (percent-encoded `/` stays `%2F`); returns `None` for an invalid PURL or when nothing changes
 - `safe_normalize` wraps `validate` + `normalize` with exception handling — returns the original purl string on any error
 - Validate PURL format using the official `packageurl-python` library
@@ -362,9 +385,9 @@
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, resolver toggles and API keys: librariesio/ecosyste.ms/depsdev/apk/llm, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, batch_max_items, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, resolver toggles and API keys: librariesio/ecosyste.ms/depsdev/apk/llm, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, batch_max_items, source_archive_timeout, source_archive_concurrency, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
-- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
+- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, source_archive_timeout: 1–300, source_archive_concurrency: 1–50, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
 - Graceful handling: missing file → create with defaults; corrupt JSON → log warning, return defaults
 
@@ -445,6 +468,8 @@
 - Calling purl2repo directly from the API Layer (must go through Service Layer)
 - Putting SBOM enrichment orchestration logic in `router.py` — use `SbomEnrichmentPipeline` instead
 - Storing state in the API Layer (the service is stateless by design)
+- Extending `resolved_purls` with versioned archive rows or columns — source archives use the separate `purl_source_archives` table and `SourceArchiveStorage`
+- Using the GitHub REST API or a GitHub token to list tags — source archive lookup uses `git ls-remote --tags`
 - Changing the canonical response format without updating contracts/api-contract.md
 - Running outside Docker for production deployment (development-only bare uvicorn)
 
