@@ -34,3 +34,24 @@ CREATE TABLE IF NOT EXISTS resolved_purls (
     resolver       TEXT NOT NULL,
     resolved_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Table for caching source archive link lookups by PURL.
+-- Auto-created on application startup via CREATE TABLE IF NOT EXISTS.
+
+CREATE TABLE IF NOT EXISTS purl_source_archives (
+    purl               TEXT PRIMARY KEY,
+    version            TEXT NOT NULL,
+    match_type         TEXT NOT NULL,
+    reason             TEXT,
+    archive_url        TEXT,
+    archive_url_commit TEXT,
+    matched_ref        TEXT,
+    matched_ref_type   TEXT,
+    matched_version    TEXT,
+    repository_url     TEXT,
+    resolver           TEXT NOT NULL,
+    resolved_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_purl_source_archives_match_type
+    ON purl_source_archives (match_type);
