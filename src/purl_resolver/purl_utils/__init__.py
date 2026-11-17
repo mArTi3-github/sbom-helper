@@ -45,6 +45,16 @@ def normalize(components: PurlComponents) -> str:
     return purl_obj.to_string()
 
 
+def normalize_with_version(components: PurlComponents) -> str:
+    purl_obj = PackageURL(
+        type=components.type,
+        namespace=components.namespace,
+        name=components.name,
+        version=components.version,
+    )
+    return purl_obj.to_string()
+
+
 def safe_normalize(purl: str) -> str:
     try:
         return normalize(validate(purl))
