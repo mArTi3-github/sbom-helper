@@ -363,3 +363,27 @@ class TestResolverChainRebuild:
         assert data["repository_url"] == "https://github.com/psf/requests"
         assert data["resolver"] == "llm"
         fake_llm.resolve.assert_awaited_once()
+
+
+class TestSourceArchiveSettings:
+    def test_get_settings_includes_source_archive_fields(self, client: TestClient) -> None:
+        data = client.get("/api/v1/settings").json()
+        assert data["source_archive_timeout"] == 30.0
+        assert data["source_archive_concurrency"] == 5
+
+    def test_patch_source_archive_settings(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        response = client.patch("/api/v1/settings", json={
+            "source_archive_timeout": 45.5,
+            "source_archive_concurrency": 8,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["source_archive_timeout"] == 45.5
+        assert data["source_archive_concurrency"] == 8
+
+    def test_patch_source_archive_settings_bounds(self, client: TestClient) -> None:
+        assert client.patch("/api/v1/settings", json={"source_archive_timeout": 0}).status_code == 422
+        assert client.patch("/api/v1/settings", json={"source_archive_timeout": 301}).status_code == 422
+        assert client.patch("/api/v1/settings", json={"source_archive_concurrency": 0}).status_code == 422
+        assert client.patch("/api/v1/settings", json={"source_archive_concurrency": 51}).status_code == 422

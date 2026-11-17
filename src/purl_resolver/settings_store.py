@@ -39,6 +39,8 @@ class AppSettings(BaseModel):
     llm_resolver_model: str | None = None
     llm_resolver_attempts_count: int = Field(default=2, ge=1, le=10)
     llm_resolver_timeout: float = Field(default=60.0, ge=1, le=600)
+    source_archive_timeout: float = Field(default=30.0, ge=1, le=300)
+    source_archive_concurrency: int = Field(default=5, ge=1, le=50)
 
     def log_level_as_int(self) -> int:
         return getattr(logging, self.log_level.upper(), logging.INFO)

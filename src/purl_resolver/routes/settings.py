@@ -56,6 +56,8 @@ class SettingsUpdate(BaseModel):
     llm_resolver_model: str | None = None
     llm_resolver_attempts_count: int | None = Field(None, ge=1, le=10)
     llm_resolver_timeout: float | None = Field(None, ge=1, le=600)
+    source_archive_timeout: float | None = Field(None, ge=1, le=300)
+    source_archive_concurrency: int | None = Field(None, ge=1, le=50)
 
 
 def _rebuild_resolvers(request: Request) -> None:
@@ -103,6 +105,8 @@ async def get_settings(request: Request) -> JSONResponse:
         "llm_resolver_model": app_settings.llm_resolver_model,
         "llm_resolver_attempts_count": app_settings.llm_resolver_attempts_count,
         "llm_resolver_timeout": app_settings.llm_resolver_timeout,
+        "source_archive_timeout": app_settings.source_archive_timeout,
+        "source_archive_concurrency": app_settings.source_archive_concurrency,
         "token_set": {
             "librariesio_api_key": app_settings.librariesio_api_key is not None,
             "ecosystems_api_key": app_settings.ecosystems_api_key is not None,
@@ -169,6 +173,8 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "llm_resolver_model": updated.llm_resolver_model,
         "llm_resolver_attempts_count": updated.llm_resolver_attempts_count,
         "llm_resolver_timeout": updated.llm_resolver_timeout,
+        "source_archive_timeout": updated.source_archive_timeout,
+        "source_archive_concurrency": updated.source_archive_concurrency,
         "token_set": {
             "librariesio_api_key": updated.librariesio_api_key is not None,
             "ecosystems_api_key": updated.ecosystems_api_key is not None,
