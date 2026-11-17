@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import httpx
 import pytest
 
@@ -8,6 +10,35 @@ from purl_resolver.source_archive.github import (
     parse_github_repository,
     tag_archive_url,
 )
+
+_ARCHIVE_URL = "https://github.com/x/y/archive/abc.tar.gz"
+
+
+def _redirect_handler(final_status: int) -> Callable[[httpx.Request], httpx.Response]:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "github.com":
+            return httpx.Response(
+                302, headers={"location": "https://codeload.github.com/x/y/tar.gz/abc"}
+            )
+        return httpx.Response(final_status)
+
+    return handler
+
+
+def _install_mock_client(
+    monkeypatch: pytest.MonkeyPatch,
+    handler: Callable[[httpx.Request], httpx.Response],
+) -> list[dict[str, object]]:
+    calls: list[dict[str, object]] = []
+
+    class MockClient(httpx.AsyncClient):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            calls.append(dict(kwargs))
+            kwargs["transport"] = httpx.MockTransport(handler)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", MockClient)
+    return calls
 
 
 def test_parse_github_repository_variants() -> None:
@@ -51,6 +82,30 @@ async def test_check_archive_url_follows_redirect() -> None:
         assert await check_archive_url(
             "https://github.com/x/y/archive/abc.tar.gz", 5, client=client
         )
+
+
+@pytest.mark.asyncio
+async def test_check_archive_url_default_client_follows_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _install_mock_client(monkeypatch, _redirect_handler(200))
+    assert await check_archive_url(_ARCHIVE_URL, 5)
+    assert calls[0]["follow_redirects"] is True
+
+
+@pytest.mark.asyncio
+async def test_check_archive_url_default_client_reports_failed_redirect_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_mock_client(monkeypatch, _redirect_handler(404))
+    assert not await check_archive_url(_ARCHIVE_URL, 5)
+
+
+@pytest.mark.asyncio
+async def test_check_archive_url_follows_redirects_with_plain_client() -> None:
+    transport = httpx.MockTransport(_redirect_handler(404))
+    async with httpx.AsyncClient(transport=transport) as client:
+        assert not await check_archive_url(_ARCHIVE_URL, 5, client=client)
 
 
 @pytest.mark.asyncio

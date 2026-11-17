@@ -61,7 +61,7 @@ async def check_archive_url(
 
 async def _head_ok(client: httpx.AsyncClient, url: str, timeout: float) -> bool:
     try:
-        response = await client.head(url, timeout=timeout)
+        response = await client.head(url, timeout=timeout, follow_redirects=True)
     except httpx.HTTPError:
         return False
     return response.status_code < 400
