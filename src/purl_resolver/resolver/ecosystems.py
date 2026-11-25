@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -14,6 +15,21 @@ logger = logging.getLogger(__name__)
 
 _API_URL = "https://packages.ecosyste.ms/api/v1/packages/lookup"
 
+_GITHUB_DOMAIN = "github.com"
+_ECOSYSTEMS_REPOS_DOMAIN = "repos.ecosyste.ms"
+
+
+def _hostname(url: str) -> str:
+    try:
+        return (urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _is_domain(url: str, domain: str) -> bool:
+    host = _hostname(url)
+    return host == domain or host.endswith("." + domain)
+
 
 def select_repository_url(package_data: dict) -> str | None:
     candidates = [
@@ -23,13 +39,13 @@ def select_repository_url(package_data: dict) -> str | None:
     ]
 
     for url in candidates:
-        if not url or "repos.ecosyste.ms" in url:
+        if not url or _is_domain(url, _ECOSYSTEMS_REPOS_DOMAIN):
             continue
-        if "github.com" in url:
+        if _is_domain(url, _GITHUB_DOMAIN):
             return url
 
     for url in candidates:
-        if url and "repos.ecosyste.ms" not in url:
+        if url and not _is_domain(url, _ECOSYSTEMS_REPOS_DOMAIN):
             return url
 
     return None

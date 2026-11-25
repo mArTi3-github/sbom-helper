@@ -31,6 +31,39 @@ class TestSelectRepositoryUrl:
         data = {"repository_url": "https://gitlab.com/foo/bar", "homepage": "https://github.com/foo/bar"}
         assert select_repository_url(data) == "https://github.com/foo/bar"
 
+    def test_github_substring_in_query_is_not_github(self) -> None:
+        data = {
+            "repository_url": "https://example.com/redirect?url=https://github.com/foo/bar",
+            "homepage": "https://github.com/foo/bar",
+        }
+        assert select_repository_url(data) == "https://github.com/foo/bar"
+
+    def test_github_lookalike_host_is_not_github(self) -> None:
+        data = {
+            "repository_url": "https://github.com.evil.example/foo/bar",
+            "homepage": "https://github.com/foo/bar",
+        }
+        assert select_repository_url(data) == "https://github.com/foo/bar"
+
+    def test_github_subdomain_is_github(self) -> None:
+        data = {"repository_url": "https://gist.github.com/foo/bar"}
+        assert select_repository_url(data) == "https://gist.github.com/foo/bar"
+
+    def test_github_host_is_case_insensitive(self) -> None:
+        data = {"repository_url": "https://gitlab.com/foo/bar", "homepage": "https://GitHub.com/foo/bar"}
+        assert select_repository_url(data) == "https://GitHub.com/foo/bar"
+
+    def test_repos_ecosyste_ms_substring_is_not_skipped(self) -> None:
+        data = {
+            "repository_url": "https://example.com/repos.ecosyste.ms",
+            "homepage": "https://other.example",
+        }
+        assert select_repository_url(data) == "https://example.com/repos.ecosyste.ms"
+
+    def test_invalid_url_does_not_raise(self) -> None:
+        data = {"repository_url": "https://example.com/repo", "homepage": "https://[broken"}
+        assert select_repository_url(data) == "https://example.com/repo"
+
     def test_empty_data_returns_none(self) -> None:
         assert select_repository_url({}) is None
 
