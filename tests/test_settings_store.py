@@ -197,6 +197,23 @@ class TestLlmResolverSettings:
         with pytest.raises(Exception):
             AppSettings(llm_resolver_timeout=601)
 
+    def test_tls_defaults(self) -> None:
+        s = AppSettings()
+        assert s.llm_resolver_verify_ssl is True
+        assert s.llm_resolver_ca_bundle is None
+
+    def test_tls_roundtrip(self, tmp_path: Path) -> None:
+        store = SettingsStore(path=tmp_path / "settings.json")
+        settings = store.load()
+        updated = settings.model_copy(update={
+            "llm_resolver_verify_ssl": False,
+            "llm_resolver_ca_bundle": "/etc/ssl/corp-ca.pem",
+        })
+        store.save(updated)
+        loaded = store.load()
+        assert loaded.llm_resolver_verify_ssl is False
+        assert loaded.llm_resolver_ca_bundle == "/etc/ssl/corp-ca.pem"
+
 
 class TestSettingsStoreCache:
 
