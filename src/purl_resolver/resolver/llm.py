@@ -158,7 +158,14 @@ class LlmResolver(Resolver):
             )
             return completion.choices[0].message.content, None
         except (APIError, httpx.HTTPError) as exc:
-            reason = f"LLM request failed ({type(exc).__name__}: {exc})"
+            cause = exc.__cause__ or exc.__context__
+            if cause is not None and cause is not exc:
+                reason = (
+                    f"LLM request failed ({type(exc).__name__}: {exc}; "
+                    f"caused by {type(cause).__name__}: {cause})"
+                )
+            else:
+                reason = f"LLM request failed ({type(exc).__name__}: {exc})"
             logger.warning("%s", reason)
             return None, reason
 

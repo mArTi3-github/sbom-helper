@@ -139,7 +139,7 @@ Key settings available in the web UI (`/settings`):
 
 Additional settings (URL validation timeout, retry config, batch concurrency, batch size limit, job TTL, log level, connectivity checks) are available in the Settings UI.
 
-For an internal LLM endpoint whose certificate is signed by a corporate CA, set the LLM resolver's `CA bundle path` to a mounted PEM file containing the root/intermediate CA; the `Verify TLS certificate` toggle can be turned off only as a temporary fallback.
+For an internal LLM endpoint whose certificate is signed by a corporate CA, set the LLM resolver's `CA bundle path` to a mounted PEM file containing the root/intermediate CA; the `Verify TLS certificate` toggle can be turned off only as a temporary fallback. Setting a CA bundle makes httpx trust ONLY that bundle (it replaces, rather than augments, the default system trust store), so a public endpoint would then fail verification unless its CA is also included in the bundle.
 
 **Browser-only settings:** language (English/Russian) and UI theme (light/dark) are stored locally per user.
 

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from openai import APIError
+from openai import APIConnectionError, APIError
 
 from purl_resolver.resolver.llm import LlmResolver, _build_ssl_verify
 
@@ -446,7 +446,11 @@ class TestTlsConfiguration:
     @pytest.mark.asyncio
     async def test_connection_error_reason_surfaces_in_warnings(self) -> None:
         resolver, create, _ = make_llm_resolver(attempts_count=1)
-        create.side_effect = httpx.ConnectError("CERTIFICATE_VERIFY_FAILED self-signed certificate")
+        err = APIConnectionError(request=MagicMock(), message="Connection error.")
+        err.__cause__ = httpx.ConnectError(
+            "CERTIFICATE_VERIFY_FAILED self-signed certificate"
+        )
+        create.side_effect = err
         result = await resolver.resolve(_PURL)
         assert result.repository_url is None
         assert any("CERTIFICATE_VERIFY_FAILED" in w for w in result.warnings)
