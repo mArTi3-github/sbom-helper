@@ -39,12 +39,13 @@ A web application and API service for enriching and validating CycloneDX SBOMs w
 git clone https://github.com/mArTi3-github/sbom-helper.git
 cd sbom-helper
 cp .env.example .env
-# Generate a one-time SearXNG secret and store it in .env:
+# For a manual `docker compose up`, set a non-empty SearXNG secret first.
+# `scripts/update.sh` generates it automatically if missing.
 sed -i "s/^SEARXNG_SECRET=.*/SEARXNG_SECRET=$(openssl rand -hex 32)/" .env
 docker compose up -d
 ```
 
-`docker compose up -d` starts the `app`, `db`, and `searxng` services. `docker compose up` refuses to start without a non-empty `SEARXNG_SECRET` (set it in `.env`); generate it once and keep it in `.env`.
+`docker compose up -d` starts the `app`, `db`, and `searxng` services. `scripts/update.sh` auto-generates `SEARXNG_SECRET` in `.env` when it is missing or empty. If you start the stack manually with `docker compose`, set a non-empty `SEARXNG_SECRET` first; otherwise the `searxng` service cannot start (the `app` and `db` services still do).
 
 The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
 
@@ -56,7 +57,7 @@ The app reaches SearXNG over that internal URL; no API key or external search se
 
 ### Upgrade note
 
-`docker compose up` now requires a non-empty `SEARXNG_SECRET` for all deployments, even when the LLM resolver is disabled, because the `searxng` service is always part of the compose stack. The SearXNG image tag is `searxng/searxng:latest` and is intentionally unpinned; it may change behavior between restarts.
+The `searxng` service is always part of the compose stack, so the stack needs a non-empty `SEARXNG_SECRET` even when the LLM resolver is disabled. Existing deployments upgrading via `scripts/update.sh` get it generated automatically (added to `.env` if missing); manual `docker compose` users must set it themselves. The SearXNG image tag is `searxng/searxng:latest` and is intentionally unpinned; it may change behavior between restarts.
 
 ### Viewing logs
 
@@ -222,7 +223,7 @@ The LLM resolver's `web_fetch` tool makes outbound requests to URLs proposed by 
 - Response bodies are capped at 512 KiB and each request has a 15-second timeout; only visible text (at most 8000 characters) is returned to the model.
 - Fetches use a separate HTTP client with default TLS verification, independent of the LLM endpoint's `Verify TLS certificate` / `CA bundle path` settings.
 
-The `searxng` service is not exposed outside the compose network and has no published port. Its `SEARXNG_SECRET` must be set in `.env`.
+The `searxng` service is not exposed outside the compose network and has no published port. Its `SEARXNG_SECRET` is auto-generated into `.env` by `scripts/update.sh` (set it manually before a manual `docker compose up`).
 
 ## Planned Features
 

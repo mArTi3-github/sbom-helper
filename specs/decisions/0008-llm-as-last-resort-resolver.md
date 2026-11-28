@@ -26,7 +26,7 @@ Add `LlmResolver` as the last resolver in the chain, enabled only when the user 
 
 - Long-tail PURLs may now resolve when an LLM endpoint is configured, using real web search instead of the model's memory
 - Search is performed from the sbom-helper host through a locally deployed SearXNG instance, so no external search API key is required
-- SearXNG becomes a runtime dependency of the compose deployment: it ships as a separate compose service with no published port, and its `SEARXNG_SECRET` must be set in `.env`. When the app runs outside compose (bare `.venv`), `web_search` returns an error to the model and resolution degrades to the model's own knowledge instead of failing
+- SearXNG becomes a runtime dependency of the compose deployment: it ships as a separate compose service with no published port, and its `SEARXNG_SECRET` is auto-generated into `.env` by `scripts/update.sh` (or set manually). When the app runs outside compose (bare `.venv`), `web_search` returns an error to the model and resolution degrades to the model's own knowledge instead of failing
 - Per-PURL latency increases when the LLM is reached: tool-calling rounds are bounded by `llm_resolver_max_tool_rounds` (at most `max_tool_rounds + 1` model calls per attempt), and exhausting the limit stops further attempts
 - `web_fetch` is an SSRF-sensitive capability: it accepts only `http(s)`, blocks private/reserved destination IPs on every redirect hop, and caps response size and time; fetched page content is untrusted, so acceptance still depends on the JSON schema check and the HEAD verification
 - `web_fetch` uses a separate HTTP client with default TLS verification; `llm_resolver_verify_ssl` and `llm_resolver_ca_bundle` keep applying to the LLM endpoint only
