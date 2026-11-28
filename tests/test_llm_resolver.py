@@ -1,18 +1,40 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+import ssl
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from openai import APIError
 
-from purl_resolver.resolver.llm import LlmResolver
+from purl_resolver.resolver.llm import LlmResolver, _build_ssl_verify
 
 _BASE_URL = "https://api.example.com"
 _API_KEY = "test-key"
 _MODEL = "test-model"
 _PURL = "pkg:pypi/requests@2.31.0"
+
+_TEST_CA_PEM = """-----BEGIN CERTIFICATE-----
+MIIDBTCCAe2gAwIBAgIUOVjTn3UjbzM9+V12JP+mDSIYdMQwDQYJKoZIhvcNAQEL
+BQAwEjEQMA4GA1UEAwwHdGVzdC1jYTAeFw0yNjExMjgxMTU4NDJaFw0zNjExMjUx
+MTU4NDJaMBIxEDAOBgNVBAMMB3Rlc3QtY2EwggEiMA0GCSqGSIb3DQEBAQUAA4IB
+DwAwggEKAoIBAQDAHmd2osRANdzgT1lPITOKQYLsMwFhiXytRMrkWhJcQSTiRNdC
+8xIBiIl+rWbWyHDRxM+ERGg1jfHO/jjDKw6mf+KsRVuGSnfqjKgS8OojpuYDbHWb
+ohZbkkcF9FhriC6L13OcFp6Qo+DjVHrJf16dUe0/QP0rfDVuFBmqRLwER+7VEW3E
+Lel9SOyoKOeaxhCdJ2CRUaYUR4Ms1tad50esiNb8CwzFe6Xsoxk6ATYOUD45Cjh6
+kg6x0ZhZntxNv6TKC7cr2pzEy6FuDEWv8CQQlDjUVEhpJhmJOZcJdl0bp97Ob5yT
+SFeDnmscYOIci+cjnyS8ydKdV+3UwPHhvRIDAgMBAAGjUzBRMB0GA1UdDgQWBBS3
+XwBW8V5ArDAYofilBYnsua+/9TAfBgNVHSMEGDAWgBS3XwBW8V5ArDAYofilBYns
+ua+/9TAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAJUH6ncrcw
+IIrPLpAo/UXcr2dIs+cf4b4JtvNfuM0Q5My5xUOMwo387xcX6HH2bjuBbP/2YHja
+oKdG2NAxBaMRhvvhQqkY63Y19C5r3wVT/fyC3pmcvtXg4p0nSW77v9t1N6Kj6SPY
+cm+s5F8Xzj9I5v9U8lzksKmXh0r98CVhTalHI6bq2hBaaAlBQWdSj7/s7oxDG2/i
+QhTdJzTKWSEjupIgo6neGUKsE+2ti7BE5RG4qinRlTDEkIStxAAizk3L75PO3FQV
+eoFy088URbNmOBq/FilIrFyGfnKXY/FFjhdGMD6d+NhkqOomY2ttcrUXrwvyYHd7
+ISDO4sIiueAz
+-----END CERTIFICATE-----
+"""
 
 
 def make_completion(content: str) -> MagicMock:
@@ -121,7 +143,13 @@ class TestResponseValidation:
     @pytest.mark.asyncio
     async def test_purl_mismatch_retries_and_succeeds(self) -> None:
         resolver, create, _ = make_llm_resolver(attempts_count=2)
-        bad = json.dumps({"purl": "pkg:pypi/other", "status": "success", "repository_url": "https://github.com/x"})
+        bad = json.dumps(
+            {
+                "purl": "pkg:pypi/other",
+                "status": "success",
+                "repository_url": "https://github.com/x",
+            }
+        )
         set_response(create, [bad, success_json("pkg:pypi/requests@2.31.0")])
         result = await resolver.resolve("pkg:pypi/requests@2.31.0")
         assert result.repository_url == "https://github.com/psf/requests"
@@ -130,7 +158,13 @@ class TestResponseValidation:
     @pytest.mark.asyncio
     async def test_purl_mismatch_exhausts_attempts(self) -> None:
         resolver, create, _ = make_llm_resolver(attempts_count=2)
-        bad = json.dumps({"purl": "pkg:pypi/other", "status": "success", "repository_url": "https://github.com/x"})
+        bad = json.dumps(
+            {
+                "purl": "pkg:pypi/other",
+                "status": "success",
+                "repository_url": "https://github.com/x",
+            }
+        )
         set_response(create, [bad, bad])
         result = await resolver.resolve("pkg:pypi/requests@2.31.0")
         assert result.repository_url is None
@@ -148,7 +182,9 @@ class TestResponseValidation:
     @pytest.mark.asyncio
     async def test_invalid_status_value_is_rejected(self) -> None:
         resolver, create, _ = make_llm_resolver(attempts_count=1)
-        content = json.dumps({"purl": _PURL, "status": "maybe", "repository_url": "https://github.com/x"})
+        content = json.dumps(
+            {"purl": _PURL, "status": "maybe", "repository_url": "https://github.com/x"}
+        )
         set_response(create, [content])
         result = await resolver.resolve("pkg:pypi/requests@2.31.0")
         assert result.repository_url is None
@@ -242,6 +278,7 @@ class TestLogging:
     @pytest.mark.asyncio
     async def test_attempts_are_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         import logging
+
         resolver, create, _ = make_llm_resolver(attempts_count=2, status_codes=[404, 200])
         set_response(create, [success_json(_PURL), success_json(_PURL)])
         with caplog.at_level(logging.INFO, logger="purl_resolver.resolver.llm"):
@@ -252,6 +289,7 @@ class TestLogging:
     @pytest.mark.asyncio
     async def test_failure_reason_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         import logging
+
         resolver, create, _ = make_llm_resolver(attempts_count=1)
         set_response(create, ["not json at all"])
         with caplog.at_level(logging.WARNING, logger="purl_resolver.resolver.llm"):
@@ -343,3 +381,51 @@ class TestFactory:
         with caplog.at_level(logging.INFO, logger="purl_resolver.resolver.factory"):
             build_resolvers(Settings(), app_settings)
         assert any("LLM resolver added as the last resolver" in m for m in caplog.messages)
+
+
+class TestTlsConfiguration:
+    def test_default_verification_is_true(self) -> None:
+        assert _build_ssl_verify(True, None) is True
+
+    def test_verify_disabled_returns_cert_none_context(self) -> None:
+        ctx = _build_ssl_verify(False, None)
+        assert isinstance(ctx, ssl.SSLContext)
+        assert ctx.verify_mode == ssl.CERT_NONE
+
+    def test_verify_disabled_ignores_ca_bundle(self) -> None:
+        ctx = _build_ssl_verify(False, "/etc/ssl/corp-ca.pem")
+        assert isinstance(ctx, ssl.SSLContext)
+        assert ctx.verify_mode == ssl.CERT_NONE
+
+    def test_empty_ca_bundle_is_unset(self) -> None:
+        assert _build_ssl_verify(True, "") is True
+
+    def test_ca_bundle_loaded_returns_context(self, tmp_path) -> None:
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_text(_TEST_CA_PEM)
+        ctx = _build_ssl_verify(True, str(ca_file))
+        assert isinstance(ctx, ssl.SSLContext)
+        assert len(ctx.get_ca_certs()) >= 1
+
+    def test_missing_ca_bundle_falls_back_and_warns(self, caplog: pytest.LogCaptureFixture) -> None:
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="purl_resolver.resolver.llm"):
+            assert _build_ssl_verify(True, "/nonexistent/ca.pem") is True
+        assert any("CA bundle" in m for m in caplog.messages)
+
+    def test_client_created_with_max_retries_zero(self) -> None:
+        with patch("purl_resolver.resolver.llm.AsyncOpenAI") as client_cls:
+            LlmResolver(base_url=_BASE_URL, api_key=_API_KEY, model=_MODEL)
+        kwargs = client_cls.call_args.kwargs
+        assert kwargs["max_retries"] == 0
+        assert "http_client" in kwargs
+
+    @pytest.mark.asyncio
+    async def test_connection_error_reason_surfaces_in_warnings(self) -> None:
+        resolver, create, _ = make_llm_resolver(attempts_count=1)
+        create.side_effect = httpx.ConnectError("CERTIFICATE_VERIFY_FAILED self-signed certificate")
+        result = await resolver.resolve(_PURL)
+        assert result.repository_url is None
+        assert any("CERTIFICATE_VERIFY_FAILED" in w for w in result.warnings)
+        assert any("ConnectError" in w for w in result.warnings)

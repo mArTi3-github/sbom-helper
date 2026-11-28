@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import ssl
 from urllib.parse import urlparse
 
 import httpx
@@ -35,8 +36,26 @@ _RETRY_FEEDBACK = (
 )
 
 
-class LlmResolver(Resolver):
+def _build_ssl_verify(verify_ssl: bool, ca_bundle: str | None) -> bool | ssl.SSLContext:
+    if not verify_ssl:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        logger.warning("LLM resolver: TLS certificate verification is disabled")
+        return context
+    if ca_bundle:
+        try:
+            return ssl.create_default_context(cafile=ca_bundle)
+        except OSError as exc:
+            logger.warning(
+                "LLM resolver: cannot load CA bundle %s (%s); falling back to default verification",
+                ca_bundle,
+                exc,
+            )
+    return True
 
+
+class LlmResolver(Resolver):
     def __init__(
         self,
         base_url: str,
@@ -44,14 +63,27 @@ class LlmResolver(Resolver):
         model: str,
         attempts_count: int = 2,
         timeout: float = 60.0,
+        verify_ssl: bool = True,
+        ca_bundle: str | None = None,
     ) -> None:
         self._base_url = base_url
         self._api_key = api_key
         self._model = model
         self._attempts_count = attempts_count
         self._timeout = timeout
-        self._client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
-        self._http_client = httpx.AsyncClient(timeout=timeout, follow_redirects=True)
+        self._verify = _build_ssl_verify(verify_ssl, ca_bundle)
+        self._client = AsyncOpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            timeout=timeout,
+            max_retries=0,
+            http_client=httpx.AsyncClient(
+                verify=self._verify, timeout=timeout, follow_redirects=True
+            ),
+        )
+        self._http_client = httpx.AsyncClient(
+            verify=self._verify, timeout=timeout, follow_redirects=True
+        )
 
     @property
     def name(self) -> str:
@@ -70,16 +102,18 @@ class LlmResolver(Resolver):
                 "role": "user",
                 "content": (
                     f"Find the source code repository for the package with PURL: {purl}\n"
-                    'Respond with the JSON object in the required format.'
+                    "Respond with the JSON object in the required format."
                 ),
             },
         ]
 
         for attempt in range(1, self._attempts_count + 1):
             logger.info("llm resolving %s (attempt %d/%d)", purl, attempt, self._attempts_count)
-            content = await self._request(messages)
+            content, error = await self._request(messages)
             if content is None:
-                self._record_failure(warnings, messages, attempt, purl, "LLM request failed")
+                self._record_failure(
+                    warnings, messages, attempt, purl, error or "LLM request failed"
+                )
                 continue
 
             repo_url, error = self._validate_response(content, purl)
@@ -109,20 +143,24 @@ class LlmResolver(Resolver):
         warnings.append(warning)
         logger.warning(
             "llm resolver failed for %s (attempt %d/%d): %s",
-            purl, attempt, self._attempts_count, reason,
+            purl,
+            attempt,
+            self._attempts_count,
+            reason,
         )
         messages.append({"role": "user", "content": _RETRY_FEEDBACK.format(reason=reason)})
 
-    async def _request(self, messages: list[dict[str, str]]) -> str | None:
+    async def _request(self, messages: list[dict[str, str]]) -> tuple[str | None, str | None]:
         try:
             completion = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
             )
-            return completion.choices[0].message.content
+            return completion.choices[0].message.content, None
         except (APIError, httpx.HTTPError) as exc:
-            logger.warning("LLM request failed: %s", exc)
-            return None
+            reason = f"LLM request failed ({type(exc).__name__}: {exc})"
+            logger.warning("%s", reason)
+            return None, reason
 
     def _validate_response(self, content: str | None, purl: str) -> tuple[str | None, str | None]:
         if not content:
@@ -151,14 +189,14 @@ class LlmResolver(Resolver):
         if text.startswith("```"):
             text = text.strip("`")
             if text.startswith("json"):
-                text = text[len("json"):]
+                text = text[len("json") :]
             text = text.strip()
         start = text.find("{")
         end = text.rfind("}")
         if start == -1 or end == -1 or end <= start:
             return None
         try:
-            return json.loads(text[start:end + 1])
+            return json.loads(text[start : end + 1])
         except json.JSONDecodeError:
             return None
 
