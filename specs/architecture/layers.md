@@ -89,6 +89,8 @@
   |  |  LibrariesIoResolver        |                   |
   |  |  ApkResolver                |                   |
   |  |  LlmResolver (last)         |                   |
+  |  |    web_search/web_fetch     |                   |
+  |  |    → SearXNG (HTTP)         |                   |
   |  +----+------------------------+                   |
   |       |                                            |
   |       | Python call                                |
@@ -97,7 +99,8 @@
   |  |     Domain Layer            |                   |
   |  |  (external: purl2repo,      |                   |
   |  |   deps.dev, ecosyste.ms,    |                   |
-  |  |   libraries.io, LLM API)    |                   |
+  |  |   libraries.io, LLM API,    |                   |
+  |  |   SearXNG)                  |                   |
   |  |  resolve(original_purl)     |                   |
   |  +-----------------------------+                   |
 |                                                    |
@@ -265,10 +268,10 @@
 - **SBOM Fix Options Store** (`sbom_fix_options_store.py`) imports `SbomFixOptions` from `sbom/fixer.py` and provides JSON-file persistence only; it is instantiated in `main.py` as `app.state.sbom_fix_options_store`
 - **PURL Utils Layer** is a standalone module — imports only `packageurl-python`, no internal project imports
 - **Storage Layer** is a standalone module — imports only asyncpg, no internal project imports outside `storage/`; exports `UpsertRow` dataclass for typed batch insert, `SourceArchiveRow`, and the `SourceArchiveStorage` ABC with `PostgresSourceArchiveStorage`/`InMemorySourceArchiveStorage` implementations
-- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings) → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `DepsdevResolver` wraps the deps.dev v3 API (maven, npm, golang, pypi, nuget, cargo, gem; no API key). `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages. `LlmResolver` wraps an OpenAI-compatible chat API and is always added last.
-- **Resolver Layer** imports purl2repo, httpx, and `purl_utils`; internal project code does NOT import purl2repo directly
+- **Resolver Layer** (`resolver/`) defines the `Resolver` ABC (with `name` property and `resolve` method), `Resolution` dataclass, resolver-specific exceptions (`InvalidPurlError`, `UpstreamError`), and a `factory.py` module with `build_resolvers(settings, app_settings, searxng_url="http://searxng:8080") → list[Resolver]` that centralizes resolver initialization. `Purl2RepoResolver` wraps the purl2repo library. `DepsdevResolver` wraps the deps.dev v3 API (maven, npm, golang, pypi, nuget, cargo, gem; no API key). `LibrariesIoResolver` wraps the libraries.io REST API with rate limiting and graceful degradation. `ApkResolver` is a local-only fallback for Alpine Linux APK packages. `LlmResolver` wraps an OpenAI-compatible chat API, runs an unconditional tool-calling loop (`web_search` against SearXNG, `web_fetch` with an SSRF guard), receives `searxng_url` and `llm_resolver_max_tool_rounds` from the factory, and is always added last.
+- **Resolver Layer** imports purl2repo, httpx, openai, and `purl_utils`; internal project code does NOT import purl2repo directly
 - **PURL Utils Layer** does NOT depend on any resolver — it is resolver-agnostic
-- **Config Layer** is a standalone module with no internal project imports
+- **Config Layer** is a standalone module with no internal project imports; besides `Settings`/`StorageSettings`/`SbomSettings`, it defines `SearxngSettings` (`SEARXNG_` prefix, `url` default `http://searxng:8080`) exposed as the `searxng_settings` singleton; `main.py` and `routes/settings.py` pass `searxng_settings.url` to `build_resolvers()`
 - **Web UI Layer** (`frontend/`) is a standalone Vue 3 SPA; communicates with the API Layer via HTTP (`fetch` → API endpoints); FastAPI serves the built SPA via `SPAStaticFiles` (custom `StaticFiles` subclass with `index.html` fallback for client-side routing); SPA is mounted after all API routes
 - **API Layer (routes/jobs.py)** imports **Job Manager** (`job_manager.py`) for async SBOM enrichment; job endpoints are available only when PostgreSQL is available
 - **Service Layer** depends on **DbAdminService** (`db_admin_service.py`) for database admin operations that wrap CSV I/O and Storage
@@ -383,11 +386,12 @@
 - `Settings` class uses the `PURL2REPO_` prefix for resolver settings
 - `StorageSettings` class uses the `DB_` prefix for database connection settings (`DB_URL`, etc.)
 - `SbomSettings` class uses the `SBOM_` prefix for SBOM processing (`SBOM_MAX_FILE_SIZE`, default 200 MB)
+- `SearxngSettings` class uses the `SEARXNG_` prefix for the internal search service (`SEARXNG_URL`, default `http://searxng:8080`); exposed as the `searxng_settings` singleton and passed into `build_resolvers()`
 
 ### Settings Store (`settings_store.py`)
-- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, resolver toggles and API keys: librariesio/ecosyste.ms/depsdev/apk/llm, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, batch_max_items, source_archive_timeout, source_archive_concurrency, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
+- JSON-based persistence for application settings (validate_db_urls, validate_sbom_refs, sbom_multiple_vcs_behavior, url_validation_timeout, resolver toggles and API keys: librariesio/ecosyste.ms/depsdev/apk/llm, llm_resolver_max_tool_rounds, retry_max_attempts, retry_base_cooldown_seconds, log_level, ecosystems_max_requests_per_second, batch_semaphore_limit, batch_max_items, source_archive_timeout, source_archive_concurrency, job_ttl_hours, connectivity_url, connectivity_timeout, language, json_indent)
 - `SettingsStore` class with `load() → AppSettings` and `save(settings)` methods
-- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, source_archive_timeout: 1–300, source_archive_concurrency: 1–50, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
+- `AppSettings` Pydantic model with field validation (url_validation_timeout: 1–60, retry_max_attempts: 1–10, llm_resolver_max_tool_rounds: 1–10, retry_base_cooldown_seconds: 0.5–120, batch_semaphore_limit: 1–100, source_archive_timeout: 1–300, source_archive_concurrency: 1–50, job_ttl_hours: 1–720, connectivity_timeout: 1–30)
 - File path from `SETTINGS_FILE` env var (default: `./data/settings.json`)
 - Graceful handling: missing file → create with defaults; corrupt JSON → log warning, return defaults
 
@@ -451,13 +455,13 @@
 
 ### Resolver Layer (`resolver/`)
 - **interface.py** — `Resolver(ABC)` with `name` property (returns resolver identifier string, e.g. `"purl2repo"`, `"depsdev"`, `"libraries.io"`, `"llm"`) and `async resolve(purl) → Resolution`; `Resolution` dataclass with `purl`, `repository_url`, `warnings`
-- **factory.py** — `build_resolvers(settings, app_settings) → list[Resolver]` centralizes resolver initialization; always creates `Purl2RepoResolver` from `Settings`; then conditionally adds `DepsdevResolver` (if `depsdev_enabled`), `EcosystemsResolver` (if `ecosystems_enabled`), `LibrariesIoResolver` (if `librariesio_enabled` and API key present), `ApkResolver` (if `apk_resolver_enabled`), and `LlmResolver` (if `llm_resolver_enabled` and base URL/api key/model are all set — always last; skipped with a warning if configuration is incomplete); used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
+- **factory.py** — `build_resolvers(settings, app_settings, searxng_url="http://searxng:8080") → list[Resolver]` centralizes resolver initialization; always creates `Purl2RepoResolver` from `Settings`; then conditionally adds `DepsdevResolver` (if `depsdev_enabled`), `EcosystemsResolver` (if `ecosystems_enabled`), `LibrariesIoResolver` (if `librariesio_enabled` and API key present), `ApkResolver` (if `apk_resolver_enabled`), and `LlmResolver` (if `llm_resolver_enabled` and base URL/api key/model are all set — always last; receives `searxng_url` and `app_settings.llm_resolver_max_tool_rounds`; skipped with a warning if configuration is incomplete); used by both `main.py` lifespan and `_rebuild_resolvers()` in the API Layer
 - **purl2repo.py** — `Purl2RepoResolver(Resolver)` wrapping purl2repo; `name` returns `"purl2repo"`; async implementation uses `asyncio.to_thread()` to offload synchronous purl2repo calls to a thread pool; `UnsupportedEcosystemError` returns `Resolution(repository_url=None)` with warning (not `InvalidPurlError`); maps `InvalidPurlError` to `InvalidPurlError`; maps `ResolutionError`/`MetadataFetchError` to `UpstreamError`
 - **depsdev.py** — `DepsdevResolver(Resolver)` using the deps.dev v3 API; `name` returns `"depsdev"`; supports maven, npm, golang, pypi, nuget, cargo, gem; no API key required; enabled by default via `depsdev_enabled`; ~1 req/s rate limiting and shared `RetryConfig`; unversioned PURLs resolve against the default (or latest published) version; the SOURCE_REPO link is normalized to an HTTPS URL (strips `scm:` prefixes, converts `git://`/`ssh://`/`git@`, drops `/tree/` segments and trailing `.git`); graceful degradation on errors
 - **librariesio.py** — `LibrariesIoResolver(Resolver)` using libraries.io REST API; `name` returns `"libraries.io"`; async implementation uses `httpx.AsyncClient` and `asyncio.sleep()` for rate limiting; optional, settings-controlled (`librariesio_enabled` + `librariesio_api_key`); maps 16 PURL types to libraries.io platforms; rate-limited (1 req/sec via `asyncio.sleep()`); graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **ecosystems.py** — `EcosystemsResolver(Resolver)` using ecosyste.ms Packages API; `name` returns `"ecosyste.ms"`; async implementation uses `httpx.AsyncClient` with a descriptive `User-Agent` header (`sbom-helper/0.1.0`); enabled by default via settings (`ecosystems_enabled`); no API key required (optional for higher rate limits); configurable rate limiting via `ecosystems_max_requests_per_second` app setting; URL selection prioritizes GitHub URLs; graceful degradation on errors (timeout, HTTP errors, network failures all return `Resolution` with warnings); uses `httpx.AsyncClient` and `purl_utils.validate()` for PURL parsing, now with configurable retry for HTTP 429, timeout, and 5xx
 - **apk.py** — `ApkResolver(Resolver)` for Alpine Linux APK packages; `name` returns `"apk"`; purely local — checks `validate().type == "apk"` and returns constant URL `https://github.com/alpinelinux/aports`; no network calls, no API key; enabled by default via `apk_resolver_enabled` setting
-- **llm.py** — `LlmResolver(Resolver)` using an OpenAI-compatible chat API (`AsyncOpenAI`); `name` returns `"llm"`; optional, settings-controlled (`llm_resolver_enabled` + `llm_resolver_base_url` + `llm_resolver_api_key` + `llm_resolver_model`); always placed last; asks the model for a JSON object (`purl`, `status`, `repository_url`), validates the schema, and verifies the URL with an HTTP HEAD request before accepting; failed attempts (`attempts_count` total) are fed back into the prompt
+- **llm.py** — `LlmResolver(Resolver)` using an OpenAI-compatible chat API (`AsyncOpenAI`); `name` returns `"llm"`; optional, settings-controlled (`llm_resolver_enabled` + `llm_resolver_base_url` + `llm_resolver_api_key` + `llm_resolver_model`); always placed last; passes the `web_search` and `web_fetch` tool definitions on every chat completion and runs a tool-calling loop bounded by `llm_resolver_max_tool_rounds` (1–10, default 3; exhaustion is terminal for the PURL); `web_search` calls the SearXNG JSON API at `searxng_url` (`GET /search?q=...&format=json`, top 5 results); `web_fetch` allows only `http(s)`, resolves every hop's host and rejects private/loopback/link-local/reserved/multicast/unspecified IPs, follows at most 3 manual redirects with per-hop re-checks, caps the body at 512 KiB, and uses a dedicated client with default TLS verification; tool failures are returned to the model as text; the model's final JSON (`purl`, `status`, `repository_url`) is schema-validated and the URL is verified with an HTTP HEAD request before acceptance; failed attempts (`attempts_count` total) are fed back into the prompt
 - **retry.py** — `RetryConfig` dataclass, `RetryableErrorPolicy` (retryable error classification), `RetryHelper` (async retry loop with linear backoff)
 - Exceptions: `ResolverError`, `InvalidPurlError`, `UpstreamError`
 
@@ -470,6 +474,8 @@
 - Storing state in the API Layer (the service is stateless by design)
 - Extending `resolved_purls` with versioned archive rows or columns — source archives use the separate `purl_source_archives` table and `SourceArchiveStorage`
 - Using the GitHub REST API or a GitHub token to list tags — source archive lookup uses `git ls-remote --tags`
+- Publishing the `searxng` port or calling an external search API directly — the LLM resolver searches through the internal SearXNG service only
+- Reusing the LLM client's TLS verification settings (`llm_resolver_verify_ssl`, `llm_resolver_ca_bundle`) for `web_fetch` — arbitrary external pages are fetched with default TLS verification in a separate client
 - Changing the canonical response format without updating contracts/api-contract.md
 - Running outside Docker for production deployment (development-only bare uvicorn)
 
@@ -486,6 +492,8 @@ Multi-stage Dockerfile:
 
 ### Docker Compose
 - `docker-compose.yml` defines app service with `${VAR:-default}` pattern for deployment-specific overrides
+- `docker-compose.yml` also defines a `searxng` service (`searxng/searxng:latest`, volume `./searxng:/etc/searxng:rw`) used by the LLM resolver's `web_search`; it publishes no port, binds `SEARXNG_BASE_URL=http://searxng:8080/`, requires `SEARXNG_SECRET`, and the app waits for it (`depends_on` / `service_started`) and reaches it via `SEARXNG_URL` (default `http://searxng:8080`)
+- `searxng/settings.yml` enables the `json` search format (required for the API) and disables the rate limiter (`server.limiter: false`)
 - `docker-compose.override.yml` (auto-merged by Compose) mounts `./src` for Python hot-reload and `./frontend/dist` so frontend build output is available without rebuilding the image
 - Frontend development: `cd frontend && npm run build -- --watch` for auto-rebuild on changes; the volume mount `./frontend/dist:/app/frontend/dist` in the override picks up rebuilt files without `docker compose up --build`
 - Environment variables are the sole configuration mechanism (twelve-factor app). No `.env` is baked into the image.
@@ -493,6 +501,8 @@ Multi-stage Dockerfile:
 ### Security
 - Production container runs as non-root user (UID 1001)
 - HEALTHCHECK monitors service availability — container marked unhealthy on repeated failure
+- The `searxng` service has no published port and is reachable only on the internal compose network
+- `web_fetch` in the LLM resolver enforces an SSRF boundary: `http(s)` only, resolved-IP blocking of private/reserved ranges on every redirect hop, a 3-hop redirect limit, a 512 KiB body cap, and a 15-second timeout
 
 ### Build Context
 `.dockerignore` excludes `.git`, `.venv`, `__pycache__`, `.pytest_cache`, `.env` files to keep build context minimal. `pyproject.toml`, `src/`, and `frontend/` are copied separately to optimize Docker layer caching. `frontend/node_modules/` is not copied — `npm ci` in the `frontend-build` stage installs dependencies fresh.

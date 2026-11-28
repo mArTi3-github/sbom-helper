@@ -2,7 +2,7 @@
 
 ## Description
 
-Core capability of the system. Accepts one or more Package URL (PURL) strings and returns the corresponding source code repository URLs with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → deps.dev → ecosyste.ms → libraries.io → apk → llm), storing successful results for future lookups. Resolver composition is settings-driven — each resolver after purl2repo can be toggled; the LLM resolver, when enabled, is always last. An optional source archive mode returns a download link for the exact version named in the PURL, using repository git tags and a deterministic version/tag matcher.
+Core capability of the system. Accepts one or more Package URL (PURL) strings and returns the corresponding source code repository URLs with warnings and resolver attribution. Uses a two-tier strategy: first checks PostgreSQL for a cached result, and on cache miss delegates resolution to the resolver chain (purl2repo → deps.dev → ecosyste.ms → libraries.io → apk → llm), storing successful results for future lookups. Resolver composition is settings-driven — each resolver after purl2repo can be toggled; the LLM resolver, when enabled, is always last and performs real web search via tool calls to a bundled SearXNG service. An optional source archive mode returns a download link for the exact version named in the PURL, using repository git tags and a deterministic version/tag matcher.
 
 ## Key Files
 
@@ -17,12 +17,13 @@ Core capability of the system. Accepts one or more Package URL (PURL) strings an
 - `src/purl_resolver/sbom_enrichment.py` — `SbomEnrichmentPipeline` orchestrating the full SBOM enrichment workflow: parse → collect → resolve → enrich → remove → report; used by async jobs (`routes/jobs.py`)
 - `src/purl_resolver/purl_utils/` — PURL validation, normalization, and `safe_normalize()` convenience function
 - `src/purl_resolver/resolver/` — Resolver abstraction (ABC, Resolution, exceptions), purl2repo wrapper, deps.dev wrapper, ecosyste.ms wrapper, libraries.io wrapper, apk wrapper, LLM wrapper, and factory module
-- `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings) → list[Resolver]`: centralizes resolver initialization; always creates Purl2RepoResolver, then conditionally adds DepsdevResolver, EcosystemsResolver, LibrariesIoResolver, ApkResolver, and LlmResolver (always last) based on settings
+- `src/purl_resolver/resolver/factory.py` — `build_resolvers(settings, app_settings, searxng_url="http://searxng:8080") → list[Resolver]`: centralizes resolver initialization; always creates Purl2RepoResolver, then conditionally adds DepsdevResolver, EcosystemsResolver, LibrariesIoResolver, ApkResolver, and LlmResolver (always last) based on settings; passes `searxng_url` and `llm_resolver_max_tool_rounds` to LlmResolver
 - `src/purl_resolver/resolver/depsdev.py` — `DepsdevResolver`: fallback resolver using the deps.dev v3 API; enabled by default (settings-controlled), no API key required; supports: maven, npm, golang, pypi, nuget, cargo, gem; returns the package's SOURCE_REPO link normalized to an HTTPS URL
 - `src/purl_resolver/resolver/ecosystems.py` — `EcosystemsResolver`: fallback resolver using ecosyste.ms Packages API, enabled by default (settings-controlled), no API key required (optional for higher rate limits)
 - `src/purl_resolver/resolver/librariesio.py` — `LibrariesIoResolver`: fallback resolver using libraries.io API, optional (settings-controlled), supports: cargo, composer, conda, cpan, cran, gem, generic, golang, hackage, hex, maven, npm, nuget, pub, pypi, swift
 - `src/purl_resolver/resolver/apk.py` — `ApkResolver`: fallback resolver for Alpine Linux APK packages (`pkg:apk/...`), returns constant URL `https://github.com/alpinelinux/aports`; purely local (no network calls), enabled by default via `apk_resolver_enabled` setting
-- `src/purl_resolver/resolver/llm.py` — `LlmResolver`: last resolver in the chain; asks an OpenAI-compatible LLM (with web search) for the repository URL, validates the JSON response schema and verifies the URL via HTTP HEAD (failed checks are fed back for the next attempt); optional (settings-controlled), always placed last
+- `src/purl_resolver/resolver/llm.py` — `LlmResolver`: last resolver in the chain; asks an OpenAI-compatible LLM for the repository URL using an unconditional tool-calling loop (`web_search` via SearXNG, `web_fetch` with SSRF guard), validates the JSON response schema and verifies the URL via HTTP HEAD (failed checks are fed back for the next attempt); optional (settings-controlled), always placed last
+- `src/purl_resolver/config.py` — `SearxngSettings` (`SEARXNG_` prefix) exposes the internal SearXNG URL (`url`, default `http://searxng:8080`) as the `searxng_settings` singleton; read by `main.py` and `routes/settings.py` when building resolvers
 - `src/purl_resolver/schemas.py` — Request and response data models
 - `src/purl_resolver/storage/` — Storage Layer (interface, postgres, inmemory implementations)
 - `src/purl_resolver/storage/source_archive.py` — `SourceArchiveRow` dataclass and the `SourceArchiveStorage` ABC (`lookup_archive`, `store_archive`), a storage surface separate from `Storage`
@@ -34,7 +35,7 @@ Core capability of the system. Accepts one or more Package URL (PURL) strings an
 - `src/purl_resolver/sbom/enricher.py` — Inserts VCS external references into SBOM components
 - `src/purl_resolver/sbom/remover.py` — Removes unresolved components without subcomponents from SBOM
 - `src/purl_resolver/sbom/reporter.py` — Builds enrichment report with found/not_found/removed counts
-- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, batch_semaphore_limit, batch_max_items, source_archive_timeout, source_archive_concurrency, job_ttl_hours, connectivity settings)
+- `src/purl_resolver/settings_store.py` — JSON-based application settings persistence (validate_db_urls, url_validation_timeout, revalidation_cooldown_hours, resolver toggles, API keys, LLM resolver settings including `llm_resolver_max_tool_rounds`, batch_semaphore_limit, batch_max_items, source_archive_timeout, source_archive_concurrency, job_ttl_hours, connectivity settings)
 - `src/purl_resolver/url_validator.py` — URL validation via HTTP HEAD + multi-VCS probe (`_check_vcs`: git → svn → hg → fossil) with rate limit mitigation; returns `UrlValidationOutput` dataclass capturing the final URL after 3xx redirects
 - `src/purl_resolver/url_validation_cache.py` — `UrlValidationCache`: diskcache-based URL validation result cache with TTL expiry; used by `UrlValidationService`
 - `src/purl_resolver/validation_service.py` — `UrlValidationService`: wraps `validate_url()` with UrlValidationCache; consumed by `PurlResolutionService` and accessed by `SbomEnrichmentPipeline` through `PurlResolutionService.validation_service` property
@@ -230,6 +231,48 @@ Client                    API Layer (router)         Service Layer             p
   |                          | 200 {results: [...]}     |                        |                |                |
   |<-------------------------|--------------------------|                        |                |                |
 ```
+
+## LLM Web Search (tool-calling)
+
+When the LLM resolver is enabled, every `resolve()` call passes the OpenAI Chat Completions `tools` parameter; the model decides what to search and when to fetch a page, and `LlmResolver` executes those calls on the host running sbom-helper.
+
+### Tools
+
+| Tool | Arguments | Result |
+|---|---|---|
+| `web_search` | `query` (string) | Up to 5 results formatted as title / URL / snippet, or `no results` |
+| `web_fetch` | `url` (string) | Visible page text (up to 8000 characters), or a textual error |
+
+`SYSTEM_PROMPT` instructs the model to call `web_search` when it does not know the repository, to call `web_fetch` when a candidate URL is ambiguous, and to return the same JSON object schema as before (`purl`, `status`, `repository_url`). The final JSON schema check and the HTTP HEAD check of the returned URL are unchanged.
+
+### Tool-calling Loop
+
+`_run_with_tools(messages)` makes at most `llm_resolver_max_tool_rounds + 1` model calls:
+
+1. Call the model with `tools=TOOLS` and the accumulated `messages`.
+2. If the assistant message has no `tool_calls`, return its content as the final answer.
+3. Otherwise append the assistant message, execute every tool call in order, and append each result as a `role: "tool"` message with the matching `tool_call_id`.
+4. Repeat until a final answer is produced or the round limit is reached.
+
+Exhausting the round limit is a terminal outcome for that PURL: `resolve()` records an `exceeded max tool rounds` warning and does not run further `attempts_count` attempts. Tool errors (invalid arguments, unknown tool, search or fetch failure) are returned to the model as error strings and never raised.
+
+### `web_search`
+
+- Sends `GET {searxng_url}/search` with `params={"q": query, "format": "json"}` and a 15-second timeout.
+- Rejects an empty query with an error string.
+- Reads `results` from the JSON response and formats the first 5 entries as `title`, `url`, and `content` (snippet).
+- Any HTTP, timeout, or JSON error becomes an error string returned to the model; it does not fail resolution.
+
+### `web_fetch`
+
+- Accepts only `http` and `https` URLs with a non-empty hostname; other schemes return an error string.
+- Resolves the hostname with `socket.getaddrinfo` and rejects the request if **any** resolved address is private, loopback, link-local, reserved, multicast, or unspecified. Hostname resolution failure is treated as forbidden.
+- Follows redirects manually (`follow_redirects=False`) for at most 3 hops; the scheme and IP checks run again on every hop, so a redirect cannot reach a private address.
+- Uses a dedicated `httpx.AsyncClient` with default TLS verification (`verify=True`), separate from the LLM client's `llm_resolver_verify_ssl` / `llm_resolver_ca_bundle` settings, which apply only to the LLM endpoint.
+- Caps the response body at 512 KiB (reading stops at the cap), uses a 15-second request timeout, converts HTML to visible text with the standard library `html.parser`, normalizes whitespace, and returns at most 8000 characters.
+- Every failure (unsupported scheme, forbidden host, too many redirects, HTTP error, timeout, decode error) becomes an error string returned to the model.
+
+SearXNG is an internal compose service and is normally unavailable when the app runs outside Docker. In that case `web_search` returns an error to the model, and the resolver degrades to the model's own knowledge rather than failing.
 
 ## URL Validator
 
@@ -429,6 +472,13 @@ Only deterministic outcomes are cached, including negative ones: `exact`, `near`
 - **Archive storage is best-effort**: any lookup or store failure in `SourceArchiveStorage` is logged and the computed archive result is still returned
 - **Archive concurrency is independent**: `source_archive_concurrency` bounds archive lookups per batch and does not replace `batch_semaphore_limit`
 - **Archive lookups are deduplicated per batch**: inputs that share the versioned cache key and repository URL are resolved once and the result is reused for every matching row
+- **LLM tool-calling is unconditional**: when the LLM resolver is enabled, every chat completion request includes the `web_search` and `web_fetch` tool definitions, regardless of model or settings
+- **LLM tool rounds are bounded and terminal**: a single attempt makes at most `llm_resolver_max_tool_rounds + 1` model calls; exhausting the limit ends resolution for that PURL without further `attempts_count` attempts
+- **LLM tool failures degrade, never raise**: search and fetch errors, invalid tool arguments, and unknown tool names are returned to the model as text; they do not abort resolution or change the API response shape
+- **`web_fetch` enforces an SSRF boundary**: only `http`/`https`, all resolved addresses must be public (private, loopback, link-local, reserved, multicast, and unspecified are rejected), redirects are followed manually for at most 3 hops, and the scheme/IP checks repeat on every hop
+- **`web_fetch` limits apply independently of LLM TLS settings**: it uses its own HTTP client with default TLS verification, a 15-second timeout, a 512 KiB body cap, and at most 8000 characters of extracted text; `llm_resolver_verify_ssl` and `llm_resolver_ca_bundle` affect only the LLM endpoint
+- **SearXNG is an internal dependency**: the app calls `SEARXNG_URL` (default `http://searxng:8080`), a compose service with no published port; if SearXNG is unreachable, `web_search` returns an error to the model and resolution continues instead of failing
+- **LLM resolution still requires a valid final answer**: after tool use, the response must be the expected JSON object with a matching PURL and an `http(s)` `repository_url`, and the URL must pass the HTTP HEAD check
 
 ## Configuration
 
@@ -446,6 +496,7 @@ Only deterministic outcomes are cached, including negative ones: `exact`, `near`
 | `DB_POOL_MAX_SIZE` | `10` | Maximum asyncpg pool connections |
 | `SBOM_MAX_FILE_SIZE` | `209715200` (200 MB) | Maximum uploaded SBOM file size (bytes) |
 | `SETTINGS_FILE` | `./data/settings.json` | Path to JSON settings file |
+| `SEARXNG_URL` | `http://searxng:8080` | Internal SearXNG base URL used by the LLM resolver's `web_search` tool (`SEARXNG_` prefix, `SearxngSettings`) |
 
 ### JSON Settings (`data/settings.json`)
 
@@ -481,6 +532,7 @@ Only deterministic outcomes are cached, including negative ones: `exact`, `near`
 | `llm_resolver_model` | `null` | LLM model name |
 | `llm_resolver_attempts_count` | `2` | Total LLM attempts per PURL (1–10) |
 | `llm_resolver_timeout` | `60` | LLM request timeout in seconds (1–600) |
+| `llm_resolver_max_tool_rounds` | `3` | Maximum tool-calling rounds per LLM attempt (1–10); exhausting it ends resolution for the PURL |
 
 ## Database Schema
 

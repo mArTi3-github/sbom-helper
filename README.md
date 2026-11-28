@@ -38,10 +38,21 @@ A web application and API service for enriching and validating CycloneDX SBOMs w
 ```bash
 git clone https://github.com/mArTi3-github/sbom-helper.git
 cd sbom-helper
+cp .env.example .env
+# Generate a one-time SearXNG secret and store it in .env:
+sed -i "s/^SEARXNG_SECRET=.*/SEARXNG_SECRET=$(openssl rand -hex 32)/" .env
 docker compose up -d
 ```
 
+`docker compose up -d` starts the `app`, `db`, and `searxng` services. `SEARXNG_SECRET` is mandatory — the `searxng` service refuses to start without it; generate it once and keep it in `.env`.
+
 The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
+
+### SearXNG (internal web search)
+
+SearXNG is a bundled compose service that gives the LLM resolver real web search. It has no published port and is reachable only from the internal compose network at `SEARXNG_URL` (default `http://searxng:8080`). Its configuration in `searxng/settings.yml` enables the JSON API and disables the rate limiter, both required for tool calls from the app.
+
+The app reaches SearXNG over that internal URL; no API key or external search service is involved. When the app runs outside Docker (bare `.venv`), SearXNG is normally unavailable, and the LLM resolver degrades to answering from the model's own knowledge while returning a tool error to the model.
 
 ### Viewing logs
 
@@ -81,7 +92,7 @@ The core functionality of sbom-helper revolves around resolving `PURL → reposi
    - **[ecosyste.ms](https://ecosyste.ms/)** — open package registry API (enabled by default)
    - **[libraries.io](https://libraries.io/)** — open source package discovery API (optional, requires API key)
    - **[APK Resolver (Alpine Linux)](https://github.com/alpinelinux/aports)** — fallback for `pkg:apk/...` PURLs, returns the aports repo URL (enabled by default)
-   - **[LLM Resolver]** — optional last-resort resolver: an OpenAI-compatible LLM with web search finds the repository URL (disabled by default)
+   - **[LLM Resolver]** — optional last-resort resolver: an OpenAI-compatible LLM that calls `web_search` (backed by the bundled SearXNG service) and `web_fetch` tools to find and verify the repository URL (disabled by default)
 3. **Validate the found URL** — checks if the URL points to a VCS repository using git, svn, hg (Mercurial), and fossil probes
 4. **Cache and return** — on success, the mapping is stored in the local database and the URL is returned
 
@@ -120,7 +131,7 @@ Each resolver after purl2repo can be enabled or disabled independently in Settin
 - **ecosyste.ms** is enabled by default as a fallback
 - **libraries.io** is optional and requires an API key, configured via Settings
 - **APK resolver** is enabled by default — resolves any `pkg:apk/...` PURL to `https://github.com/alpinelinux/aports` (no API key required)
-- **LLM resolver** is optional and disabled by default; when enabled it is always tried last
+- **LLM resolver** is optional and disabled by default; when enabled it is always tried last and performs real web search through the bundled SearXNG service
 
 ## Settings
 
@@ -134,7 +145,8 @@ Key settings available in the web UI (`/settings`):
 | `Enable APK resolver (Alpine Linux)` | Enabled | Fallback for Alpine Linux APK packages (`pkg:apk/...`). Always returns `https://github.com/alpinelinux/aports`. No API key required. |
 | `Enable libraries.io resolver` + `API key` | Enabled + active key | Enables search across the public libraries.io database. [Get a key](https://libraries.io/account) |
 | `Enable ecosyste.ms resolver` + `API key` | Enabled + active key | Enables search across the public ecosyste.ms database. [Get a key](https://ecosyste.ms/account/api_key) |
-| `Enable LLM resolver` + `Base URL` + `API key` + `Model` | Disabled | Optional last-resort resolver: an OpenAI-compatible LLM with web search finds the repository URL. Requires a compatible endpoint and API key. |
+| `Enable LLM resolver` + `Base URL` + `API key` + `Model` | Disabled | Optional last-resort resolver: an OpenAI-compatible LLM with web search finds the repository URL. Requires a compatible endpoint and API key. The model calls `web_search` through the bundled SearXNG service and `web_fetch` to verify candidate URLs. |
+| `Max search rounds` (LLM resolver) | 3 | Maximum tool-calling rounds per LLM attempt (1–10, default 3). Each round may execute one or more `web_search`/`web_fetch` calls. When the limit is exhausted, the resolver stops retrying that PURL. |
 | `Verify TLS certificate` + `CA bundle path` (LLM resolver) | On + empty | Controls TLS verification of the LLM endpoint. For an internal LLM behind a corporate CA, set `CA bundle path` to a mounted PEM file with the root/intermediate CA. Turning `Verify TLS certificate` off disables verification — use only as a temporary fallback. |
 
 Additional settings (URL validation timeout, retry config, batch concurrency, batch size limit, job TTL, log level, connectivity checks) are available in the Settings UI.
@@ -184,7 +196,7 @@ Manage the local PURL → repository URL mapping database:
 
 **Infrastructure:**
 - Docker + Docker Compose
-- Python 3.12-slim (app), postgres:16-alpine (database), node:20-alpine (frontend build)
+- Python 3.12-slim (app), postgres:16-alpine (database), searxng/searxng (internal web search for the LLM resolver), node:20-alpine (frontend build)
 
 **Testing:**
 - Backend: pytest
@@ -197,6 +209,16 @@ An interactive OpenAPI/Swagger UI is available at `/docs` when the server is run
 ## Security Notes
 
 sbom-helper does **not** implement authentication or access control. Protect the service at the infrastructure level — do not expose it to the internet or untrusted networks.
+
+The LLM resolver's `web_fetch` tool makes outbound requests to URLs proposed by the model, so it enforces a security boundary:
+
+- Only `http` and `https` URLs are fetched.
+- Every hostname is resolved and **all** resulting addresses must be public; private, loopback, link-local, reserved, multicast, and unspecified IP ranges are rejected.
+- Redirects are followed manually (at most 3) and the scheme plus IP checks are re-applied on every hop, so a public URL cannot redirect into a private network.
+- Response bodies are capped at 512 KiB and each request has a 15-second timeout; only visible text (at most 8000 characters) is returned to the model.
+- Fetches use a separate HTTP client with default TLS verification, independent of the LLM endpoint's `Verify TLS certificate` / `CA bundle path` settings.
+
+The `searxng` service is not exposed outside the compose network and has no published port. Its `SEARXNG_SECRET` must be set in `.env`.
 
 ## Planned Features
 
