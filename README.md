@@ -135,8 +135,11 @@ Key settings available in the web UI (`/settings`):
 | `Enable libraries.io resolver` + `API key` | Enabled + active key | Enables search across the public libraries.io database. [Get a key](https://libraries.io/account) |
 | `Enable ecosyste.ms resolver` + `API key` | Enabled + active key | Enables search across the public ecosyste.ms database. [Get a key](https://ecosyste.ms/account/api_key) |
 | `Enable LLM resolver` + `Base URL` + `API key` + `Model` | Disabled | Optional last-resort resolver: an OpenAI-compatible LLM with web search finds the repository URL. Requires a compatible endpoint and API key. |
+| `Verify TLS certificate` + `CA bundle path` (LLM resolver) | On + empty | Controls TLS verification of the LLM endpoint. For an internal LLM behind a corporate CA, set `CA bundle path` to a mounted PEM file with the root/intermediate CA. Turning `Verify TLS certificate` off disables verification — use only as a temporary fallback. |
 
 Additional settings (URL validation timeout, retry config, batch concurrency, batch size limit, job TTL, log level, connectivity checks) are available in the Settings UI.
+
+For an internal LLM endpoint whose certificate is signed by a corporate CA, set the LLM resolver's `CA bundle path` to a mounted PEM file containing the root/intermediate CA; the `Verify TLS certificate` toggle can be turned off only as a temporary fallback.
 
 **Browser-only settings:** language (English/Russian) and UI theme (light/dark) are stored locally per user.
 

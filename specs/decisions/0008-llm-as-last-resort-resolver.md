@@ -7,7 +7,7 @@ Deterministic resolvers (purl2repo, deps.dev, ecosyste.ms, libraries.io, apk) le
 ## Decision
 
 Add `LlmResolver` as the last resolver in the chain, enabled only when the user provides an OpenAI-compatible endpoint configuration:
-- Settings: `llm_resolver_enabled` (default `false`), `llm_resolver_base_url`, `llm_resolver_api_key`, `llm_resolver_model`, `llm_resolver_attempts_count` (default 2), `llm_resolver_timeout` (default 60 s)
+- Settings: `llm_resolver_enabled` (default `false`), `llm_resolver_base_url`, `llm_resolver_api_key`, `llm_resolver_model`, `llm_resolver_attempts_count` (default 2), `llm_resolver_timeout` (default 60 s), `llm_resolver_verify_ssl` (default `true`), `llm_resolver_ca_bundle` (path to a PEM CA bundle, empty by default)
 - The LLM is prompted to return a single JSON object (`purl`, `status`, `repository_url`); the response is validated against this schema
 - Every returned URL is verified with an HTTP HEAD request before being accepted; failed checks are fed back into the prompt for the next attempt
 - If any required configuration is missing, the resolver is omitted from the chain with a warning
@@ -24,3 +24,4 @@ Add `LlmResolver` as the last resolver in the chain, enabled only when the user 
 - Per-PURL latency increases when the LLM is reached (multiple attempts with a configurable timeout)
 - Resolver name `"llm"` stored in DB results distinguishes the resolution source
 - Requires external credentials — the feature is opt-in and disabled by default
+- Outbound TLS trust is configurable: `llm_resolver_ca_bundle` trusts a corporate CA (recommended); `llm_resolver_verify_ssl=false` disables verification as a temporary fallback
