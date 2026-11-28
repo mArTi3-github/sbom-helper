@@ -311,7 +311,10 @@ class LlmResolver(Resolver):
     async def _web_fetch(self, url: str) -> str:
         current = url
         for _ in range(_MAX_REDIRECTS + 1):
-            parsed = urlparse(current)
+            try:
+                parsed = urlparse(current)
+            except ValueError:
+                return f"error: invalid URL '{current}'"
             if parsed.scheme not in ("http", "https") or not parsed.hostname:
                 return f"error: unsupported URL '{current}'"
             if await self._resolves_to_forbidden(parsed.hostname):
@@ -331,6 +334,9 @@ class LlmResolver(Resolver):
                             break
             except httpx.HTTPError as exc:
                 return f"error: fetch failed ({type(exc).__name__}: {exc})"
-            text = _html_to_text(body[:_FETCH_MAX_BYTES].decode(charset, errors="replace"))
+            try:
+                text = _html_to_text(body[:_FETCH_MAX_BYTES].decode(charset, errors="replace"))
+            except (LookupError, UnicodeError) as exc:
+                return f"error: decode failed ({type(exc).__name__}: {exc})"
             return text[:_FETCH_MAX_TEXT]
         return "error: too many redirects"

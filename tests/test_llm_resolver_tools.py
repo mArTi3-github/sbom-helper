@@ -127,3 +127,29 @@ async def test_web_fetch_blocks_redirect_to_private(monkeypatch) -> None:
     resolver._fetch_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     out = await resolver._web_fetch("https://public.example/")
     assert out.startswith("error:")
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_unknown_charset_returns_error(monkeypatch) -> None:
+    resolver = make_resolver()
+    monkeypatch.setattr(
+        "purl_resolver.resolver.llm.socket.getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 0))],
+    )
+    response = httpx.Response(
+        200,
+        text="<p>hi</p>",
+        headers={"Content-Type": "text/html; charset=bogus"},
+    )
+    resolver._fetch_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: response)
+    )
+    out = await resolver._web_fetch("https://public.example/")
+    assert out.startswith("error:")
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_malformed_url_returns_error() -> None:
+    resolver = make_resolver()
+    out = await resolver._web_fetch("http://[::1")
+    assert out.startswith("error:")
