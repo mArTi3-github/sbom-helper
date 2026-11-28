@@ -41,7 +41,7 @@ services:
       - ./searxng:/etc/searxng:rw
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080/
-      - SEARXNG_SECRET=${SEARXNG_SECRET:-}
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-ultrasecretkey}
     restart: unless-stopped
 
   db:

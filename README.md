@@ -45,7 +45,7 @@ sed -i "s/^SEARXNG_SECRET=.*/SEARXNG_SECRET=$(openssl rand -hex 32)/" .env
 docker compose up -d
 ```
 
-`docker compose up -d` starts the `app`, `db`, and `searxng` services. `scripts/update.sh` auto-generates `SEARXNG_SECRET` in `.env` when it is missing or empty. If you start the stack manually with `docker compose`, set a non-empty `SEARXNG_SECRET` first; otherwise the `searxng` service cannot start (the `app` and `db` services still do).
+`docker compose up -d` starts the `app`, `db`, and `searxng` services. `scripts/update.sh` auto-generates `SEARXNG_SECRET` in `.env` when it is missing or empty. If you start the stack manually with `docker compose` and skip that, SearXNG starts with its built-in default key (`ultrasecretkey`); that is fine for this internal, non-exposed service but is not a real secret.
 
 The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
 
