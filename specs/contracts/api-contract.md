@@ -580,6 +580,7 @@ Return current application settings.
 - `llm_resolver_model`: string|null — LLM model name
 - `llm_resolver_attempts_count`: integer — attempts per PURL (1–10, default: `2`)
 - `llm_resolver_timeout`: number — request timeout in seconds (1–600, default: `60`)
+- `llm_resolver_max_tool_rounds`: integer — maximum tool-calling rounds per LLM attempt (1–10, default: `3`)
 - `source_archive_timeout`: number — timeout in seconds for `git ls-remote` and the archive HEAD check (1–300, default: `30.0`)
 - `source_archive_concurrency`: integer — maximum concurrent source archive lookups per batch request (1–50, default: `5`)
 - `token_set.librariesio_api_key`: boolean — whether an API key is configured
@@ -631,6 +632,7 @@ All fields optional. Only provided fields are updated.
 - `llm_resolver_model`: optional string — LLM model name.
 - `llm_resolver_attempts_count`: optional int — attempts per PURL (1–10).
 - `llm_resolver_timeout`: optional float — LLM request timeout in seconds (1–600).
+- `llm_resolver_max_tool_rounds`: optional int|null — maximum tool-calling rounds per LLM attempt (1–10).
 - `source_archive_timeout`: optional float — timeout in seconds for `git ls-remote` and the archive HEAD check (1–300).
 - `source_archive_concurrency`: optional int — maximum concurrent source archive lookups per batch request (1–50).
 
