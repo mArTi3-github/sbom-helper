@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 _API_URL = "https://packages.ecosyste.ms/api/v1/packages/lookup"
 
+_USER_AGENT = "sbom-helper/0.1.0"
+
 _GITHUB_DOMAIN = "github.com"
 _ECOSYSTEMS_REPOS_DOMAIN = "repos.ecosyste.ms"
 
@@ -62,7 +64,9 @@ class EcosystemsResolver(Resolver):
     ) -> None:
         self._api_key = api_key
         self._timeout = timeout
-        self._client = httpx.AsyncClient(timeout=timeout)
+        self._client = httpx.AsyncClient(
+            timeout=timeout, headers={"User-Agent": _USER_AGENT}
+        )
         self._min_interval = 1.0 / max_requests_per_second if max_requests_per_second > 0 else 0
         self._last_request_time = 0.0
         self._retry = RetryHelper(retry_config or RetryConfig())

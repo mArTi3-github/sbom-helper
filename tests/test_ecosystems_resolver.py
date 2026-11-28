@@ -78,6 +78,12 @@ class TestResolverName:
         assert r.name == "ecosyste.ms"
 
 
+class TestUserAgent:
+    def test_client_sends_descriptive_user_agent(self) -> None:
+        r = EcosystemsResolver()
+        assert r._client.headers.get("User-Agent") == "sbom-helper/0.1.0"
+
+
 class TestResolveSuccess:
     @pytest.mark.asyncio
     async def test_successful_resolution(self) -> None:
