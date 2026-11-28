@@ -44,7 +44,7 @@ sed -i "s/^SEARXNG_SECRET=.*/SEARXNG_SECRET=$(openssl rand -hex 32)/" .env
 docker compose up -d
 ```
 
-`docker compose up -d` starts the `app`, `db`, and `searxng` services. `SEARXNG_SECRET` is mandatory — the `searxng` service refuses to start without it; generate it once and keep it in `.env`.
+`docker compose up -d` starts the `app`, `db`, and `searxng` services. `docker compose up` refuses to start without a non-empty `SEARXNG_SECRET` (set it in `.env`); generate it once and keep it in `.env`.
 
 The web UI will be accessible at `https://<ip-address>:8443/` (port 8443 on all network interfaces by default).
 
@@ -213,8 +213,8 @@ sbom-helper does **not** implement authentication or access control. Protect the
 The LLM resolver's `web_fetch` tool makes outbound requests to URLs proposed by the model, so it enforces a security boundary:
 
 - Only `http` and `https` URLs are fetched.
-- Every hostname is resolved and **all** resulting addresses must be public; private, loopback, link-local, reserved, multicast, and unspecified IP ranges are rejected.
-- Redirects are followed manually (at most 3) and the scheme plus IP checks are re-applied on every hop, so a public URL cannot redirect into a private network.
+- Every hostname is resolved and every resolved address is checked on each hop; private, loopback, link-local, reserved, multicast, and unspecified addresses are rejected.
+- Redirects are followed manually (at most 3) and the scheme plus IP checks are re-applied on every hop.
 - Response bodies are capped at 512 KiB and each request has a 15-second timeout; only visible text (at most 8000 characters) is returned to the model.
 - Fetches use a separate HTTP client with default TLS verification, independent of the LLM endpoint's `Verify TLS certificate` / `CA bundle path` settings.
 

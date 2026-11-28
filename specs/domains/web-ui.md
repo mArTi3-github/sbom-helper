@@ -280,7 +280,7 @@ User                   Browser (Vue SPA)             API Layer
 - Deps.dev Resolver card: enable toggle (controls `depsdev_enabled`), no API key required
 - ecosyste.ms Resolver card: enable toggle, optional API key input (for higher rate limits), rate limit input (`ecosystems_max_requests_per_second`, 0.1–100), status badge (set/not set), clear button
 - Libraries.io Resolver card: enable toggle, API key input, status badge (set/not set), clear button, link to libraries.io login
-- LLM Resolver card: enable toggle, OpenAI-compatible base URL, API key (status badge, clear button), model name, attempts count (1–10), timeout (1–600 s); card controls are disabled while the resolver is off
+- LLM Resolver card: enable toggle, OpenAI-compatible base URL, API key (status badge, clear button), model name, attempts count (1–10), maximum search rounds ("Max search rounds", `llm_resolver_max_tool_rounds`, 1–10), timeout (1–600 s); card controls are disabled while the resolver is off
 - Settings are loaded from `GET /api/v1/settings` on page mount
 - Settings are auto-saved to `PATCH /api/v1/settings` on field change (toggle/select/number) or on blur for password inputs; changes are debounced at 500ms
 - Success and error feedback is shown via a single toast in the bottom-right corner of the viewport (3s for success, 5s for error); toast messages are translated via i18n keys
