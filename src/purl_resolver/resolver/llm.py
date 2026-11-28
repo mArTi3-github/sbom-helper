@@ -25,8 +25,9 @@ _TOP_K_RESULTS = 5
 
 SYSTEM_PROMPT = (
     "You are a component resolver for SBOM analysis. Your task is to find the source code "
-    "repository for a package identified by a Package URL (PURL). Use your web-search and "
-    "web-fetch tools to search the web when you do not know the repository offhand.\n"
+    "repository for a package identified by a Package URL (PURL). If you do not know the "
+    "repository offhand, call the web_search tool to search the web; when a candidate URL is "
+    "ambiguous, call the web_fetch tool to verify it.\n"
     "Respond with a single JSON object in exactly the following format:\n"
     '{"purl": "<the PURL you were asked about>", "status": "success|failure", '
     '"repository_url": "<URL of the source code repository or null>"}\n'
@@ -40,10 +41,49 @@ SYSTEM_PROMPT = (
     "- Output nothing but the JSON object."
 )
 
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web. Returns top results (title, url, snippet).",
+            "parameters": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_fetch",
+            "description": "Fetch a web page and return its visible text.",
+            "parameters": {
+                "type": "object",
+                "properties": {"url": {"type": "string"}},
+                "required": ["url"],
+            },
+        },
+    },
+]
+
+_TOOL_ROUNDS_EXHAUSTED = "exceeded max tool rounds"
+
 _RETRY_FEEDBACK = (
     "Your previous answer was rejected because: {reason}. Please try again and return a "
     "valid JSON object in the required format."
 )
+
+
+def _format_request_error(exc: BaseException) -> str:
+    cause = exc.__cause__ or exc.__context__
+    if cause is not None and cause is not exc:
+        return (
+            f"LLM request failed ({type(exc).__name__}: {exc}; "
+            f"caused by {type(cause).__name__}: {cause})"
+        )
+    return f"LLM request failed ({type(exc).__name__}: {exc})"
 
 
 def _build_ssl_verify(verify_ssl: bool, ca_bundle: str | None) -> bool | ssl.SSLContext:
@@ -157,7 +197,7 @@ class LlmResolver(Resolver):
             return Resolution(purl=purl, warnings=[f"Invalid PURL: {e}"])
 
         warnings: list[str] = []
-        messages: list[dict[str, str]] = [
+        messages: list[dict] = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
@@ -170,11 +210,13 @@ class LlmResolver(Resolver):
 
         for attempt in range(1, self._attempts_count + 1):
             logger.info("llm resolving %s (attempt %d/%d)", purl, attempt, self._attempts_count)
-            content, error = await self._request(messages)
+            content, error = await self._run_with_tools(messages)
             if content is None:
                 self._record_failure(
                     warnings, messages, attempt, purl, error or "LLM request failed"
                 )
+                if error == _TOOL_ROUNDS_EXHAUSTED:
+                    break
                 continue
 
             repo_url, error = self._validate_response(content, purl)
@@ -195,7 +237,7 @@ class LlmResolver(Resolver):
     def _record_failure(
         self,
         warnings: list[str],
-        messages: list[dict[str, str]],
+        messages: list[dict],
         attempt: int,
         purl: str,
         reason: str,
@@ -211,24 +253,43 @@ class LlmResolver(Resolver):
         )
         messages.append({"role": "user", "content": _RETRY_FEEDBACK.format(reason=reason)})
 
-    async def _request(self, messages: list[dict[str, str]]) -> tuple[str | None, str | None]:
-        try:
-            completion = await self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-            )
-            return completion.choices[0].message.content, None
-        except (APIError, httpx.HTTPError) as exc:
-            cause = exc.__cause__ or exc.__context__
-            if cause is not None and cause is not exc:
-                reason = (
-                    f"LLM request failed ({type(exc).__name__}: {exc}; "
-                    f"caused by {type(cause).__name__}: {cause})"
+    async def _run_with_tools(self, messages: list[dict]) -> tuple[str | None, str | None]:
+        for _ in range(self._max_tool_rounds + 1):
+            try:
+                completion = await self._client.chat.completions.create(
+                    model=self._model, messages=messages, tools=TOOLS
                 )
-            else:
-                reason = f"LLM request failed ({type(exc).__name__}: {exc})"
-            logger.warning("%s", reason)
-            return None, reason
+            except (APIError, httpx.HTTPError) as exc:
+                reason = _format_request_error(exc)
+                logger.warning("%s", reason)
+                return None, reason
+            message = completion.choices[0].message
+            tool_calls = getattr(message, "tool_calls", None)
+            if not tool_calls:
+                return message.content, None
+            messages.append(message)
+            for call in tool_calls:
+                result = await self._execute_tool(call)
+                messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
+        return None, _TOOL_ROUNDS_EXHAUSTED
+
+    async def _execute_tool(self, call) -> str:
+        name = getattr(call.function, "name", "")
+        try:
+            args = json.loads(call.function.arguments or "{}")
+        except (TypeError, json.JSONDecodeError):
+            return f"error: invalid arguments for {name}"
+        if not isinstance(args, dict):
+            return f"error: invalid arguments for {name}"
+        try:
+            if name == "web_search":
+                return await self._web_search(str(args.get("query", "")))
+            if name == "web_fetch":
+                return await self._web_fetch(str(args.get("url", "")))
+        except Exception as exc:
+            logger.warning("llm tool %s raised %s: %s", name, type(exc).__name__, exc)
+            return f"error: tool {name} failed ({type(exc).__name__}: {exc})"
+        return f"error: unknown tool {name}"
 
     def _validate_response(self, content: str | None, purl: str) -> tuple[str | None, str | None]:
         if not content:

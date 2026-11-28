@@ -40,6 +40,7 @@ ISDO4sIiueAz
 def make_completion(content: str) -> MagicMock:
     message = MagicMock()
     message.content = content
+    message.tool_calls = None
     choice = MagicMock()
     choice.message = message
     completion = MagicMock()
@@ -455,3 +456,72 @@ class TestTlsConfiguration:
         assert result.repository_url is None
         assert any("CERTIFICATE_VERIFY_FAILED" in w for w in result.warnings)
         assert any("ConnectError" in w for w in result.warnings)
+
+
+def make_tool_call_completion(tool_name: str, arguments: str, call_id: str = "call_1") -> MagicMock:
+    call = MagicMock()
+    call.id = call_id
+    call.function.name = tool_name
+    call.function.arguments = arguments
+    message = MagicMock()
+    message.content = None
+    message.tool_calls = [call]
+    choice = MagicMock()
+    choice.message = message
+    completion = MagicMock()
+    completion.choices = [choice]
+    return completion
+
+
+class TestToolCallingLoop:
+    @pytest.mark.asyncio
+    async def test_tools_passed_to_create(self) -> None:
+        resolver, create, _ = make_llm_resolver()
+        set_response(create, [success_json(_PURL)])
+        await resolver.resolve(_PURL)
+        tools = create.await_args.kwargs["tools"]
+        assert {tool["function"]["name"] for tool in tools} == {"web_search", "web_fetch"}
+
+    @pytest.mark.asyncio
+    async def test_tool_call_executed_then_final_answer(self) -> None:
+        resolver, create, _ = make_llm_resolver()
+        resolver._web_search = AsyncMock(return_value="result-text")  # type: ignore
+        create.side_effect = [
+            make_tool_call_completion("web_search", '{"query": "requests repo"}'),
+            make_completion(success_json(_PURL)),
+        ]
+        result = await resolver.resolve(_PURL)
+        assert result.repository_url == "https://github.com/psf/requests"
+        resolver._web_search.assert_awaited_once_with("requests repo")
+        second_messages = create.await_args_list[1].kwargs["messages"]
+        assert any(
+            m.get("role") == "tool" and m.get("content") == "result-text" for m in second_messages
+        )
+
+    @pytest.mark.asyncio
+    async def test_tool_round_exhaustion_is_terminal(self) -> None:
+        resolver, create, _ = make_llm_resolver(attempts_count=3)
+        resolver._web_search = AsyncMock(return_value="x")  # type: ignore
+        create.side_effect = [
+            make_tool_call_completion("web_search", '{"query": "a"}')
+            for _ in range(resolver._max_tool_rounds + 1)
+        ]
+        result = await resolver.resolve(_PURL)
+        assert result.repository_url is None
+        assert any("max tool rounds" in w for w in result.warnings)
+        assert create.await_count == resolver._max_tool_rounds + 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_tool_arguments_return_error_string(self) -> None:
+        resolver, create, _ = make_llm_resolver()
+        create.side_effect = [
+            make_tool_call_completion("web_search", "not-json"),
+            make_completion(success_json(_PURL)),
+        ]
+        result = await resolver.resolve(_PURL)
+        assert result.repository_url == "https://github.com/psf/requests"
+        second_messages = create.await_args_list[1].kwargs["messages"]
+        assert any(
+            m.get("role") == "tool" and str(m.get("content", "")).startswith("error:")
+            for m in second_messages
+        )
