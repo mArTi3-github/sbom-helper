@@ -401,6 +401,8 @@
       "modelDesc": "Model name, e.g. deepseek-v4-flash",
       "attemptsCount": "Attempts count",
       "attemptsCountDesc": "Total number of LLM requests per PURL, including the first one. On a rejected answer (bad JSON, mismatched PURL, invalid or unreachable URL) the model receives feedback and is asked to retry. Default: 2. Range: 1–10.",
+      "maxToolRounds": "Max search rounds",
+      "maxToolRoundsDesc": "Maximum number of web search/fetch tool rounds per LLM attempt before the model must return its final answer. Default: 3. Range: 1–10.",
       "timeout": "Timeout (seconds)",
       "timeoutDesc": "Timeout for each LLM request and HTTP HEAD check (1–600 seconds). Default: 60.",
       "verifySsl": "Verify TLS certificate",

@@ -31,6 +31,7 @@ const defaultSettings: SettingsResponse = {
   llm_resolver_base_url: null,
   llm_resolver_model: null,
   llm_resolver_attempts_count: 2,
+  llm_resolver_max_tool_rounds: 3,
   llm_resolver_timeout: 60,
   llm_resolver_verify_ssl: true,
   llm_resolver_ca_bundle: null,
@@ -217,6 +218,28 @@ describe('Settings.vue', () => {
       await verifyInput.setValue(false)
       await flush(500)
       expect(successUpdate).toHaveBeenCalledWith({ llm_resolver_verify_ssl: false })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('renders and auto-saves LLM max tool rounds', async () => {
+    vi.useFakeTimers()
+    try {
+      const store = useSettingsStore()
+      const wrapper = mountSettings()
+      await flushPromises()
+      store.llmEnabled = true
+      await flushPromises()
+
+      const roundsInput = findNumberInputByLabel(wrapper, 'Max search rounds')
+      expect(roundsInput.element.value).toBe('3')
+
+      await roundsInput.setValue(5)
+      await flush(500)
+
+      expect(successUpdate).toHaveBeenCalledTimes(1)
+      expect(successUpdate).toHaveBeenCalledWith({ llm_resolver_max_tool_rounds: 5 })
     } finally {
       vi.useRealTimers()
     }

@@ -27,6 +27,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const llmBaseUrl = ref('')
   const llmModel = ref('')
   const llmAttemptsCount = ref(2)
+  const llmMaxToolRounds = ref(3)
   const llmTimeout = ref(60)
   const llmVerifySsl = ref(true)
   const llmCaBundle = ref('')
@@ -68,6 +69,7 @@ export const useSettingsStore = defineStore('settings', () => {
       llmBaseUrl.value = data.llm_resolver_base_url ?? ''
       llmModel.value = data.llm_resolver_model ?? ''
       llmAttemptsCount.value = data.llm_resolver_attempts_count
+      llmMaxToolRounds.value = data.llm_resolver_max_tool_rounds
       llmTimeout.value = data.llm_resolver_timeout
       llmVerifySsl.value = data.llm_resolver_verify_ssl
       llmCaBundle.value = data.llm_resolver_ca_bundle ?? ''
@@ -96,7 +98,7 @@ export const useSettingsStore = defineStore('settings', () => {
     retryMaxAttempts, retryBaseCooldownSeconds, logLevel,
     librariesioEnabled, depsdevEnabled, apkEnabled, ecosystemsEnabled, ecosystemsMaxRequestsPerSecond,
     batchSemaphoreLimit, batchMaxItems, jobTtlHours, connectivityUrl, connectivityTimeout, jsonIndent,
-    llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout, llmVerifySsl, llmCaBundle,
+    llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmMaxToolRounds, llmTimeout, llmVerifySsl, llmCaBundle,
     sourceArchiveTimeout, sourceArchiveConcurrency,
     tokenSet, librariesioKey, ecosystemsKey, llmApiKey, loading,
     hasAnyToken, load, save, clearToken,

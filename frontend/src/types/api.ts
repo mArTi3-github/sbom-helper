@@ -69,6 +69,7 @@ export interface SettingsResponse {
   llm_resolver_base_url: string | null
   llm_resolver_model: string | null
   llm_resolver_attempts_count: number
+  llm_resolver_max_tool_rounds: number
   llm_resolver_timeout: number
   llm_resolver_verify_ssl: boolean
   llm_resolver_ca_bundle: string | null
@@ -104,6 +105,7 @@ export interface SettingsUpdate {
   llm_resolver_api_key?: string | null
   llm_resolver_model?: string | null
   llm_resolver_attempts_count?: number
+  llm_resolver_max_tool_rounds?: number
   llm_resolver_timeout?: number
   llm_resolver_verify_ssl?: boolean
   llm_resolver_ca_bundle?: string | null

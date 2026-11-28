@@ -82,6 +82,7 @@ const settingsResponse: SettingsResponse = {
   llm_resolver_base_url: null,
   llm_resolver_model: null,
   llm_resolver_attempts_count: 2,
+  llm_resolver_max_tool_rounds: 3,
   llm_resolver_timeout: 60,
   llm_resolver_verify_ssl: true,
   llm_resolver_ca_bundle: null,

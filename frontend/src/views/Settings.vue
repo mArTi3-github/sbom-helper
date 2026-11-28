@@ -277,6 +277,15 @@
         </div>
         <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
           <div>
+            <div class="setting-label">{{ t('settings.llmResolver.maxToolRounds') }}</div>
+            <div class="setting-desc">
+              {{ t('settings.llmResolver.maxToolRoundsDesc') }}
+            </div>
+          </div>
+          <input type="number" v-model.number="llmMaxToolRounds" :disabled="!llmEnabled" min="1" max="10" @change="debouncedAutoSave({ llm_resolver_max_tool_rounds: llmMaxToolRounds })" class="num-input">
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
             <div class="setting-label">{{ t('settings.llmResolver.timeout') }}</div>
             <div class="setting-desc">
               {{ t('settings.llmResolver.timeoutDesc') }}
@@ -458,7 +467,7 @@ const {
   batchSemaphoreLimit, batchMaxItems, jobTtlHours, connectivityUrl, connectivityTimeout,
   sourceArchiveTimeout, sourceArchiveConcurrency,
   tokenSet, loading, jsonIndent,
-  llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout, llmVerifySsl, llmCaBundle,
+  llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmMaxToolRounds, llmTimeout, llmVerifySsl, llmCaBundle,
 } = storeToRefs(store)
 
 const librariesioKeyInput = ref('')
