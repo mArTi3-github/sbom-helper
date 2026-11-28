@@ -315,6 +315,28 @@ class TestFactory:
         resolvers = build_resolvers(Settings(), app_settings)
         assert resolvers[-1].name == "llm"
 
+    def test_factory_passes_tls_settings(self) -> None:
+        from purl_resolver.config import Settings
+        from purl_resolver.resolver.factory import build_resolvers
+        from purl_resolver.settings_store import AppSettings
+
+        app_settings = AppSettings(
+            ecosystems_enabled=False,
+            librariesio_enabled=False,
+            llm_resolver_enabled=True,
+            llm_resolver_base_url=_BASE_URL,
+            llm_resolver_api_key=_API_KEY,
+            llm_resolver_model=_MODEL,
+            llm_resolver_verify_ssl=False,
+            llm_resolver_ca_bundle="/etc/ssl/corp-ca.pem",
+        )
+        with patch("purl_resolver.resolver.factory.LlmResolver") as llm_cls:
+            llm_cls.return_value.name = "llm"
+            build_resolvers(Settings(), app_settings)
+        kwargs = llm_cls.call_args.kwargs
+        assert kwargs["verify_ssl"] is False
+        assert kwargs["ca_bundle"] == "/etc/ssl/corp-ca.pem"
+
     def test_llm_resolver_not_added_when_disabled(self) -> None:
         from purl_resolver.config import Settings
         from purl_resolver.resolver.factory import build_resolvers

@@ -77,6 +77,8 @@ def build_resolvers(
                     model=app_settings.llm_resolver_model,
                     attempts_count=app_settings.llm_resolver_attempts_count,
                     timeout=app_settings.llm_resolver_timeout,
+                    verify_ssl=app_settings.llm_resolver_verify_ssl,
+                    ca_bundle=app_settings.llm_resolver_ca_bundle,
                 )
             )
             logger.info("LLM resolver added as the last resolver in the chain")
