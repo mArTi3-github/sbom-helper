@@ -284,6 +284,23 @@
           </div>
           <input type="number" v-model.number="llmTimeout" :disabled="!llmEnabled" min="1" max="600" @change="debouncedAutoSave({ llm_resolver_timeout: llmTimeout })" class="num-input">
         </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.verifySsl') }}</div>
+            <div class="setting-desc">{{ t('settings.llmResolver.verifySslDesc') }}</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" v-model="llmVerifySsl" :disabled="!llmEnabled" @change="debouncedAutoSave({ llm_resolver_verify_ssl: llmVerifySsl })">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row" :class="{ 'setting-disabled': !llmEnabled || !llmVerifySsl }">
+          <div>
+            <div class="setting-label">{{ t('settings.llmResolver.caBundle') }}</div>
+            <div class="setting-desc">{{ t('settings.llmResolver.caBundleDesc') }}</div>
+          </div>
+          <input type="text" v-model="llmCaBundle" :disabled="!llmEnabled || !llmVerifySsl" @blur="debouncedAutoSave({ llm_resolver_ca_bundle: llmCaBundle || null })" class="txt-input">
+        </div>
       </div>
 
       <div class="card">
@@ -441,7 +458,7 @@ const {
   batchSemaphoreLimit, batchMaxItems, jobTtlHours, connectivityUrl, connectivityTimeout,
   sourceArchiveTimeout, sourceArchiveConcurrency,
   tokenSet, loading, jsonIndent,
-  llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout,
+  llmEnabled, llmBaseUrl, llmModel, llmAttemptsCount, llmTimeout, llmVerifySsl, llmCaBundle,
 } = storeToRefs(store)
 
 const librariesioKeyInput = ref('')

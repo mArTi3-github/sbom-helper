@@ -70,6 +70,8 @@ export interface SettingsResponse {
   llm_resolver_model: string | null
   llm_resolver_attempts_count: number
   llm_resolver_timeout: number
+  llm_resolver_verify_ssl: boolean
+  llm_resolver_ca_bundle: string | null
   source_archive_timeout: number
   source_archive_concurrency: number
   token_set: SettingsTokenSet
@@ -103,6 +105,8 @@ export interface SettingsUpdate {
   llm_resolver_model?: string | null
   llm_resolver_attempts_count?: number
   llm_resolver_timeout?: number
+  llm_resolver_verify_ssl?: boolean
+  llm_resolver_ca_bundle?: string | null
   source_archive_timeout?: number
   source_archive_concurrency?: number
 }

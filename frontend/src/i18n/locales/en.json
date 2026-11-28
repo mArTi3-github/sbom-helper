@@ -402,7 +402,11 @@
       "attemptsCount": "Attempts count",
       "attemptsCountDesc": "Total number of LLM requests per PURL, including the first one. On a rejected answer (bad JSON, mismatched PURL, invalid or unreachable URL) the model receives feedback and is asked to retry. Default: 2. Range: 1–10.",
       "timeout": "Timeout (seconds)",
-      "timeoutDesc": "Timeout for each LLM request and HTTP HEAD check (1–600 seconds). Default: 60."
+      "timeoutDesc": "Timeout for each LLM request and HTTP HEAD check (1–600 seconds). Default: 60.",
+      "verifySsl": "Verify TLS certificate",
+      "verifySslDesc": "Validate the LLM endpoint's TLS certificate against the trusted CA bundle. Disable only as a temporary measure for internal LLM endpoints behind a self-signed certificate.",
+      "caBundle": "CA bundle path (PEM)",
+      "caBundleDesc": "Filesystem path inside the container to a PEM file with the corporate root/intermediate CA, used when TLS verification is enabled. Leave empty to use the default system CA bundle."
     },
     "ecosystems": {
       "title": "Resolver \"Ecosyste.ms\"",

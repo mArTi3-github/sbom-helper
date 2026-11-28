@@ -32,6 +32,8 @@ const defaultSettings: SettingsResponse = {
   llm_resolver_model: null,
   llm_resolver_attempts_count: 2,
   llm_resolver_timeout: 60,
+  llm_resolver_verify_ssl: true,
+  llm_resolver_ca_bundle: null,
   source_archive_timeout: 30,
   source_archive_concurrency: 5,
   token_set: { librariesio_api_key: false, ecosystems_api_key: false, llm_resolver_api_key: false },
@@ -58,6 +60,12 @@ function findNumberInputByLabel(wrapper: VueWrapper, label: string) {
   const row = wrapper.findAll('.setting-row').find((item) => item.find('.setting-label').exists() && item.find('.setting-label').text() === label)
   expect(row).toBeDefined()
   return row!.find<HTMLInputElement>('input[type="number"]')
+}
+
+function findTextInputByLabel(wrapper: VueWrapper, label: string) {
+  const row = wrapper.findAll('.setting-row').find((item) => item.find('.setting-label').exists() && item.find('.setting-label').text() === label)
+  expect(row).toBeDefined()
+  return row!.find<HTMLInputElement>('input[type="text"]')
 }
 
 describe('Settings.vue', () => {
@@ -180,6 +188,35 @@ describe('Settings.vue', () => {
 
       expect(successUpdate).toHaveBeenCalledTimes(1)
       expect(successUpdate).toHaveBeenCalledWith({ source_archive_concurrency: 8 })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('renders and auto-saves LLM TLS controls', async () => {
+    vi.useFakeTimers()
+    try {
+      const store = useSettingsStore()
+      const wrapper = mountSettings()
+      await flushPromises()
+      store.llmEnabled = true
+      await flushPromises()
+
+      const caInput = findTextInputByLabel(wrapper, 'CA bundle path (PEM)')
+      await caInput.setValue('/etc/ssl/corp-ca.pem')
+      await caInput.trigger('blur')
+      await flush(500)
+      expect(successUpdate).toHaveBeenCalledWith({ llm_resolver_ca_bundle: '/etc/ssl/corp-ca.pem' })
+
+      store.llmEnabled = true
+      await flushPromises()
+
+      const verifyRow = wrapper.findAll('.setting-row').find((r) => r.find('.setting-label').exists() && r.find('.setting-label').text() === 'Verify TLS certificate')
+      expect(verifyRow).toBeDefined()
+      const verifyInput = verifyRow!.find<HTMLInputElement>('input[type="checkbox"]')
+      await verifyInput.setValue(false)
+      await flush(500)
+      expect(successUpdate).toHaveBeenCalledWith({ llm_resolver_verify_ssl: false })
     } finally {
       vi.useRealTimers()
     }
