@@ -56,6 +56,8 @@ class SettingsUpdate(BaseModel):
     llm_resolver_model: str | None = None
     llm_resolver_attempts_count: int | None = Field(None, ge=1, le=10)
     llm_resolver_timeout: float | None = Field(None, ge=1, le=600)
+    llm_resolver_verify_ssl: bool | None = None
+    llm_resolver_ca_bundle: str | None = None
     source_archive_timeout: float | None = Field(None, ge=1, le=300)
     source_archive_concurrency: int | None = Field(None, ge=1, le=50)
 
@@ -105,6 +107,8 @@ async def get_settings(request: Request) -> JSONResponse:
         "llm_resolver_model": app_settings.llm_resolver_model,
         "llm_resolver_attempts_count": app_settings.llm_resolver_attempts_count,
         "llm_resolver_timeout": app_settings.llm_resolver_timeout,
+        "llm_resolver_verify_ssl": app_settings.llm_resolver_verify_ssl,
+        "llm_resolver_ca_bundle": app_settings.llm_resolver_ca_bundle,
         "source_archive_timeout": app_settings.source_archive_timeout,
         "source_archive_concurrency": app_settings.source_archive_concurrency,
         "token_set": {
@@ -173,6 +177,8 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "llm_resolver_model": updated.llm_resolver_model,
         "llm_resolver_attempts_count": updated.llm_resolver_attempts_count,
         "llm_resolver_timeout": updated.llm_resolver_timeout,
+        "llm_resolver_verify_ssl": updated.llm_resolver_verify_ssl,
+        "llm_resolver_ca_bundle": updated.llm_resolver_ca_bundle,
         "source_archive_timeout": updated.source_archive_timeout,
         "source_archive_concurrency": updated.source_archive_concurrency,
         "token_set": {

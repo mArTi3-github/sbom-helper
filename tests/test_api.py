@@ -297,6 +297,25 @@ class TestLibrariesIoSettings:
         assert data["token_set"]["librariesio_api_key"] is False
 
 
+class TestLlmResolverTlsSettings:
+    def test_get_settings_includes_llm_tls_fields(self, client: TestClient) -> None:
+        data = client.get("/api/v1/settings").json()
+        assert data["llm_resolver_verify_ssl"] is True
+        assert data["llm_resolver_ca_bundle"] is None
+        assert "llm_resolver_api_key" not in data
+
+    def test_patch_settings_llm_tls_fields(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        response = client.patch("/api/v1/settings", json={
+            "llm_resolver_verify_ssl": False,
+            "llm_resolver_ca_bundle": "/etc/ssl/corp-ca.pem",
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["llm_resolver_verify_ssl"] is False
+        assert data["llm_resolver_ca_bundle"] == "/etc/ssl/corp-ca.pem"
+
+
 class TestResolverChainRebuild:
     def test_patch_settings_updates_resolution_service_chain(
         self, client: TestClient, tmp_path: Path
