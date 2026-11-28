@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import html.parser
+import ipaddress
 import json
 import logging
+import socket
 import ssl
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from openai import APIError, AsyncOpenAI
@@ -12,6 +15,13 @@ from ..purl_utils import PurlValidationError, validate
 from .interface import Resolution, Resolver
 
 logger = logging.getLogger(__name__)
+
+_SEARCH_TIMEOUT = 15.0
+_FETCH_TIMEOUT = 15.0
+_FETCH_MAX_BYTES = 512 * 1024
+_FETCH_MAX_TEXT = 8000
+_MAX_REDIRECTS = 3
+_TOP_K_RESULTS = 5
 
 SYSTEM_PROMPT = (
     "You are a component resolver for SBOM analysis. Your task is to find the source code "
@@ -55,6 +65,50 @@ def _build_ssl_verify(verify_ssl: bool, ca_bundle: str | None) -> bool | ssl.SSL
     return True
 
 
+class _TextExtractor(html.parser.HTMLParser):
+    _SKIP = {"script", "style", "head", "title"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._skip_depth = 0
+        self._parts: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self._SKIP:
+            self._skip_depth += 1
+        elif tag in {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4"}:
+            self._parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in self._SKIP and self._skip_depth:
+            self._skip_depth -= 1
+
+    def handle_data(self, data):
+        if self._skip_depth == 0:
+            self._parts.append(data)
+
+
+def _html_to_text(raw: str) -> str:
+    parser = _TextExtractor()
+    parser.feed(raw)
+    return " ".join("".join(parser._parts).split())
+
+
+def _is_forbidden_ip(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip.split("%")[0])
+    except ValueError:
+        return True
+    return (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    )
+
+
 class LlmResolver(Resolver):
     def __init__(
         self,
@@ -65,6 +119,8 @@ class LlmResolver(Resolver):
         timeout: float = 60.0,
         verify_ssl: bool = True,
         ca_bundle: str | None = None,
+        searxng_url: str = "http://searxng:8080",
+        max_tool_rounds: int = 3,
     ) -> None:
         self._base_url = base_url
         self._api_key = api_key
@@ -72,6 +128,8 @@ class LlmResolver(Resolver):
         self._attempts_count = attempts_count
         self._timeout = timeout
         self._verify = _build_ssl_verify(verify_ssl, ca_bundle)
+        self._searxng_url = searxng_url.rstrip("/")
+        self._max_tool_rounds = max_tool_rounds
         self._client = AsyncOpenAI(
             base_url=base_url,
             api_key=api_key,
@@ -83,6 +141,9 @@ class LlmResolver(Resolver):
         )
         self._http_client = httpx.AsyncClient(
             verify=self._verify, timeout=timeout, follow_redirects=True
+        )
+        self._fetch_client = httpx.AsyncClient(
+            verify=True, timeout=_FETCH_TIMEOUT, follow_redirects=False
         )
 
     @property
@@ -215,3 +276,61 @@ class LlmResolver(Resolver):
         if response.status_code >= 400:
             return False, f"URL '{url}' returned HTTP {response.status_code}"
         return True, ""
+
+    async def _web_search(self, query: str) -> str:
+        if not query.strip():
+            return "error: empty query"
+        try:
+            response = await self._fetch_client.get(
+                f"{self._searxng_url}/search",
+                params={"q": query, "format": "json"},
+                timeout=_SEARCH_TIMEOUT,
+            )
+            response.raise_for_status()
+            data = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            return f"error: search failed ({type(exc).__name__}: {exc})"
+        results = data.get("results") if isinstance(data, dict) else None
+        if not results:
+            return "no results"
+        lines = []
+        for item in results[:_TOP_K_RESULTS]:
+            title = str(item.get("title") or "").strip()
+            url = str(item.get("url") or "").strip()
+            snippet = str(item.get("content") or "").strip()
+            lines.append(f"- {title}\n  {url}\n  {snippet}")
+        return "\n".join(lines)
+
+    async def _resolves_to_forbidden(self, hostname: str) -> bool:
+        try:
+            infos = socket.getaddrinfo(hostname, None)
+        except socket.gaierror:
+            return True
+        return any(_is_forbidden_ip(info[4][0]) for info in infos)
+
+    async def _web_fetch(self, url: str) -> str:
+        current = url
+        for _ in range(_MAX_REDIRECTS + 1):
+            parsed = urlparse(current)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                return f"error: unsupported URL '{current}'"
+            if await self._resolves_to_forbidden(parsed.hostname):
+                return f"error: forbidden host '{current}'"
+            try:
+                async with self._fetch_client.stream("GET", current) as response:
+                    if response.is_redirect and response.headers.get("location"):
+                        current = urljoin(current, response.headers["location"])
+                        continue
+                    if response.status_code >= 400:
+                        return f"error: HTTP {response.status_code} for '{current}'"
+                    charset = response.charset_encoding or "utf-8"
+                    body = b""
+                    async for chunk in response.aiter_bytes():
+                        body += chunk
+                        if len(body) >= _FETCH_MAX_BYTES:
+                            break
+            except httpx.HTTPError as exc:
+                return f"error: fetch failed ({type(exc).__name__}: {exc})"
+            text = _html_to_text(body[:_FETCH_MAX_BYTES].decode(charset, errors="replace"))
+            return text[:_FETCH_MAX_TEXT]
+        return "error: too many redirects"
