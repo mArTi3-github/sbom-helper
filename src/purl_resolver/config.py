@@ -42,3 +42,16 @@ class SbomSettings(BaseSettings):
 
 
 sbom_settings = SbomSettings()
+
+
+class SearxngSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="SEARXNG_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
+
+    url: str = "http://searxng:8080"
+
+
+searxng_settings = SearxngSettings()

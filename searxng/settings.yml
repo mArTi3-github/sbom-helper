@@ -1,0 +1,9 @@
+use_default_settings: true
+server:
+  limiter: false
+  image_proxy: true
+  bind_address: "0.0.0.0"
+search:
+  formats:
+    - html
+    - json

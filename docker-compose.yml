@@ -12,6 +12,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      searxng:
+        condition: service_started
     ports:
       - "${PORT:-8443}:8443"
     volumes:
@@ -23,12 +25,23 @@ services:
       - PURL2REPO_NO_NETWORK=false
       - DB_URL=postgresql://sbom:${DB_PASSWORD:-sbom}@db:5432/sbom
       - PGSSLMODE=disable
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE; urllib.request.urlopen('https://localhost:8443/health', context=ctx)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: sbom-searxng
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?set SEARXNG_SECRET in .env}
     restart: unless-stopped
 
   db:
