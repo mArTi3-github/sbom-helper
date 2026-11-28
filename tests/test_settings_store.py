@@ -61,6 +61,13 @@ class TestSettingsStoreLoad:
         assert result.validate_db_urls is False
         assert result.url_validation_timeout == 5
 
+    def test_file_null_int_falls_back_to_defaults(
+        self, store: SettingsStore, tmp_settings_file: Path
+    ):
+        tmp_settings_file.write_text(json.dumps({"llm_resolver_max_tool_rounds": None}))
+        result = store.load()
+        assert result.llm_resolver_max_tool_rounds == 3
+
 
 class TestSettingsStoreSave:
     def test_save_and_load_roundtrip(self, store: SettingsStore):

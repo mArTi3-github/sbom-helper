@@ -266,7 +266,7 @@ Exhausting the round limit is a terminal outcome for that PURL: `resolve()` reco
 ### `web_fetch`
 
 - Accepts only `http` and `https` URLs with a non-empty hostname; other schemes return an error string.
-- Resolves the hostname with `socket.getaddrinfo` and rejects the request if **any** resolved address is private, loopback, link-local, reserved, multicast, or unspecified. Hostname resolution failure is treated as forbidden.
+- Resolves the hostname with `socket.getaddrinfo` and rejects the request if **any** resolved address is non-global (including CGNAT/shared, private, loopback, link-local, reserved, multicast, unspecified). Hostname resolution failure or an empty resolution result is treated as forbidden.
 - Follows redirects manually (`follow_redirects=False`) for at most 3 hops; the scheme and IP checks run again on every hop.
 - Uses a dedicated `httpx.AsyncClient` with default TLS verification (`verify=True`), separate from the LLM client's `llm_resolver_verify_ssl` / `llm_resolver_ca_bundle` settings, which apply only to the LLM endpoint.
 - Caps the response body at 512 KiB (reading stops at the cap), uses a 15-second request timeout, converts HTML to visible text with the standard library `html.parser`, normalizes whitespace, and returns at most 8000 characters.
@@ -475,7 +475,7 @@ Only deterministic outcomes are cached, including negative ones: `exact`, `near`
 - **LLM tool-calling is unconditional**: when the LLM resolver is enabled, every chat completion request includes the `web_search` and `web_fetch` tool definitions, regardless of model or settings
 - **LLM tool rounds are bounded and terminal**: a single attempt makes at most `llm_resolver_max_tool_rounds + 1` model calls; exhausting the limit ends resolution for that PURL without further `attempts_count` attempts
 - **LLM tool failures degrade, never raise**: search and fetch errors, invalid tool arguments, and unknown tool names are returned to the model as text; they do not abort resolution or change the API response shape
-- **`web_fetch` enforces an SSRF boundary**: only `http`/`https`; every hostname is resolved on each hop and private, loopback, link-local, reserved, multicast, and unspecified addresses are rejected; redirects are followed manually for at most 3 hops, and the scheme/IP checks repeat on every hop
+- **`web_fetch` enforces an SSRF boundary**: only `http`/`https`; every hostname is resolved on each hop and non-global (including CGNAT/shared, private, loopback, link-local, reserved, multicast, unspecified) addresses are rejected; redirects are followed manually for at most 3 hops, and the scheme/IP checks repeat on every hop
 - **`web_fetch` limits apply independently of LLM TLS settings**: it uses its own HTTP client with default TLS verification, a 15-second timeout, a 512 KiB body cap, and at most 8000 characters of extracted text; `llm_resolver_verify_ssl` and `llm_resolver_ca_bundle` affect only the LLM endpoint
 - **SearXNG is an internal dependency**: the app calls `SEARXNG_URL` (default `http://searxng:8080`), a compose service with no published port; if SearXNG is unreachable, `web_search` returns an error to the model and resolution continues instead of failing
 - **LLM resolution still requires a valid final answer**: after tool use, the response must be the expected JSON object with a matching PURL and an `http(s)` `repository_url`, and the URL must pass the HTTP HEAD check

@@ -223,6 +223,20 @@ describe('Settings.vue', () => {
     }
   })
 
+  it('disables max search rounds when the LLM resolver is off', async () => {
+    const store = useSettingsStore()
+    const wrapper = mountSettings()
+    await flushPromises()
+
+    expect(store.llmEnabled).toBe(false)
+    const roundsInput = findNumberInputByLabel(wrapper, 'Max search rounds')
+    expect(roundsInput.element.disabled).toBe(true)
+
+    store.llmEnabled = true
+    await flushPromises()
+    expect(roundsInput.element.disabled).toBe(false)
+  })
+
   it('renders and auto-saves LLM max tool rounds', async () => {
     vi.useFakeTimers()
     try {

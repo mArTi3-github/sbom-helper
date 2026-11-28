@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 
@@ -8,11 +13,20 @@ def make_resolver() -> LlmResolver:
     return LlmResolver(base_url="https://api.example.com", api_key="k", model="m")
 
 
+def make_tool_call(name: str, arguments: str, call_id: str = "call_1") -> SimpleNamespace:
+    return SimpleNamespace(
+        id=call_id,
+        function=SimpleNamespace(name=name, arguments=arguments),
+    )
+
+
 def test_forbidden_ips() -> None:
     assert _is_forbidden_ip("127.0.0.1") is True
     assert _is_forbidden_ip("10.1.2.3") is True
     assert _is_forbidden_ip("169.254.1.1") is True
     assert _is_forbidden_ip("192.168.0.1") is True
+    assert _is_forbidden_ip("100.64.0.1") is True
+    assert _is_forbidden_ip("100.100.100.200") is True
     assert _is_forbidden_ip("93.184.216.34") is False
 
 
@@ -153,3 +167,52 @@ async def test_web_fetch_malformed_url_returns_error() -> None:
     resolver = make_resolver()
     out = await resolver._web_fetch("http://[::1")
     assert out.startswith("error:")
+
+
+@pytest.mark.asyncio
+async def test_web_search_follows_searxng_redirect() -> None:
+    resolver = make_resolver()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/search":
+            return httpx.Response(302, headers={"location": "https://searxng/search/"})
+        return httpx.Response(200, json={"results": [{"title": "T", "url": "https://a/1"}]})
+
+    resolver._fetch_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    out = await resolver._web_search("x")
+    assert "https://a/1" in out
+
+
+@pytest.mark.asyncio
+async def test_resolves_to_forbidden_empty_dns_fails_closed(monkeypatch) -> None:
+    resolver = make_resolver()
+    monkeypatch.setattr(
+        "purl_resolver.resolver.llm.socket.getaddrinfo",
+        lambda *a, **k: [],
+    )
+    assert await resolver._resolves_to_forbidden("public.example") is True
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_dispatches_web_fetch() -> None:
+    resolver = make_resolver()
+    resolver._web_fetch = AsyncMock(return_value="page-text")  # type: ignore
+    out = await resolver._execute_tool(make_tool_call("web_fetch", '{"url": "https://a/"}'))
+    assert out == "page-text"
+    resolver._web_fetch.assert_awaited_once_with("https://a/")  # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_unknown_name_returns_error() -> None:
+    resolver = make_resolver()
+    out = await resolver._execute_tool(make_tool_call("nope", "{}"))
+    assert out.startswith("error:")
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_malformed_function_returns_error() -> None:
+    resolver = make_resolver()
+    call = SimpleNamespace(id="call_1", function=None)
+    out = await resolver._execute_tool(call)
+    assert out.startswith("error:")
+

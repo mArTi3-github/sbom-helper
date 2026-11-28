@@ -140,6 +140,12 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
                     content={"error": "invalid_token"},
                 )
 
+    if (
+        "llm_resolver_max_tool_rounds" in update_data
+        and update_data["llm_resolver_max_tool_rounds"] is None
+    ):
+        del update_data["llm_resolver_max_tool_rounds"]
+
     if update_data:
         updated = current.model_copy(update=update_data)
         store.save(updated)

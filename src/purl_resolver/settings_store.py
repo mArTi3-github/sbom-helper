@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class SettingsStore:
             data = json.loads(raw)
             self._cached = AppSettings(**data)
             return self._cached
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, ValidationError) as exc:
             logger.warning("Corrupt settings file at %s, using defaults: %s", self._path, exc)
             self._cached = AppSettings()
             return self._cached

@@ -317,7 +317,10 @@ class TestLlmResolverTlsSettings:
 
 
 class TestLlmMaxToolRounds:
-    def test_get_settings_includes_max_tool_rounds(self, client: TestClient) -> None:
+    def test_get_settings_includes_max_tool_rounds(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
         data = client.get("/api/v1/settings").json()
         assert data["llm_resolver_max_tool_rounds"] == 3
 
@@ -326,6 +329,15 @@ class TestLlmMaxToolRounds:
         response = client.patch("/api/v1/settings", json={"llm_resolver_max_tool_rounds": 4})
         assert response.status_code == 200
         assert response.json()["llm_resolver_max_tool_rounds"] == 4
+
+    def test_patch_null_max_tool_rounds_is_noop(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        response = client.patch("/api/v1/settings", json={"llm_resolver_max_tool_rounds": None})
+        assert response.status_code == 200
+        assert response.json()["llm_resolver_max_tool_rounds"] == 3
+        follow_up = client.get("/api/v1/settings")
+        assert follow_up.status_code == 200
+        assert follow_up.json()["llm_resolver_max_tool_rounds"] == 3
 
 
 class TestResolverChainRebuild:

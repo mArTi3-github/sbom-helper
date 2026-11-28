@@ -463,6 +463,24 @@ class TestTlsConfiguration:
         assert kwargs["max_retries"] == 0
         assert "http_client" in kwargs
 
+    def test_fetch_client_is_isolated_and_verifies_tls(self) -> None:
+        with (
+            patch("purl_resolver.resolver.llm.AsyncOpenAI"),
+            patch("purl_resolver.resolver.llm.httpx.AsyncClient") as http_cls,
+        ):
+            http_cls.side_effect = [MagicMock(), MagicMock(), MagicMock()]
+            resolver = LlmResolver(
+                base_url=_BASE_URL,
+                api_key=_API_KEY,
+                model=_MODEL,
+                verify_ssl=False,
+                ca_bundle="/etc/ssl/x.pem",
+            )
+        assert resolver._fetch_client is not resolver._http_client
+        fetch_kwargs = http_cls.call_args_list[2].kwargs
+        assert fetch_kwargs["verify"] is True
+        assert fetch_kwargs["follow_redirects"] is False
+
     @pytest.mark.asyncio
     async def test_connection_error_reason_surfaces_in_warnings(self) -> None:
         resolver, create, _ = make_llm_resolver(attempts_count=1)
@@ -482,6 +500,38 @@ def make_tool_call_completion(tool_name: str, arguments: str, call_id: str = "ca
     call.id = call_id
     call.function.name = tool_name
     call.function.arguments = arguments
+    message = MagicMock()
+    message.content = None
+    message.tool_calls = [call]
+    choice = MagicMock()
+    choice.message = message
+    completion = MagicMock()
+    completion.choices = [choice]
+    return completion
+
+
+def make_multi_tool_call_completion(calls: list[tuple[str, str, str]]) -> MagicMock:
+    tool_calls = []
+    for tool_name, arguments, call_id in calls:
+        call = MagicMock()
+        call.id = call_id
+        call.function.name = tool_name
+        call.function.arguments = arguments
+        tool_calls.append(call)
+    message = MagicMock()
+    message.content = None
+    message.tool_calls = tool_calls
+    choice = MagicMock()
+    choice.message = message
+    completion = MagicMock()
+    completion.choices = [choice]
+    return completion
+
+
+def make_malformed_tool_call_completion(call_id: str = "call_1") -> MagicMock:
+    call = MagicMock()
+    call.id = call_id
+    call.function = None
     message = MagicMock()
     message.content = None
     message.tool_calls = [call]
@@ -516,6 +566,45 @@ class TestToolCallingLoop:
         assert any(
             m.get("role") == "tool" and m.get("content") == "result-text" for m in second_messages
         )
+        assert any(
+            m.get("role") == "tool" and m.get("tool_call_id") == "call_1"
+            for m in second_messages
+        )
+
+    @pytest.mark.asyncio
+    async def test_malformed_tool_call_yields_error_and_loop_continues(self) -> None:
+        resolver, create, _ = make_llm_resolver()
+        create.side_effect = [
+            make_malformed_tool_call_completion(),
+            make_completion(success_json(_PURL)),
+        ]
+        result = await resolver.resolve(_PURL)
+        assert result.repository_url == "https://github.com/psf/requests"
+        second_messages = create.await_args_list[1].kwargs["messages"]
+        tool_messages = [m for m in second_messages if m.get("role") == "tool"]
+        assert len(tool_messages) == 1
+        assert str(tool_messages[0]["content"]).startswith("error:")
+        assert tool_messages[0]["tool_call_id"] == "call_1"
+
+    @pytest.mark.asyncio
+    async def test_multiple_tool_calls_in_one_message(self) -> None:
+        resolver, create, _ = make_llm_resolver()
+        resolver._web_search = AsyncMock(return_value="search-text")  # type: ignore
+        resolver._web_fetch = AsyncMock(return_value="fetch-text")  # type: ignore
+        create.side_effect = [
+            make_multi_tool_call_completion([
+                ("web_search", '{"query": "q"}', "call_1"),
+                ("web_fetch", '{"url": "https://a/"}', "call_2"),
+            ]),
+            make_completion(success_json(_PURL)),
+        ]
+        result = await resolver.resolve(_PURL)
+        assert result.repository_url == "https://github.com/psf/requests"
+        resolver._web_search.assert_awaited_once_with("q")  # type: ignore
+        resolver._web_fetch.assert_awaited_once_with("https://a/")  # type: ignore
+        second_messages = create.await_args_list[1].kwargs["messages"]
+        tool_messages = [m for m in second_messages if m.get("role") == "tool"]
+        assert {m["tool_call_id"] for m in tool_messages} == {"call_1", "call_2"}
 
     @pytest.mark.asyncio
     async def test_tool_round_exhaustion_is_terminal(self) -> None:

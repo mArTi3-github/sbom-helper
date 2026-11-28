@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html.parser
 import ipaddress
 import json
@@ -140,7 +141,8 @@ def _is_forbidden_ip(ip: str) -> bool:
     except ValueError:
         return True
     return (
-        addr.is_private
+        not addr.is_global
+        or addr.is_private
         or addr.is_loopback
         or addr.is_link_local
         or addr.is_reserved
@@ -270,26 +272,29 @@ class LlmResolver(Resolver):
             messages.append(message)
             for call in tool_calls:
                 result = await self._execute_tool(call)
-                messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
+                messages.append(
+                    {"role": "tool", "tool_call_id": getattr(call, "id", ""), "content": result}
+                )
         return None, _TOOL_ROUNDS_EXHAUSTED
 
     async def _execute_tool(self, call) -> str:
-        name = getattr(call.function, "name", "")
+        name = ""
         try:
-            args = json.loads(call.function.arguments or "{}")
-        except (TypeError, json.JSONDecodeError):
-            return f"error: invalid arguments for {name}"
-        if not isinstance(args, dict):
-            return f"error: invalid arguments for {name}"
-        try:
+            name = getattr(call.function, "name", "")
+            try:
+                args = json.loads(call.function.arguments or "{}")
+            except (TypeError, json.JSONDecodeError):
+                return f"error: invalid arguments for {name}"
+            if not isinstance(args, dict):
+                return f"error: invalid arguments for {name}"
             if name == "web_search":
                 return await self._web_search(str(args.get("query", "")))
             if name == "web_fetch":
                 return await self._web_fetch(str(args.get("url", "")))
+            return f"error: unknown tool {name}"
         except Exception as exc:
             logger.warning("llm tool %s raised %s: %s", name, type(exc).__name__, exc)
             return f"error: tool {name} failed ({type(exc).__name__}: {exc})"
-        return f"error: unknown tool {name}"
 
     def _validate_response(self, content: str | None, purl: str) -> tuple[str | None, str | None]:
         if not content:
@@ -346,6 +351,7 @@ class LlmResolver(Resolver):
                 f"{self._searxng_url}/search",
                 params={"q": query, "format": "json"},
                 timeout=_SEARCH_TIMEOUT,
+                follow_redirects=True,
             )
             response.raise_for_status()
             data = response.json()
@@ -364,10 +370,10 @@ class LlmResolver(Resolver):
 
     async def _resolves_to_forbidden(self, hostname: str) -> bool:
         try:
-            infos = socket.getaddrinfo(hostname, None)
-        except socket.gaierror:
+            infos = await asyncio.get_running_loop().getaddrinfo(hostname, None)
+        except (socket.gaierror, OSError):
             return True
-        return any(_is_forbidden_ip(info[4][0]) for info in infos)
+        return not infos or any(_is_forbidden_ip(info[4][0]) for info in infos)
 
     async def _web_fetch(self, url: str) -> str:
         current = url

@@ -54,6 +54,10 @@ SearXNG is a bundled compose service that gives the LLM resolver real web search
 
 The app reaches SearXNG over that internal URL; no API key or external search service is involved. When the app runs outside Docker (bare `.venv`), SearXNG is normally unavailable, and the LLM resolver degrades to answering from the model's own knowledge while returning a tool error to the model.
 
+### Upgrade note
+
+`docker compose up` now requires a non-empty `SEARXNG_SECRET` for all deployments, even when the LLM resolver is disabled, because the `searxng` service is always part of the compose stack. The SearXNG image tag is `searxng/searxng:latest` and is intentionally unpinned; it may change behavior between restarts.
+
 ### Viewing logs
 
 ```bash
@@ -213,7 +217,7 @@ sbom-helper does **not** implement authentication or access control. Protect the
 The LLM resolver's `web_fetch` tool makes outbound requests to URLs proposed by the model, so it enforces a security boundary:
 
 - Only `http` and `https` URLs are fetched.
-- Every hostname is resolved and every resolved address is checked on each hop; private, loopback, link-local, reserved, multicast, and unspecified addresses are rejected.
+- Every hostname is resolved and every resolved address is checked on each hop; non-global (including CGNAT/shared, private, loopback, link-local, reserved, multicast, unspecified) addresses are rejected.
 - Redirects are followed manually (at most 3) and the scheme plus IP checks are re-applied on every hop.
 - Response bodies are capped at 512 KiB and each request has a 15-second timeout; only visible text (at most 8000 characters) is returned to the model.
 - Fetches use a separate HTTP client with default TLS verification, independent of the LLM endpoint's `Verify TLS certificate` / `CA bundle path` settings.
