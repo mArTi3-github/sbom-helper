@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ..config import settings
+from ..config import searxng_settings, settings
 from ..resolver.factory import build_resolvers
 from ..settings_store import SettingsStore
 from ..validation_service import UrlValidationService
@@ -58,6 +58,7 @@ class SettingsUpdate(BaseModel):
     llm_resolver_timeout: float | None = Field(None, ge=1, le=600)
     llm_resolver_verify_ssl: bool | None = None
     llm_resolver_ca_bundle: str | None = None
+    llm_resolver_max_tool_rounds: int | None = Field(None, ge=1, le=10)
     source_archive_timeout: float | None = Field(None, ge=1, le=300)
     source_archive_concurrency: int | None = Field(None, ge=1, le=50)
 
@@ -65,7 +66,7 @@ class SettingsUpdate(BaseModel):
 def _rebuild_resolvers(request: Request) -> None:
     store: SettingsStore = request.app.state.settings_store
     app_settings = store.load()
-    resolvers = build_resolvers(settings, app_settings)
+    resolvers = build_resolvers(settings, app_settings, searxng_settings.url)
     request.app.state.resolvers = resolvers
     service = getattr(request.app.state, "resolution_service", None)
     if service is not None:
@@ -109,6 +110,7 @@ async def get_settings(request: Request) -> JSONResponse:
         "llm_resolver_timeout": app_settings.llm_resolver_timeout,
         "llm_resolver_verify_ssl": app_settings.llm_resolver_verify_ssl,
         "llm_resolver_ca_bundle": app_settings.llm_resolver_ca_bundle,
+        "llm_resolver_max_tool_rounds": app_settings.llm_resolver_max_tool_rounds,
         "source_archive_timeout": app_settings.source_archive_timeout,
         "source_archive_concurrency": app_settings.source_archive_concurrency,
         "token_set": {
@@ -179,6 +181,7 @@ async def update_settings(body: SettingsUpdate, request: Request) -> JSONRespons
         "llm_resolver_timeout": updated.llm_resolver_timeout,
         "llm_resolver_verify_ssl": updated.llm_resolver_verify_ssl,
         "llm_resolver_ca_bundle": updated.llm_resolver_ca_bundle,
+        "llm_resolver_max_tool_rounds": updated.llm_resolver_max_tool_rounds,
         "source_archive_timeout": updated.source_archive_timeout,
         "source_archive_concurrency": updated.source_archive_concurrency,
         "token_set": {

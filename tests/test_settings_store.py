@@ -215,6 +215,14 @@ class TestLlmResolverSettings:
         assert loaded.llm_resolver_ca_bundle == "/etc/ssl/corp-ca.pem"
 
 
+def test_max_tool_rounds_default_and_roundtrip(tmp_path):
+    from purl_resolver.settings_store import AppSettings, SettingsStore
+    store = SettingsStore(tmp_path / "settings.json")
+    assert store.load().llm_resolver_max_tool_rounds == 3
+    store.save(AppSettings(llm_resolver_max_tool_rounds=5))
+    assert SettingsStore(tmp_path / "settings.json").load().llm_resolver_max_tool_rounds == 5
+
+
 class TestSettingsStoreCache:
 
     def test_load_returns_cached_value_after_first_read(

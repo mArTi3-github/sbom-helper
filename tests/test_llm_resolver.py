@@ -299,6 +299,25 @@ class TestLogging:
         assert any("JSON" in m for m in caplog.messages)
 
 
+def test_factory_passes_searxng_and_rounds() -> None:
+    from purl_resolver.config import Settings
+    from purl_resolver.resolver.factory import build_resolvers
+    from purl_resolver.settings_store import AppSettings
+
+    app_settings = AppSettings(
+        ecosystems_enabled=False, librariesio_enabled=False,
+        llm_resolver_enabled=True, llm_resolver_base_url=_BASE_URL,
+        llm_resolver_api_key=_API_KEY, llm_resolver_model=_MODEL,
+        llm_resolver_max_tool_rounds=5,
+    )
+    with patch("purl_resolver.resolver.factory.LlmResolver") as llm_cls:
+        llm_cls.return_value.name = "llm"
+        build_resolvers(Settings(), app_settings, "http://searxng:8080")
+    kwargs = llm_cls.call_args.kwargs
+    assert kwargs["searxng_url"] == "http://searxng:8080"
+    assert kwargs["max_tool_rounds"] == 5
+
+
 class TestFactory:
     def test_llm_resolver_is_last_in_chain(self) -> None:
         from purl_resolver.config import Settings

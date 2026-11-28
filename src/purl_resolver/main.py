@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from starlette.exceptions import HTTPException
 from starlette.staticfiles import StaticFiles
 
-from .config import settings, storage_settings
+from .config import searxng_settings, settings, storage_settings
 from .db_admin_service import DbAdminService
 from .ignore_patterns_store import IgnorePatternsStore
 from .job_manager import JobManager
@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     validation_cache = UrlValidationCache(VALIDATION_CACHE_DIR)
     app.state.validation_cache = validation_cache
 
-    app.state.resolvers = build_resolvers(settings, app_settings)
+    app.state.resolvers = build_resolvers(settings, app_settings, searxng_settings.url)
     app.state.db_admin_service = DbAdminService(app.state.storage)
     app.state.validation_service = UrlValidationService(app.state.settings_store, validation_cache)
     app.state.resolution_service = PurlResolutionService(

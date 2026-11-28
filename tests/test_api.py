@@ -316,6 +316,18 @@ class TestLlmResolverTlsSettings:
         assert data["llm_resolver_ca_bundle"] == "/etc/ssl/corp-ca.pem"
 
 
+class TestLlmMaxToolRounds:
+    def test_get_settings_includes_max_tool_rounds(self, client: TestClient) -> None:
+        data = client.get("/api/v1/settings").json()
+        assert data["llm_resolver_max_tool_rounds"] == 3
+
+    def test_patch_settings_max_tool_rounds(self, client: TestClient, tmp_path: Path) -> None:
+        client.app.state.settings_store = SettingsStore(path=tmp_path / "settings.json")
+        response = client.patch("/api/v1/settings", json={"llm_resolver_max_tool_rounds": 4})
+        assert response.status_code == 200
+        assert response.json()["llm_resolver_max_tool_rounds"] == 4
+
+
 class TestResolverChainRebuild:
     def test_patch_settings_updates_resolution_service_chain(
         self, client: TestClient, tmp_path: Path

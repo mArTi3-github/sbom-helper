@@ -41,6 +41,7 @@ class AppSettings(BaseModel):
     llm_resolver_timeout: float = Field(default=60.0, ge=1, le=600)
     llm_resolver_verify_ssl: bool = True
     llm_resolver_ca_bundle: str | None = None
+    llm_resolver_max_tool_rounds: int = Field(default=3, ge=1, le=10)
     source_archive_timeout: float = Field(default=30.0, ge=1, le=300)
     source_archive_concurrency: int = Field(default=5, ge=1, le=50)
 

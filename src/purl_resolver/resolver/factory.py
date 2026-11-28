@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def build_resolvers(
     settings: Settings,
     app_settings: AppSettings,
+    searxng_url: str = "http://searxng:8080",
 ) -> list[Resolver]:
     resolvers: list[Resolver] = [
         Purl2RepoResolver(
@@ -79,6 +80,8 @@ def build_resolvers(
                     timeout=app_settings.llm_resolver_timeout,
                     verify_ssl=app_settings.llm_resolver_verify_ssl,
                     ca_bundle=app_settings.llm_resolver_ca_bundle,
+                    searxng_url=searxng_url,
+                    max_tool_rounds=app_settings.llm_resolver_max_tool_rounds,
                 )
             )
             logger.info("LLM resolver added as the last resolver in the chain")
